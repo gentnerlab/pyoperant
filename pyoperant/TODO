@@ -1,0 +1,12 @@
+TODO
+- define Box() class w/ the following:
+  DONE * methods for getting list of actual input & output port numbers
+  DONE * methods for reading and writing ports (abstracted from actual numbers)
+
+- define OperantBox(Box) class w/ :
+  * methods for basic operant box functions, e.g. raise hopper, lower hopper, peckcheck
+  DONE * methods for operant tasks, e.g. feed(duration), timeout(duration), playwav
+
+- define FemxBox(Box) class w/ :
+  * methods for checking perching, playing on a certain speaker
+
