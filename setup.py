@@ -12,7 +12,7 @@ setup(
     description = 'hardware interface and controls for operant conditioning in the Gentner Lab',
     long_description = read('README.md'),
     packages = ['pyoperant'],
-    scripts = ['tricks/lights.py','tricks/2ac_seq_decide.py'],
+    scripts = ['tricks/lights.py',],
     requires = ['pyephem'],
     license = "GNU Affero General Public License v3",
     classifiers = [
