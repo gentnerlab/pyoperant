@@ -270,18 +270,21 @@ class OperantBox(Box):
         try:
             if self.read(self.id_IRhopper):
                 raise HopperError(self.box_id,1) # hopper already up
-            tic = time.time()
+            tic = datetime.datetime.now()
             self.write(self.id_hopper, True)
-            while (time.time() - tic) < feedsecs:
+            feed_timedelta = datetime.datetime.now() - tic
+            while feed_timedelta < datetime.timedelta(seconds=feedsecs):
                 for port_id in [1, 2, 3]:
                     if self.read(port_id):
                         raise ResponseDuringFeedError(self.box_id)
-                if (time.time() - tic) > hopper_lag and not self.read(4):
+                if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(4):
                     raise HopperError(self.box_id,2) # hopper not up during feed
+                feed_time = datetime.datetime.now() - tic
             
             self.write(self.id_hopper, False)
-
             wait(hopper_lag) # let the hopper drop
+            toc = datetime.datetime.now()
+
             if self.read(4):
                 raise HopperError(self.box_id,3) # hopper still up after feed
 
@@ -290,7 +293,7 @@ class OperantBox(Box):
         except HopperError as e:
             return e
         else: 
-            return True
+            return (tic, toc)
         finally:
             self.write(self.id_hopper, False)
     
@@ -300,19 +303,19 @@ class OperantBox(Box):
         :param timeoutsecs: Duration of timeout in seconds
         :type  timeoutsecs: float
 
-        :return: success of timeout
-        :rtype: boolean
+        :return: epoch of timeout
+        :rtype: (datetime, datetime)
         """
         try:
-            tic = time.time()
+            tic = datetime.datetime.now()
             self.write(self.id_light, False)
             wait(timeoutsecs)
-            toc = time.time()
+            toc = datetime.datetime.now()
             self.write(self.id_light, True)
         except OperantError as e:
-            return (tic, e)
+            return e
         except Error as e:
-            return (tic, e)
+            return e
         else:
             return (tic, toc)
 
@@ -336,18 +339,22 @@ class OperantBox(Box):
             return False
 
     def flash(self,port_ids=(1,2,3),dur=2.0,isi=0.1):
+        """ flash a set of LEDs """
+
         try:
             prior = [self.write(p) for p in port_ids]
             
-            t0=time.time()
-            while (time.time()-t0)<dur:
+            tic = datetime.datetime.now()
+            while (datetime.datetime.now()-tic) < datetime.timedelta(seconds=dur):
                 for p in port_ids:
                     self.toggle(p)
                 wait(isi)
-
             for i, p in enumerate(port_ids): 
                 self.write(p,prior[i])
-            return True
+
+            toc = datetime.datetime.now()
+            
+            return (tic, toc)
             
         except:
             return False
@@ -365,8 +372,6 @@ class OperantBox(Box):
             no_peck = not self.read(port_id)
         return datetime.datetime.now()
 
-
-
 class RGBcueBox(OperantBox):
     def __init__(self,box_id):
         OperantBox.__init__(self,box_id)
@@ -374,26 +379,4 @@ class RGBcueBox(OperantBox):
         self.id_cueB      = 7
         self.id_cueR      = 8
 
-
-def testbox(box_id):
-    b = OperantBox(box_id)
-    dur = 1.0
-    outs = range(8)
-    for p in outs:
-        b.write(p,0)
-    for p in outs:
-        b.write(p,1)
-        wait(dur)
-    for p in outs:
-        b.write(p,0)
-        wait(dur)
-    for p in outs:
-        b.write(p,1)
-        wait(dur)
-        b.write(p,0)
-    
-    b.lights_on()
-    wait(0.5)
-    b.feed()
-    b.timeout()
 

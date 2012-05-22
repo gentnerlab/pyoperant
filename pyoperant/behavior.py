@@ -27,14 +27,14 @@ def dprime(confusion_matrix):
 
 # accuracy (% correct)
 def acc(confusion_matrix):
-    """Function takes in a 1-D array of expected values and a 1-D array of predictions
+    """Function takes in a NxN confusion matrix
     and returns the fraction of correct predictions"""
     a = confusion_matrix.diagonal().sum() / confusion_matrix.sum()
     return a
 
 # matthew's correlation coefficient
 def mcc(confusion_matrix):
-    """Function takes in a 1-D array of expected values and a 1-D array of predictions
+    """Function takes in a 2x2 confusion matrix
     and returns the Matthew's Correlation Coefficient for the predictions.
     
     MCC = (TP*TN-FP*FN)/sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))
