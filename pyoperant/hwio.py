@@ -279,7 +279,7 @@ class OperantBox(Box):
                         raise ResponseDuringFeedError(self.box_id)
                 if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(4):
                     raise HopperError(self.box_id,2) # hopper not up during feed
-                feed_time = datetime.datetime.now() - tic
+                feed_timedelta = datetime.datetime.now() - tic
             
             self.write(self.id_hopper, False)
             wait(hopper_lag) # let the hopper drop
