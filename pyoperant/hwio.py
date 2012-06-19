@@ -1,30 +1,50 @@
-import time, datetime, subprocess, comedi, socket
+import time, datetime, subprocess, comedi, socket, logging
 
 ## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in thie module'''
-    pass
+    logger = logging.getLogger()
+    log_level = logging.ERROR
+    def __init__(self):
+        self.logger.log(self.log_level, self.log_message())
+    def log_message(self):
+        return 'Exception occured'
 
 class ComediError(Error):
-    '''raised for problems communicating with the comedi driver'''  
-    pass
+    '''raised for problems communicating with the comedi driver''' 
+    log_level = logging.CRITICAL
+    def log_message(self):
+        return 'error with comedi driver'
 
 class OperantError(Error):
     """raised for problems with the operant box"""
-    pass
+    log_level = logging.ERROR
+    def log_message(self):
+        return 'error with operant control'
 
 class ResponseDuringFeedError(Error):
     """raised when subject response during feed, suggesting that hopper may be working improperly"""
+    log_level = logging.ERROR
     def __init__(self,box_id):
         self.box_id = box_id
         self.timestamp = datetime.datetime.now()
+    def log_message(self):
+        return 'bird is responding during a feed'
 
 class HopperError(Error):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
+    log_level = logging.ERROR
     def __init__(self,box_id,value):
         self.box_id = box_id
         self.value = value
         self.timestamp = datetime.datetime.now()
+    def log_message(self):
+        if self.value == 1:
+            return "hopper was already up at start of the feed"
+        elif self.value == 2:
+            return "hopper didn't raise at the start of the feed"
+        elif self.value == 3:
+            return "hopper didn't go down at the end of the feed"
 
 ## some basic parameters for the operant interface on vogel
 # vogel IO map
@@ -38,44 +58,46 @@ class Machine():
               box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
     """
     def __init__(self):
-        self.device = []
-        self.hostname = socket.gethostname()
-        self.box_io = []
-        if self.hostname.find('vogel')>-1:
-            self.name = 'vogel'
-            self.device.append(comedi.comedi_open('/dev/comedi0'))
-            self.box_io= {1:(0,2, 0,2, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                          2:(0,2, 4,2,16),
-                          3:(0,2,24,2,32),
-                          4:(0,2,28,2,40),
-                          5:(0,2,48,2,56),
-                          6:(0,2,52,2,64),
-                          7:(0,2,72,2,80),
-                          8:(0,2,76,2,88),
-                          }
-        elif self.hostname.find('ndege')>-1:
-            self.name = 'ndege'
-            self.device.append(comedi.comedi_open('/dev/comedi0'))
-            self.device.append(comedi.comedi_open('/dev/comedi1'))
-            self.box_io= {1:(0,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                          2:(0,0,4,0,16),
-                          3:(0,1,0,1, 8),
-                          4:(0,1,4,1,16),
-                          5:(0,2,0,2, 8),
-                          6:(0,2,4,2,16),
-                          7:(0,3,0,3, 8),
-                          8:(0,3,4,3,16),
-                          9:(1,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                          10:(1,0,4,0,16),
-                          11:(1,1,0,1, 8),
-                          12:(1,1,4,1,16),
-                          13:(1,2,0,2, 8),
-                          14:(1,2,4,2,16),
-                          15:(1,3,0,3, 8),
-                          16:(1,3,4,3,16),
-                          }
-        else:
-            raise ComediError
+        try:
+            self.device = []
+            self.hostname = socket.gethostname()
+            self.box_io = []
+            if self.hostname.find('vogel')>-1:
+                self.name = 'vogel'
+                self.device.append(comedi.comedi_open('/dev/comedi0'))
+                self.box_io= {1:(0,2, 0,2, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                              2:(0,2, 4,2,16),
+                              3:(0,2,24,2,32),
+                              4:(0,2,28,2,40),
+                              5:(0,2,48,2,56),
+                              6:(0,2,52,2,64),
+                              7:(0,2,72,2,80),
+                              8:(0,2,76,2,88),
+                              }
+            elif self.hostname.find('ndege')>-1:
+                self.name = 'ndege'
+                self.device.append(comedi.comedi_open('/dev/comedi0'))
+                self.device.append(comedi.comedi_open('/dev/comedi1'))
+                self.box_io= {1:(0,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                              2:(0,0,4,0,16),
+                              3:(0,1,0,1, 8),
+                              4:(0,1,4,1,16),
+                              5:(0,2,0,2, 8),
+                              6:(0,2,4,2,16),
+                              7:(0,3,0,3, 8),
+                              8:(0,3,4,3,16),
+                              9:(1,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                              10:(1,0,4,0,16),
+                              11:(1,1,0,1, 8),
+                              12:(1,1,4,1,16),
+                              13:(1,2,0,2, 8),
+                              14:(1,2,4,2,16),
+                              15:(1,3,0,3, 8),
+                              16:(1,3,4,3,16),
+                              }
+            else:
+                raise Error("unknown hostname")
+
 
 ## defining operant functions
 def operant_read(m,box_id,port):
@@ -176,8 +198,13 @@ class Box():
     of an experimental box.
     """
     def __init__(self, box_id):
-        self.box_id = box_id
-        self.m = Machine()
+        try:
+            self.box_id = box_id
+            self.m = Machine()
+        except ComediError:
+            logging.error("Error opening comedi device")
+        except Error:
+            logging.error("Unknown hostname")
 
     def read(self,port_id):
         """Reads value of input port on this box.
