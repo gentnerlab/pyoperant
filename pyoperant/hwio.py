@@ -2,7 +2,7 @@ import time, datetime, subprocess, comedi, socket, logging
 
 ## defining Error classes for operant HW control
 class Error(Exception):
-    '''base class for exceptions in thie module'''
+    '''base class for exceptions in this module'''
     logger = logging.getLogger()
     log_level = logging.ERROR
     def __init__(self):
@@ -25,19 +25,19 @@ class OperantError(Error):
 class ResponseDuringFeedError(Error):
     """raised when subject response during feed, suggesting that hopper may be working improperly"""
     log_level = logging.ERROR
-    def __init__(self,box_id):
-        self.box_id = box_id
-        self.timestamp = datetime.datetime.now()
+    # def __init__(self,box_id):
+    #     self.box_id = box_id
+    #     self.timestamp = datetime.datetime.now()
     def log_message(self):
         return 'bird is responding during a feed'
 
 class HopperError(Error):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
     log_level = logging.ERROR
-    def __init__(self,box_id,value):
-        self.box_id = box_id
-        self.value = value
-        self.timestamp = datetime.datetime.now()
+    # def __init__(self,box_id,value):
+    #     self.box_id = box_id
+    #     self.value = value
+    #     self.timestamp = datetime.datetime.now()
     def log_message(self):
         if self.value == 1:
             return "hopper was already up at start of the feed"
@@ -51,6 +51,8 @@ class HopperError(Error):
 class Machine():
     """Class which holds information about the computer which the code is running on.
 
+    NOTE: "vogel" and "ndege" are the only hostnames this will work for.
+
     Methods:
     hostname -- hostname of computer
     device --  list of C pointers to comedi devices
@@ -58,48 +60,53 @@ class Machine():
               box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
     """
     def __init__(self):
+
+    self.device = []
+    self.hostname = socket.gethostname()
+    self.box_io = []
+    if self.hostname.find('vogel')>-1:
+        self.name = 'vogel'
+        self.box_io= {1:(0,2, 0,2, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                      2:(0,2, 4,2,16),
+                      3:(0,2,24,2,32),
+                      4:(0,2,28,2,40),
+                      5:(0,2,48,2,56),
+                      6:(0,2,52,2,64),
+                      7:(0,2,72,2,80),
+                      8:(0,2,76,2,88),
+                      }
         try:
-            self.device = []
-            self.hostname = socket.gethostname()
-            self.box_io = []
-            if self.hostname.find('vogel')>-1:
-                self.name = 'vogel'
-                self.device.append(comedi.comedi_open('/dev/comedi0'))
-                self.box_io= {1:(0,2, 0,2, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                              2:(0,2, 4,2,16),
-                              3:(0,2,24,2,32),
-                              4:(0,2,28,2,40),
-                              5:(0,2,48,2,56),
-                              6:(0,2,52,2,64),
-                              7:(0,2,72,2,80),
-                              8:(0,2,76,2,88),
-                              }
-            elif self.hostname.find('ndege')>-1:
-                self.name = 'ndege'
-                self.device.append(comedi.comedi_open('/dev/comedi0'))
-                self.device.append(comedi.comedi_open('/dev/comedi1'))
-                self.box_io= {1:(0,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                              2:(0,0,4,0,16),
-                              3:(0,1,0,1, 8),
-                              4:(0,1,4,1,16),
-                              5:(0,2,0,2, 8),
-                              6:(0,2,4,2,16),
-                              7:(0,3,0,3, 8),
-                              8:(0,3,4,3,16),
-                              9:(1,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                              10:(1,0,4,0,16),
-                              11:(1,1,0,1, 8),
-                              12:(1,1,4,1,16),
-                              13:(1,2,0,2, 8),
-                              14:(1,2,4,2,16),
-                              15:(1,3,0,3, 8),
-                              16:(1,3,4,3,16),
-                              }
-            else:
-                raise Error("unknown hostname")
+            self.device.append(comedi.comedi_open('/dev/comedi0'))
+        except:
+            raise ComediError("cannot connect to comedi device on vogel")
+    elif self.hostname.find('ndege')>-1:
+        self.name = 'ndege'
+        self.box_io= {1:(0,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                      2:(0,0,4,0,16),
+                      3:(0,1,0,1, 8),
+                      4:(0,1,4,1,16),
+                      5:(0,2,0,2, 8),
+                      6:(0,2,4,2,16),
+                      7:(0,3,0,3, 8),
+                      8:(0,3,4,3,16),
+                      9:(1,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                      10:(1,0,4,0,16),
+                      11:(1,1,0,1, 8),
+                      12:(1,1,4,1,16),
+                      13:(1,2,0,2, 8),
+                      14:(1,2,4,2,16),
+                      15:(1,3,0,3, 8),
+                      16:(1,3,4,3,16),
+                      }
+        try:
+            self.device.append(comedi.comedi_open('/dev/comedi0'))
+            self.device.append(comedi.comedi_open('/dev/comedi1'))
+        except:
+            raise ComediError("cannot connect to comedi device on ndege")
+    else:
+        raise Error("unknown hostname")
 
 
-## defining operant functions
 def operant_read(m,box_id,port):
     """Read from operant input port.
     
@@ -158,7 +165,7 @@ def play_wav(box_id,filename):
     """
     # takes box_id & filename and returns process object
     alsadevice = 'dac%d' % box_id
-    proc = subprocess.Popen(['aplay','-q', '-D', alsadevice, filename],stdout=subprocess.PIPE)
+    proc = subprocess.Popen(['aplay','-q', '-D', alsadevice, filename],stdout=subprocess.PIPE,stdin=subprocess.PIPE,stderr=subprocess.PIPE)
     return proc
 
 def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
@@ -198,13 +205,8 @@ class Box():
     of an experimental box.
     """
     def __init__(self, box_id):
-        try:
-            self.box_id = box_id
-            self.m = Machine()
-        except ComediError:
-            logging.error("Error opening comedi device")
-        except Error:
-            logging.error("Unknown hostname")
+        self.box_id = box_id
+        self.m = Machine()
 
     def read(self,port_id):
         """Reads value of input port on this box.
@@ -217,7 +219,7 @@ class Box():
         # port_id is the local port number 1-4
         r =  operant_read(self.m,self.box_id,port_id)
         if r < 0 :
-            raise OperantError
+            raise OperantError("error reading from input port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
         return r
 
     def write(self,port_id,val=None):
@@ -232,12 +234,19 @@ class Box():
         """
         r = operant_write(self.m,self.box_id,port_id,val)
         if r < 0 :
-            raise OperantError
+            raise OperantError("error writing to output port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
         return r
 
     def toggle(self,port_id):
         """ Toggles value of output port based on current value"""
-        return self.write(port_id, not self.write(port_id))
+        current_val = self.write(port_id)
+        if current_val > -1:
+            r = self.write(port_id, not current_val)
+            if r < 0 :
+                raise OperantError("error writing to output port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
+            return r
+        else:
+            raise OperantError("error reading from output port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
 
 
 class OperantBox(Box):
@@ -282,10 +291,9 @@ class OperantBox(Box):
         proc.kill() to terminate playback if the subject responded).
         Returns Process object
         """
-        try:
-            return play_wav(self.box_id,soundfname)
-        except:
-            return False
+        
+        return play_wav(self.box_id,soundfname)
+        
         
     def feed(self, feedsecs=2.0, hopper_lag=0.3):
         """Performs a feed for this box.
@@ -293,36 +301,26 @@ class OperantBox(Box):
         arguments:
         feedsecs -- duration of feed in seconds (default: %default)
         """
-        
-        try:
-            if self.read(self.id_IRhopper):
-                raise HopperError(self.box_id,1) # hopper already up
-            tic = datetime.datetime.now()
-            self.write(self.id_hopper, True)
+        if self.read(self.id_IRhopper):
+            raise HopperError(self.box_id,1) # hopper already up
+        tic = datetime.datetime.now()
+        self.write(self.id_hopper, True)
+        feed_timedelta = datetime.datetime.now() - tic
+        while feed_timedelta < datetime.timedelta(seconds=feedsecs):
+            for port_id in [1, 2, 3]:
+                if self.read(port_id):
+                    raise ResponseDuringFeedError(self.box_id)
+            if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(4):
+                raise HopperError(self.box_id,2) # hopper not up during feed
             feed_timedelta = datetime.datetime.now() - tic
-            while feed_timedelta < datetime.timedelta(seconds=feedsecs):
-                for port_id in [1, 2, 3]:
-                    if self.read(port_id):
-                        raise ResponseDuringFeedError(self.box_id)
-                if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(4):
-                    raise HopperError(self.box_id,2) # hopper not up during feed
-                feed_timedelta = datetime.datetime.now() - tic
-            
-            self.write(self.id_hopper, False)
-            wait(hopper_lag) # let the hopper drop
-            toc = datetime.datetime.now()
+        
+        self.write(self.id_hopper, False)
+        wait(hopper_lag) # let the hopper drop
+        toc = datetime.datetime.now()
+        if self.read(4):
+            raise HopperError(self.box_id,3) # hopper still up after feed
 
-            if self.read(4):
-                raise HopperError(self.box_id,3) # hopper still up after feed
-
-        except ResponseDuringFeedError as e:
-            return e
-        except HopperError as e:
-            return e
-        else: 
-            return (tic, toc)
-        finally:
-            self.write(self.id_hopper, False)
+        return (tic, toc)
     
     def timeout(self, timeoutsecs=10):
         """Turns off the light in the box temporarily
@@ -333,18 +331,14 @@ class OperantBox(Box):
         :return: epoch of timeout
         :rtype: (datetime, datetime)
         """
-        try:
-            tic = datetime.datetime.now()
-            self.write(self.id_light, False)
-            wait(timeoutsecs)
-            toc = datetime.datetime.now()
-            self.write(self.id_light, True)
-        except OperantError as e:
-            return e
-        except Error as e:
-            return e
-        else:
-            return (tic, toc)
+        
+        tic = datetime.datetime.now()
+        self.write(self.id_light, False)
+        wait(timeoutsecs)
+        toc = datetime.datetime.now()
+        self.write(self.id_light, True)
+    
+        return (tic, toc)
 
     def lights_on(self,on=True):
         self.write(self.id_light,on)
@@ -354,37 +348,29 @@ class OperantBox(Box):
         self.write(self.id_light,on) 
 
     def LED(self, port_ids=(1,2,3), dur=2.0):
-        try:
-            for p in port_ids:
-                self.write(p,True)
-            wait(dur)
-            for p in port_ids:
-                self.write(p,False)
-            return True
+        for p in port_ids:
+            self.write(p,True)
+        wait(dur)
+        for p in port_ids:
+            self.write(p,False)
+        return True
             
-        except:
-            return False
 
     def flash(self,port_ids=(1,2,3),dur=2.0,isi=0.1):
         """ flash a set of LEDs """
+        prior = [self.write(p) for p in port_ids]
+        
+        tic = datetime.datetime.now()
+        while (datetime.datetime.now()-tic) < datetime.timedelta(seconds=dur):
+            for p in port_ids:
+                self.toggle(p)
+            wait(isi)
+        for i, p in enumerate(port_ids): 
+            self.write(p,prior[i])
 
-        try:
-            prior = [self.write(p) for p in port_ids]
-            
-            tic = datetime.datetime.now()
-            while (datetime.datetime.now()-tic) < datetime.timedelta(seconds=dur):
-                for p in port_ids:
-                    self.toggle(p)
-                wait(isi)
-            for i, p in enumerate(port_ids): 
-                self.write(p,prior[i])
-
-            toc = datetime.datetime.now()
-            
-            return (tic, toc)
-            
-        except:
-            return False
+        toc = datetime.datetime.now()
+        
+        return (tic, toc)
 
     
     def reset(self):
