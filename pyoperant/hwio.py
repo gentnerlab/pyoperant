@@ -60,51 +60,50 @@ class Machine():
               box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
     """
     def __init__(self):
-
-    self.device = []
-    self.hostname = socket.gethostname()
-    self.box_io = []
-    if self.hostname.find('vogel')>-1:
-        self.name = 'vogel'
-        self.box_io= {1:(0,2, 0,2, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                      2:(0,2, 4,2,16),
-                      3:(0,2,24,2,32),
-                      4:(0,2,28,2,40),
-                      5:(0,2,48,2,56),
-                      6:(0,2,52,2,64),
-                      7:(0,2,72,2,80),
-                      8:(0,2,76,2,88),
-                      }
-        try:
-            self.device.append(comedi.comedi_open('/dev/comedi0'))
-        except:
-            raise ComediError("cannot connect to comedi device on vogel")
-    elif self.hostname.find('ndege')>-1:
-        self.name = 'ndege'
-        self.box_io= {1:(0,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                      2:(0,0,4,0,16),
-                      3:(0,1,0,1, 8),
-                      4:(0,1,4,1,16),
-                      5:(0,2,0,2, 8),
-                      6:(0,2,4,2,16),
-                      7:(0,3,0,3, 8),
-                      8:(0,3,4,3,16),
-                      9:(1,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                      10:(1,0,4,0,16),
-                      11:(1,1,0,1, 8),
-                      12:(1,1,4,1,16),
-                      13:(1,2,0,2, 8),
-                      14:(1,2,4,2,16),
-                      15:(1,3,0,3, 8),
-                      16:(1,3,4,3,16),
-                      }
-        try:
-            self.device.append(comedi.comedi_open('/dev/comedi0'))
-            self.device.append(comedi.comedi_open('/dev/comedi1'))
-        except:
-            raise ComediError("cannot connect to comedi device on ndege")
-    else:
-        raise Error("unknown hostname")
+        self.device = []
+        self.hostname = socket.gethostname()
+        self.box_io = []
+        if self.hostname.find('vogel')>-1:
+            self.name = 'vogel'
+            self.box_io= {1:(0,2, 0,2, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                          2:(0,2, 4,2,16),
+                          3:(0,2,24,2,32),
+                          4:(0,2,28,2,40),
+                          5:(0,2,48,2,56),
+                          6:(0,2,52,2,64),
+                          7:(0,2,72,2,80),
+                          8:(0,2,76,2,88),
+                          }
+            try:
+                self.device.append(comedi.comedi_open('/dev/comedi0'))
+            except:
+                raise ComediError("cannot connect to comedi device on vogel")
+        elif self.hostname.find('ndege')>-1:
+            self.name = 'ndege'
+            self.box_io= {1:(0,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                          2:(0,0,4,0,16),
+                          3:(0,1,0,1, 8),
+                          4:(0,1,4,1,16),
+                          5:(0,2,0,2, 8),
+                          6:(0,2,4,2,16),
+                          7:(0,3,0,3, 8),
+                          8:(0,3,4,3,16),
+                          9:(1,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
+                          10:(1,0,4,0,16),
+                          11:(1,1,0,1, 8),
+                          12:(1,1,4,1,16),
+                          13:(1,2,0,2, 8),
+                          14:(1,2,4,2,16),
+                          15:(1,3,0,3, 8),
+                          16:(1,3,4,3,16),
+                          }
+            try:
+                self.device.append(comedi.comedi_open('/dev/comedi0'))
+                self.device.append(comedi.comedi_open('/dev/comedi1'))
+            except:
+                raise ComediError("cannot connect to comedi device on ndege")
+        else:
+            raise Error("unknown hostname")
 
 
 def operant_read(m,box_id,port):
@@ -214,12 +213,12 @@ class Box():
         Keyword arguments:
         port_id -- int of port to query
 
-        Returns boolean value of port
+        Returns boolean value of port or raises OperantError
         """
         # port_id is the local port number 1-4
         r =  operant_read(self.m,self.box_id,port_id)
         if r < 0 :
-            raise OperantError("error reading from input port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
+            raise OperantError("error reading from input port %i on %s box %i" % (port_id, self.m.name, self.box_id))
         return r
 
     def write(self,port_id,val=None):
@@ -230,11 +229,11 @@ class Box():
         val     -- value to assign to port (default=None)
 
         If no value is assigned for val, then current value is returned.
-        Otherwise, returns 1 for successful write or -1 for failure
+        Returns 1 for successful write or raises OperantError
         """
         r = operant_write(self.m,self.box_id,port_id,val)
         if r < 0 :
-            raise OperantError("error writing to output port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
+            raise OperantError("error writing to output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
         return r
 
     def toggle(self,port_id):
@@ -243,10 +242,10 @@ class Box():
         if current_val > -1:
             r = self.write(port_id, not current_val)
             if r < 0 :
-                raise OperantError("error writing to output port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
+                raise OperantError("error writing to output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
             return r
         else:
-            raise OperantError("error reading from output port %i on %s box %i" (self.port_id, self.m.name, self.box_id))
+            raise OperantError("error reading from output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
 
 
 class OperantBox(Box):

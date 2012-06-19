@@ -6,7 +6,7 @@ def read(fname):
 
 setup(
     name = 'pyoperant',
-    version = '0.0.3',
+    version = '0.0.4',
     author = 'Justin Kiggins',
     author_email = 'justin.kiggins@gmail.com',
     description = 'hardware interface and controls for operant conditioning in the Gentner Lab',
