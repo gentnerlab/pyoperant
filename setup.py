@@ -12,8 +12,7 @@ setup(
     description = 'hardware interface and controls for operant conditioning in the Gentner Lab',
     long_description = read('README'),
     packages = ['pyoperant'],
-    scripts = ['tricks',],
-    requires = ['pyephem'],
+    requires = ['pyephem','numpy'],
     license = "GNU Affero General Public License v3",
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
