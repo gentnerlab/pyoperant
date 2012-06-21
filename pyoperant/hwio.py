@@ -301,9 +301,9 @@ class OperantBox(Box):
                     'IR_hopper': 4,
                     }
 
-        self.dio['LED_all'] = (self.dio['LEDleft'],
-                               self.dio['LEDcenter'],
-                               self.dio['LEDright'],
+        self.dio['LED_all'] = (self.dio['LED_left'],
+                               self.dio['LED_center'],
+                               self.dio['LED_right'],
                                )
     
     def play_wav(self, soundfname):
