@@ -53,7 +53,7 @@ def check_time(schedule,fmt="%H:%M"):
     schedule=[('06:00','12:00'),('18:00','24:00')] will have lights on between
 
     """
-    if type(schedule) is str:
+    if (type(schedule) is str) or (type(schedule) is unicode):
         if 'sun' in schedule:
             if is_day():
                 return True
