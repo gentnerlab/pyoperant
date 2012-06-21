@@ -364,7 +364,7 @@ class OperantBox(Box):
         self.write(self.dio['light'], False)
         wait(timeoutsecs)
         toc = datetime.datetime.now()
-        self.write(self.dio['light', True)
+        self.write(self.dio['light'], True)
     
         return (tic, toc)
 
