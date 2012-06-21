@@ -386,6 +386,9 @@ class OperantBox(Box):
 
     def flash(self,port_ids=(1,2,3),dur=2.0,isi=0.1):
         """ flash a set of LEDs """
+        if type(port_ids) is int:
+            port_ids = (port_ids,)
+        
         prior = [self.write(p) for p in port_ids]
         
         tic = datetime.datetime.now()
