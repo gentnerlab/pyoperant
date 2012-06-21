@@ -290,21 +290,21 @@ class OperantBox(Box):
     def __init__(self,box_id):
         Box.__init__(self,box_id)
         # 
-        self.id_LEDleft   = 1
-        self.id_LEDcenter = 2
-        self.id_LEDright  = 3
-        self.id_light     = 4
-        self.id_hopper    = 5
+        self.dio = {'LED_left': 1,
+                    'LED_center': 2,
+                    'LED_right': 3,
+                    'light': 4,
+                    'hopper': 5,
+                    'IR_left': 1,
+                    'IR_center': 2,
+                    'IR_right': 3,
+                    'IR_hopper': 4,
+                    }
 
-        self.id_LEDall = (self.id_LEDleft,
-                          self.id_LEDcenter,
-                          self.id_LEDright,
-                          )
-
-        self.id_IRleft   = 1
-        self.id_IRcenter = 2
-        self.id_IRright  = 3
-        self.id_IRhopper = 4
+        self.dio['LED_all'] = (self.dio['LEDleft'],
+                               self.dio['LEDcenter'],
+                               self.dio['LEDright'],
+                               )
     
     def play_wav(self, soundfname):
         """Plays wave file to this box
@@ -329,23 +329,23 @@ class OperantBox(Box):
         arguments:
         feedsecs -- duration of feed in seconds (default: %default)
         """
-        if self.read(self.id_IRhopper):
-            raise HopperAlreadyUpError(self.box_id,1) # hopper already up
+        if self.read(self.dio['IR_hopper']):
+            raise HopperAlreadyUpError(self.box_id) # hopper already up
         tic = datetime.datetime.now()
-        self.write(self.id_hopper, True)
+        self.write(self.dio['hopper'], True)
         feed_timedelta = datetime.datetime.now() - tic
         while feed_timedelta < datetime.timedelta(seconds=feedsecs):
-            for port_id in [1, 2, 3]:
+            for port_id in (self.dio['IR_left'], self.dio['IR_center'], self.dio['IR_right']):
                 if self.read(port_id):
                     raise ResponseDuringFeedError(self.box_id)
-            if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(4):
-                raise HopperDidntRaiseError(self.box_id,2) # hopper not up during feed
+            if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(self.dio['IR_hopper']):
+                raise HopperDidntRaiseError(self.box_id) # hopper not up during feed
             feed_timedelta = datetime.datetime.now() - tic
         
-        self.write(self.id_hopper, False)
+        self.write(self.dio['hopper'], False)
         wait(hopper_lag) # let the hopper drop
         toc = datetime.datetime.now()
-        if self.read(4):
+        if self.read(self.dio['IR_hopper']):
             raise HopperDidntDropError(self.box_id) # hopper still up after feed
 
         return (tic, toc)
@@ -361,19 +361,19 @@ class OperantBox(Box):
         """
         
         tic = datetime.datetime.now()
-        self.write(self.id_light, False)
+        self.write(self.dio['light'], False)
         wait(timeoutsecs)
         toc = datetime.datetime.now()
-        self.write(self.id_light, True)
+        self.write(self.dio['light', True)
     
         return (tic, toc)
 
     def lights_on(self,on=True):
-        self.write(self.id_light,on)
+        self.write(self.dio['light'],on)
 
     def lights_off(self,off=True):
         on = not off
-        self.write(self.id_light,on) 
+        self.write(self.dio['light'],on) 
 
     def LED(self, port_ids=(1,2,3), dur=2.0):
         for p in port_ids:
@@ -419,8 +419,8 @@ class OperantBox(Box):
 class RGBcueBox(OperantBox):
     def __init__(self,box_id):
         OperantBox.__init__(self,box_id)
-        self.id_cueG      = 6
-        self.id_cueB      = 7
-        self.id_cueR      = 8
+        self.dio['cue_green'] = 6
+        self.dio['cue_blue'] = 7
+        self.dio['cue_red'] = 8
 
 
