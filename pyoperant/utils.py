@@ -53,16 +53,28 @@ def check_time(schedule,fmt="%H:%M"):
     schedule=[('06:00','12:00'),('18:00','24:00')] will have lights on between
 
     """
-    for epoch in schedule:
-        if 'sun' in epoch:
+    if type(schedule) is str:
+        if 'sun' in schedule:
             if is_day():
                 return True
-        else:
-            now_time = dt.datetime.time(dt.datetime.now())
-            on_time = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
-            off_time = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
-            if (now_time > on_time) and (now_time < off_time):
-                return True
+    elif type(schedule) is tuple:
+        now_time = dt.datetime.time(dt.datetime.now())
+        on_time = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
+        off_time = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
+        if (now_time > on_time) and (now_time < off_time):
+            return True
+
+    elif type(schedule) is list:
+        for epoch in schedule:
+            if 'sun' in epoch:
+                if is_day():
+                    return True
+            else:
+                now_time = dt.datetime.time(dt.datetime.now())
+                on_time = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
+                off_time = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
+                if (now_time > on_time) and (now_time < off_time):
+                    return True
     return False
 
 def concat_wav(input_file_list, output_filename='temp_concat.wav'):
