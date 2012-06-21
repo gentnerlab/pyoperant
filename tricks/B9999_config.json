@@ -1,0 +1,64 @@
+{
+	"comments": "json doesn't support comments",
+	"debug": true,
+	"stims": {
+		"a": "JKseqv2_a.wav",
+		"b": "JKseqv2_b.wav",
+		"c": "JKseqv2_c.wav",
+		"d": "JKseqv2_d.wav",
+		"e": "JKseqv2_e.wav",
+		"f": "JKseqv2_f.wav",
+		"g": "JKseqv2_g.wav",
+		"h": "JKseqv2_h.wav"
+		},
+	"stim_map": {
+		"1": "a",
+		"2": "b",
+		"3": "c",
+		"4": "d",
+		"5": "e",
+		"6": "f",
+		"7": "g",
+		"8": "h"
+		},
+	"alpha": 0.93,
+	"diagnostic_transitions": {
+		"L":[
+			[1,2],
+			[2,3],
+			[3,4],
+			[4,5],
+			[5,6],
+			[6,7],
+			[7,8],
+			[8,1]
+			],
+		"R":[
+			[1,8],
+			[2,1],
+			[3,2],
+			[4,3],
+			[5,4],
+			[6,5],
+			[7,6],
+			[8,7]
+			]
+		},
+	"strlen_max": 10,
+	"strlen_min": 10,
+	"isi_mean": 0.100,
+	"isi_stdev": 0.015,
+	"variable_ratio": 1,
+	"feed_dur": { 
+		"L": 3.0,
+		"R": 3.0
+		},
+	"timeout_dur": {
+		"L": 30.0,
+		"R": 30.0
+		},
+	"response_win": 5.0,
+	"punish_non_resp": false,
+	"secondary_reinf": true,
+	"light_schedule": "sun"
+}
