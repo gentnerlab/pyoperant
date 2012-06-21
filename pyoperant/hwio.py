@@ -1,50 +1,79 @@
-import time, datetime, subprocess, comedi, socket, logging
+import time, datetime, subprocess, comedi, socket
 
 ## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in this module'''
-    logger = logging.getLogger()
-    log_level = logging.ERROR
-    def __init__(self):
-        self.logger.log(self.log_level, self.log_message())
-    def log_message(self):
-        return 'Exception occured'
+    pass
 
 class ComediError(Error):
     '''raised for problems communicating with the comedi driver''' 
-    log_level = logging.CRITICAL
-    def log_message(self):
-        return 'error with comedi driver'
+    pass
 
 class OperantError(Error):
     """raised for problems with the operant box"""
-    log_level = logging.ERROR
-    def log_message(self):
-        return 'error with operant control'
+    pass
 
 class ResponseDuringFeedError(Error):
     """raised when subject response during feed, suggesting that hopper may be working improperly"""
-    log_level = logging.ERROR
-    # def __init__(self,box_id):
-    #     self.box_id = box_id
-    #     self.timestamp = datetime.datetime.now()
-    def log_message(self):
-        return 'bird is responding during a feed'
+    pass
 
-class HopperError(Error):
+class HopperAlreadyUpError(Error):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
-    log_level = logging.ERROR
-    # def __init__(self,box_id,value):
-    #     self.box_id = box_id
-    #     self.value = value
-    #     self.timestamp = datetime.datetime.now()
-    def log_message(self):
-        if self.value == 1:
-            return "hopper was already up at start of the feed"
-        elif self.value == 2:
-            return "hopper didn't raise at the start of the feed"
-        elif self.value == 3:
-            return "hopper didn't go down at the end of the feed"
+    pass
+
+class HopperDidntRaiseError(Error):
+    """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
+    pass
+
+class HopperDidntDropError(Error):
+    """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
+    pass
+
+# ## defining Error classes for operant HW control
+# class Error(Exception):
+#     '''base class for exceptions in this module'''
+#     logger = logging.getLogger()
+#     log_level = logging.ERROR
+#     def __init__(self,*args):
+#         self.logger.log(self.log_level, self.log_message())
+#     def log_message(self,*args):
+#         return args[0] if args else 'Exception occured'
+
+# class ComediError(Error):
+#     '''raised for problems communicating with the comedi driver''' 
+#     log_level = logging.CRITICAL
+#     def log_message(self):
+#         return 'error with comedi driver'
+
+# class OperantError(Error):
+#     """raised for problems with the operant box"""
+#     log_level = logging.ERROR
+#     def log_message(self):
+#         return 'error with operant control'
+
+# class ResponseDuringFeedError(Error):
+#     """raised when subject response during feed, suggesting that hopper may be working improperly"""
+#     log_level = logging.ERROR
+#     # def __init__(self,box_id):
+#     #     self.box_id = box_id
+#     #     self.timestamp = datetime.datetime.now()
+#     def log_message(self):
+#         return 'bird is responding during a feed'
+
+# class HopperError(Error):
+#     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
+#     log_level = logging.ERROR
+#     # def __init__(self,box_id,value):
+#     #     self.box_id = box_id
+#     #     self.value = value
+#     #     self.timestamp = datetime.datetime.now()
+#     def log_message(self):
+#         if self.value == 1:
+#             return "hopper was already up at start of the feed"
+#         elif self.value == 2:
+#             return "hopper didn't raise at the start of the feed"
+#         elif self.value == 3:
+#             return "hopper didn't go down at the end of the feed"
 
 ## some basic parameters for the operant interface on vogel
 # vogel IO map
@@ -301,7 +330,7 @@ class OperantBox(Box):
         feedsecs -- duration of feed in seconds (default: %default)
         """
         if self.read(self.id_IRhopper):
-            raise HopperError(self.box_id,1) # hopper already up
+            raise HopperAlreadyUpError(self.box_id,1) # hopper already up
         tic = datetime.datetime.now()
         self.write(self.id_hopper, True)
         feed_timedelta = datetime.datetime.now() - tic
@@ -310,14 +339,14 @@ class OperantBox(Box):
                 if self.read(port_id):
                     raise ResponseDuringFeedError(self.box_id)
             if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(4):
-                raise HopperError(self.box_id,2) # hopper not up during feed
+                raise HopperDidntRaiseError(self.box_id,2) # hopper not up during feed
             feed_timedelta = datetime.datetime.now() - tic
         
         self.write(self.id_hopper, False)
         wait(hopper_lag) # let the hopper drop
         toc = datetime.datetime.now()
         if self.read(4):
-            raise HopperError(self.box_id,3) # hopper still up after feed
+            raise HopperDidntDropError(self.box_id) # hopper still up after feed
 
         return (tic, toc)
     
