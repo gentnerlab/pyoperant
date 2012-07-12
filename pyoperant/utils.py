@@ -1,27 +1,25 @@
 import ephem, wave, sys, struct
 import datetime as dt
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 
-def parse_commandline(args=sys.argv[1:]):
+def parse_commandline(arg_str=sys.argv[1:]):
     """ parse command line arguments
     note: optparse is depreciated w/ v2.7 in favor of argparse
     
     """
-    parser=OptionParser()
-    parser.add_option('-B', '--box',
-                      action='store', type='int', dest='box',
+    parser=ArgumentParser()
+    parser.add_argument('-B', '--box',
+                      action='store', type=int, dest='box',
                       help='(int) box identifier')
-    parser.add_option('-S', '--subject',
-                      action='store', type='string', dest='subj',
-                      help='(string) subject ID and folder name')
-    parser.add_option('-c','--config',
-                      action='store', type='string', dest='config_file', default='config.json',
-                      help='(string) configuration file [default: %default]')
-    parser.set_defaults()
-    (options, args) = parser.parse_args(args)
-    return (options, args)
-
+    parser.add_argument('-S', '--subject',
+                      action='store', type=str, dest='subj',
+                      help='subject ID and folder name')
+    parser.add_argument('-c','--config',
+                      action='store', type=str, dest='config_file', default='config.json',
+                      help='configuration file [default: %(default)s]')
+    args = parser.parse_args(arg_str)
+    return vars(args)
 
 def is_day((latitude, longitude) = ('32.82', '-117.14')):
     """Is it daytime?
@@ -129,6 +127,7 @@ def concat_wav(input_file_list, output_filename='temp_concat.wav'):
 def write_summaryDAT(summary,summaryDAT_fname):
     """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
     with open(summaryDAT_fname,'wb') as f:
+        f.write("Trials this session: %s\n" % summary['trials'])
         f.write("Last trial run @: %s\n" % summary['last_trial_time'])
         f.write("Feeder ops today: %i\n" % summary['feeds'])
         f.write("Hopper failures today: %i\n" % summary['hopper_failures'])
