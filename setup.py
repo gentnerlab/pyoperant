@@ -6,7 +6,7 @@ def read(fname):
 
 setup(
     name = 'pyoperant',
-    version = '0.0.4',
+    version = '0.1.0',
     author = 'Justin Kiggins',
     author_email = 'justin.kiggins@gmail.com',
     description = 'hardware interface and controls for operant conditioning in the Gentner Lab',
@@ -15,7 +15,7 @@ setup(
     requires = ['pyephem','numpy'],
     license = "GNU Affero General Public License v3",
     classifiers = [
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: GNU Affero General Public License v3",
