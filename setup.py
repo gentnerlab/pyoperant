@@ -10,7 +10,7 @@ setup(
     author = 'Justin Kiggins',
     author_email = 'justin.kiggins@gmail.com',
     description = 'hardware interface and controls for operant conditioning in the Gentner Lab',
-    long_description = read('README'),
+    long_description = read('README.md'),
     packages = ['pyoperant'],
     requires = ['pyephem','numpy'],
     license = "GNU Affero General Public License v3",
