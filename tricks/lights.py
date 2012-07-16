@@ -3,7 +3,7 @@
 import os,sys
 import datetime
 from optparse import OptionParser
-from pyoperant import hwio, misc
+from pyoperant import hwio, utils
 
 class Config():
     def __init__(self):
@@ -49,7 +49,7 @@ def run(exp,config):
     
     while do_lights:
         if sun_check:
-            box.lights_on(misc.is_day())
+            box.lights_on(utils.is_day())
         else:
             now_time = datetime.datetime.today().time()
 

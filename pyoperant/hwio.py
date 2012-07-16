@@ -29,54 +29,6 @@ class HopperDidntDropError(Error):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
     pass
 
-# ## defining Error classes for operant HW control
-# class Error(Exception):
-#     '''base class for exceptions in this module'''
-#     logger = logging.getLogger()
-#     log_level = logging.ERROR
-#     def __init__(self,*args):
-#         self.logger.log(self.log_level, self.log_message())
-#     def log_message(self,*args):
-#         return args[0] if args else 'Exception occured'
-
-# class ComediError(Error):
-#     '''raised for problems communicating with the comedi driver''' 
-#     log_level = logging.CRITICAL
-#     def log_message(self):
-#         return 'error with comedi driver'
-
-# class OperantError(Error):
-#     """raised for problems with the operant box"""
-#     log_level = logging.ERROR
-#     def log_message(self):
-#         return 'error with operant control'
-
-# class ResponseDuringFeedError(Error):
-#     """raised when subject response during feed, suggesting that hopper may be working improperly"""
-#     log_level = logging.ERROR
-#     # def __init__(self,box_id):
-#     #     self.box_id = box_id
-#     #     self.timestamp = datetime.datetime.now()
-#     def log_message(self):
-#         return 'bird is responding during a feed'
-
-# class HopperError(Error):
-#     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
-#     log_level = logging.ERROR
-#     # def __init__(self,box_id,value):
-#     #     self.box_id = box_id
-#     #     self.value = value
-#     #     self.timestamp = datetime.datetime.now()
-#     def log_message(self):
-#         if self.value == 1:
-#             return "hopper was already up at start of the feed"
-#         elif self.value == 2:
-#             return "hopper didn't raise at the start of the feed"
-#         elif self.value == 3:
-#             return "hopper didn't go down at the end of the feed"
-
-## some basic parameters for the operant interface on vogel
-# vogel IO map
 class Machine():
     """Class which holds information about the computer which the code is running on.
 
@@ -276,6 +228,10 @@ class Box():
         else:
             raise OperantError("error reading from output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
 
+    def reset(self):
+        ports = range(1,9)
+        for p in ports:
+            self.write(p,False)
 
 class OperantBox(Box):
     """Defines class for an operant box.
@@ -335,9 +291,8 @@ class OperantBox(Box):
         self.write(self.dio['hopper'], True)
         feed_timedelta = datetime.datetime.now() - tic
         while feed_timedelta < datetime.timedelta(seconds=feedsecs):
-            for port_id in (self.dio['IR_left'], self.dio['IR_center'], self.dio['IR_right']):
-                if self.read(port_id):
-                    raise ResponseDuringFeedError(self.box_id)
+            if self.read(port_id):
+                raise ResponseDuringFeedError(self.box_id)
             if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(self.dio['IR_hopper']):
                 raise HopperDidntRaiseError(self.box_id) # hopper not up during feed
             feed_timedelta = datetime.datetime.now() - tic
@@ -402,25 +357,15 @@ class OperantBox(Box):
         toc = datetime.datetime.now()
         
         return (tic, toc)
-
     
-    def reset(self):
-        ports = range(1,9)
-        for p in ports:
-            self.write(p,False)
 
-    def wait_for_peck(self, port_id):
-        """wait for peck and return timestamp after peck"""
-        no_peck = True
-        while no_peck:
-            no_peck = not self.read(port_id)
-        return datetime.datetime.now()
-
-class RGBcueBox(OperantBox):
+class CueBox(OperantBox):
     def __init__(self,box_id):
         OperantBox.__init__(self,box_id)
         self.dio['cue_green'] = 6
         self.dio['cue_blue'] = 7
         self.dio['cue_red'] = 8
 
-
+class PerchChoiceBox(Box):
+    def __init__(self,box_id):
+        Box.__init__(self,box_id)
