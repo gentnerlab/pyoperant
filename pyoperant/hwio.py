@@ -291,7 +291,7 @@ class OperantBox(Box):
         self.write(self.dio['hopper'], True)
         feed_timedelta = datetime.datetime.now() - tic
         while feed_timedelta < datetime.timedelta(seconds=feedsecs):
-            if self.read(port_id):
+            if self.read(self.dio['LED_center']):
                 raise ResponseDuringFeedError(self.box_id)
             if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(self.dio['IR_hopper']):
                 raise HopperDidntRaiseError(self.box_id) # hopper not up during feed
