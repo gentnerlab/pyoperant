@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import norm
+from matplotlib import mlab
 
 # d-prime
 def dprime(confusion_matrix):
@@ -52,7 +53,6 @@ def mcc(confusion_matrix):
         a = (true_pos*true_neg-false_pos*false_neg)/np.sqrt((true_pos+false_pos)*(true_pos+false_neg)*(true_neg+false_pos)*(true_neg+false_neg))
         return a
 
-        # create a confusion matrix
 def create_conf_matrix(expected, predicted):
     """
     Function takes in a 1-D array of expected values and a 1-D array of predictions
@@ -74,7 +74,7 @@ def create_conf_matrix(expected, predicted):
         m[exp,pred] += 1
     return m
 
-class ConfusionMatrix:
+class ConfusionMatrix():
     def __init__(self, expected, predicted):
         self.matrix = create_conf_matrix(expected, predicted)
     def size(self):
@@ -85,3 +85,6 @@ class ConfusionMatrix:
         return acc(self.matrix)
     def mcc(self):
         return mcc(self.matrix)
+
+
+    
