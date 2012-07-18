@@ -85,15 +85,42 @@ def get_options(cmd_line):
    
     # define log files, rDAT files
     filetime_fmt = '%Y%m%d%H%M%S'
+    timestamp = dt.datetime.now().strftime(filetime_fmt)
+
     options['log_file'] = os.path.join(options['bird_path'], options['subject_id'] + '.log')
-    options['data_csv'] = os.path.join(options['bird_path'], options['subject_id'] + '_' + options['script_fname'] + '_' + dt.datetime.now().strftime(filetime_fmt) + '.csv')
+    options['data_csv'] = os.path.join(options['bird_path'], options['subject_id'] + '_' + options['script_fname'] + '_trials_' + timestamp + '.csv')
+    options['config_snapshot'] = os.path.join(options['bird_path'], options['subject_id'] + '_' + options['script_fname'] + '_config_' + timestamp + '.json')
     options['summaryDAT'] = os.path.join(options['bird_path'], options['subject_id'] + '.summaryDAT')
-    options['fields_to_save'] = ['trial_start','class','stim_start','stim_string','response','feed','timeout','cum_correct','cum_correct_thresh']
+    options['fields_to_save'] = ['number','type','trial_start','class','stim_start','stim_string','response','feed','timeout','cum_correct','cum_correct_thresh']
+    
+    # oreo
     with open(options['data_csv'], 'wb') as data_fh:
         trialWriter = csv.writer(data_fh)
         trialWriter.writerow(options['fields_to_save'])
+    with open(options['config_snapshot'], 'wb') as config_snap:
+        json.dump(options, config_snap, sort_keys=True, indent=4)
 
     return options
+
+def run_trial(trial, options):
+    pass
+
+def save_trial(trial, options):
+    # write trial results to CSV
+    with open(options['data_csv'],'ab') as data_fh:
+        trialWriter = csv.DictWriter(data_fh,fieldnames=options['fields_to_save'],extrasaction='ignore')
+        trialWriter.writerow(trial)
+
+def wait_for_peck(box, options):
+    """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
+    no_peck = True
+    box.write(box.dio['LED_center'],True)
+    while no_peck:
+        no_peck = not box.read(box.dio['IR_center'])
+
+        if not utils.check_time(options['light_schedule']):
+            raise GoodNite()
+    return dt.datetime.now()
 
 if __name__ == "__main__":
 
@@ -122,18 +149,14 @@ if __name__ == "__main__":
     box.reset()
     
     trial = dict()
+    trial['correct'] = False
     trial['cum_correct'] = 0
     trial['cum_correct_thresh'] = 1
+    trial['number'] = 0
 
-    summary = {'trials': 0,
-               'feeds': 0,
-               'hopper_failures': 0,
-               'hopper_wont_go_down': 0,
-               'hopper_already_up': 0,
-               'responses_during_feed': 0,
-               'responses': 0,
-               'last_trial_time': [],
-               }
+    do_correction = False
+
+    summary = utils.init_summary()
 
     # start experiment
     do_experiment = True
@@ -146,39 +169,33 @@ if __name__ == "__main__":
 
             # make sure lights are on at the beginning of each trial, prep for trial
             box.lights_on()
-            log.info('lights on')
 
-            trial['class'] = random.choice(options['models'].keys())
-            trial_stim = get_stimulus(trial['class'],options)
-            log.debug("trial class is %s" % trial['class'])
+            trial['feed'] = False
+            trial['timeout'] = False
+            trial['number'] += 1
+
+            if do_correction and options['correction_trials']:
+                trial['type'] = 'correction'
+                log.debug("correction trial: class is %s" % trial['class'])
+            else:
+                trial['type'] = 'normal'
+                trial['class'] = random.choice(options['models'].keys())
+                trial_stim = get_stimulus(trial['class'],options)
+                log.debug("trial class is %s" % trial['class'])
             
             # wait for bird to peck
-            no_peck = True
-            box.write(box.dio['LED_center'],True)
             log.debug('waiting for peck...')
-            while no_peck:
-                no_peck = not box.read(box.dio['IR_center'])
+            trial['trial_start'] = wait_for_peck(box, options)
 
-                if not utils.check_time(options['light_schedule']):
-                    raise GoodNite()
-
-            trial['trial_start'] = dt.datetime.now()
-            log.info("trial started at %s" % trial['trial_start'].ctime())
+            # record trial initiation
             summary['trials'] += 1
             summary['last_trial_time'] = trial['trial_start'].ctime()
+            log.info("trial started at %s" % trial['trial_start'].ctime())
 
             # play temp stimulus
             trial['stim_start'] = dt.datetime.now()
             wave_proc = box.play_wav(trial_stim['filename'])
-
-            #check_hold = (options['hold_time'] > 0.0)
-            #while check_hold:
-            #    elapsed_time = dt.datetime.now() - trial['stim_start']
-            #    if elapsed_time < dt.timedelta(seconds=options['hold_time']):
-            #        check_hold = True
-            
             box.write(box.dio['LED_center'],False)
-            # TODO: note wave played in event file
 
             # wait for response
             wait_min = trial_stim['epochs'][options['strlen_min']-1][-1]
@@ -211,7 +228,7 @@ if __name__ == "__main__":
             box.write(box.dio['LED_right'],False)
             trial['response_timedelta'] = elapsed_time
 
-            # determine the number of motifs the bird heard
+            # calculate the number of motifs the bird heard
             num_mots = 0
             for epoch in trial_stim['epochs']:
                 if elapsed_time > dt.timedelta(seconds=epoch[0]):
@@ -220,85 +237,138 @@ if __name__ == "__main__":
             trial['stim_string'] = ';'.join(trial_stim['string'][0:num_mots])
             trial['stim_epochs'] = trial_stim['epochs'][0:num_mots]
 
-            trial['feed'] = False
-            trial['timeout'] = False
 
-            # decide how to respond to the subject
-            if trial['response'] == trial['class']: 
-                if options['secondary_reinf']:
-                    trial['flash_epoch'] = box.flash(dur=1.0)
-                if trial['cum_correct'] >= trial['cum_correct_thresh']: 
-                    try:
-                        trial['feed_epoch'] = box.feed(options['feed_dur'][trial['class']])
-                        trial['feed'] = True
-                        summary['feeds'] += 1
+            # decide how to respond to the subject for normal trials
+            if trial['type'] == 'normal':
+                if trial['response'] == trial['class']:
+                    # correct response
+                    do_correction = False
+                    trial['cum_correct'] += 1 
                     
-                    # catch the feed errors
-                    except hwio.ResponseDuringFeedError as err:
-                        summary['responses_during_feed'] += 1
-                        log.error("response during feed on box %s" % str(err))
-                        hwio.wait(options['feed_dur'][trial['class']])
-                        trial['feed'] = True
-                        summary['feeds'] += 1
-                        box.reset()
-                        box.lights_on()
+                    if options['secondary_reinf']:
+                        # give secondary reinforcer
+                        trial['flash_epoch'] = box.flash(dur=0.5)
 
-                    except hwio.HopperAlreadyUpError as err:
-                        log.warning("hopper already up on box %s" % str(err))
-                        summary['hopper_already_up'] += 1
-                        hwio.wait(options['feed_dur'][trial['class']])
-                        trial['feed'] = True
+                    if (trial['cum_correct'] >= trial['cum_correct_thresh']): 
+                        # if cum currect reaches feed threshold, then feed
                         summary['feeds'] += 1
-                        box.reset()
-                        box.lights_on()
-
-                    except hwio.HopperDidntRaiseError as err:
-                        log.error("hopper didn't come up on box %s" % str(err))
-                        summary['hopper_failures'] += 1
-                        hwio.wait(options['feed_dur'][trial['class']])
-                        box.reset()
-                        box.lights_on()
-
-                    except hwio.HopperDidntDropError as err:
-                        log.warning("hopper didn't go down on box %s" % str(err))
-                        summary['hopper_wont_go_down'] += 1
                         trial['feed'] = True
-                        summary['feeds'] += 1
-                        box.reset()
-                        box.lights_on()
-                    
-                    finally:
-                        trial['cum_correct'] = 1
-                        trial['cum_correct_thresh'] = random.randint(1, 2*options['variable_ratio']-1)
+
+                        try:
+                            trial['feed_epoch'] = box.feed(options['feed_dur'][trial['class']])
+                        
+                        # but catch the feed errors
+                        except hwio.ResponseDuringFeedError as err:
+                            trial['feed'] = 'Error'
+                            summary['responses_during_feed'] += 1
+                            log.error("response during feed on box %s" % str(err))
+                            hwio.wait(options['feed_dur'][trial['class']])
+                            box.reset()
+                            box.lights_on()
+
+                        except hwio.HopperAlreadyUpError as err:
+                            trial['feed'] = 'Error'
+                            log.warning("hopper already up on box %s" % str(err))
+                            summary['hopper_already_up'] += 1
+                            hwio.wait(options['feed_dur'][trial['class']])
+                            box.reset()
+                            box.lights_on()
+
+                        except hwio.HopperDidntRaiseError as err:
+                            trial['feed'] = 'Error'
+                            log.error("hopper didn't come up on box %s" % str(err))
+                            summary['hopper_failures'] += 1
+                            hwio.wait(options['feed_dur'][trial['class']])
+                            box.reset()
+                            box.lights_on()
+
+                        except hwio.HopperDidntDropError as err:
+                            trial['feed'] = 'Error'
+                            log.warning("hopper didn't go down on box %s" % str(err))
+                            summary['hopper_wont_go_down'] += 1
+                            box.reset()
+                            box.lights_on()
+                        
+                        finally:
+                            trial['cum_correct_thresh'] = random.randint(1, 2*options['variable_ratio']-1)
+                
+                elif trial['response'] == 'none':
+                    # ignore non-responses
+                    pass
+
                 else:
-                    trial['cum_correct'] += 1
-            
-            elif (not options['punish_non_resp']) and (trial['response'] == 'none'):
+                    trial['timeout_epoch'] = box.timeout(options['timeout_dur'][trial['class']])
+                    trial['timeout'] = True
+                    trial['cum_correct'] = 0
+                    do_correction = True
+
+            # correction trial logic.
+            elif trial['type'] == 'correction':
+                if trial['response'] == trial['class']:
+                    # correct response
+                    do_correction = False
+                    
+                    if options['secondary_reinf']:
+                        # give secondary reinforcer
+                        trial['flash_epoch'] = box.flash(dur=0.5)
+
+                    if (trial['cum_correct'] >= trial['cum_correct_thresh']): 
+                        # if cum currect reaches feed threshold, then feed
+                        summary['feeds'] += 1
+                        trial['feed'] = True
+
+                        try:
+                            trial['feed_epoch'] = box.feed(options['feed_dur'][trial['class']])
+                        # but catch the feed errors
+                        except hwio.ResponseDuringFeedError as err:
+                            trial['feed'] = 'Error'
+                            summary['responses_during_feed'] += 1
+                            log.error("response during feed on box %s" % str(err))
+                            hwio.wait(options['feed_dur'][trial['class']])
+                            box.reset()
+                            box.lights_on()
+                        except hwio.HopperAlreadyUpError as err:
+                            trial['feed'] = 'Error'
+                            log.warning("hopper already up on box %s" % str(err))
+                            summary['hopper_already_up'] += 1
+                            hwio.wait(options['feed_dur'][trial['class']])
+                            box.reset()
+                            box.lights_on()
+                        except hwio.HopperDidntRaiseError as err:
+                            trial['feed'] = 'Error'
+                            log.error("hopper didn't come up on box %s" % str(err))
+                            summary['hopper_failures'] += 1
+                            hwio.wait(options['feed_dur'][trial['class']])
+                            box.reset()
+                            box.lights_on()
+                        except hwio.HopperDidntDropError as err:
+                            trial['feed'] = 'Error'
+                            log.warning("hopper didn't go down on box %s" % str(err))
+                            summary['hopper_wont_go_down'] += 1
+                            box.reset()
+                            box.lights_on()
+
+                elif trial['response'] == 'none':
+                    # ignore non-responses
+                    pass
+
+                else:
+                    trial['timeout_epoch'] = box.timeout(options['timeout_dur'][trial['class']])
+                    trial['timeout'] = True
+                    trial['cum_correct'] = 0
+                    do_correction = True
+
+            trial['trial_end'] = dt.datetime.now()
+            save_trial(trial, options)
+
+            if trial['feed']:
                 trial['cum_correct'] = 0
-
-            else:
-                trial['timeout_epoch'] = box.timeout(options['timeout_dur'][trial['class']])
-                trial['timeout'] = True
-                trial['cum_correct'] = 0
-
-
-            # write trial results to CSV
-            with open(options['data_csv'],'ab') as data_fh:
-                trialWriter = csv.DictWriter(data_fh,fieldnames=options['fields_to_save'],extrasaction='ignore')
-                trialWriter.writerow(trial)
 
         except GoodNite:
+            """ reset experimental parameters for the next day """
             poll_int = 60.0
             box.lights_off()
-            summary = {'trials': 0,
-                       'feeds': 0,
-                       'hopper_failures': 0,
-                       'hopper_wont_go_down': 0,
-                       'hopper_already_up': 0,
-                       'responses_during_feed': 0,
-                       'responses': 0,
-                       'last_trial_time': [],
-                       }
+            summary = utils.init_summary()
             log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
             hwio.wait(poll_int)
 
@@ -310,7 +380,7 @@ if __name__ == "__main__":
             log.error(str(err))
 
         finally:
-            utils.write_summaryDAT(summary,options['summaryDAT'])
+            utils.write_summary(summary,options['summaryDAT'])
 
 
 

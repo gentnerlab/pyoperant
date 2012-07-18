@@ -337,15 +337,12 @@ class OperantBox(Box):
         for p in port_ids:
             self.write(p,False)
         return True
-            
 
     def flash(self,port_ids=(1,2,3),dur=2.0,isi=0.1):
         """ flash a set of LEDs """
         if type(port_ids) is int:
             port_ids = (port_ids,)
-        
         prior = [self.write(p) for p in port_ids]
-        
         tic = datetime.datetime.now()
         while (datetime.datetime.now()-tic) < datetime.timedelta(seconds=dur):
             for p in port_ids:
@@ -353,9 +350,7 @@ class OperantBox(Box):
             wait(isi)
         for i, p in enumerate(port_ids): 
             self.write(p,prior[i])
-
         toc = datetime.datetime.now()
-        
         return (tic, toc)
     
 

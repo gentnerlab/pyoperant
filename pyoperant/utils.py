@@ -124,7 +124,20 @@ def concat_wav(input_file_list, output_filename='temp_concat.wav'):
     output.close()
     return (output_filename,epochs)
 
-def write_summaryDAT(summary,summaryDAT_fname):
+def init_summary():
+    """ initializes an empty summary dictionary """
+    summary = {'trials': 0,
+               'feeds': 0,
+               'hopper_failures': 0,
+               'hopper_wont_go_down': 0,
+               'hopper_already_up': 0,
+               'responses_during_feed': 0,
+               'responses': 0,
+               'last_trial_time': [],
+               }
+    return summary
+
+def write_summary(summary,summaryDAT_fname):
     """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
     with open(summaryDAT_fname,'wb') as f:
         f.write("Trials this session: %s\n" % summary['trials'])
