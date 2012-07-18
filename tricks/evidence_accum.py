@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
     options = get_options(utils.parse_commandline())
 
-    if options['debug']:
+    if  options['debug']:
         log_level = logging.DEBUG
     else:
         log_level = logging.INFO
