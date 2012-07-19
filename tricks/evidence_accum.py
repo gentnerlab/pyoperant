@@ -6,7 +6,7 @@
 # Add support for correction trials
 # Add support for probe trials
 
-import os, sys, random, csv, logging, logging.handlers, json
+import os, sys, random, csv, logging, logging.handlers, json, time
 import numpy as np
 import datetime as dt
 from pyoperant import hwio, utils
@@ -118,8 +118,8 @@ def wait_for_peck(box, options):
     no_peck = True
     box.write(box.dio['LED_center'],True)
     while no_peck:
+        time.sleep(0.0005)
         no_peck = not box.read(box.dio['IR_center'])
-
         if not utils.check_time(options['light_schedule']):
             raise GoodNite()
     return dt.datetime.now()
