@@ -72,16 +72,7 @@ def get_options(cmd_line):
         filename_full = os.path.join(options['stim_path'], filename)
         options['stims'][name] = filename_full
 
-    # run through the transitions for each stimulus and generate transition matrixes
-    n = len(options['stims'])
-    options['models'] = {}
-    for stim_class, pair_set in options['diagnostic_transitions'].items():
-        mat = np.zeros((n+1,n+1))
-        mat[0][1:] = 1.0/n
-        for pair in pair_set:
-            mat[pair[0]][1:] = (1-options['alpha'])/(n-1)
-            mat[pair[0]][pair[1]] = options['alpha']
-        options['models'][stim_class] = mat
+    
    
     # define log files, rDAT files
     filetime_fmt = '%Y%m%d%H%M%S'
@@ -99,6 +90,17 @@ def get_options(cmd_line):
         trialWriter.writerow(options['fields_to_save'])
     with open(options['config_snapshot'], 'wb') as config_snap:
         json.dump(options, config_snap, sort_keys=True, indent=4)
+
+    # run through the transitions for each stimulus and generate transition matrixes
+    n = len(options['stims'])
+    options['models'] = {}
+    for stim_class, pair_set in options['diagnostic_transitions'].items():
+        mat = np.zeros((n+1,n+1))
+        mat[0][1:] = 1.0/n
+        for pair in pair_set:
+            mat[pair[0]][1:] = (1-options['alpha'])/(n-1)
+            mat[pair[0]][pair[1]] = options['alpha']
+        options['models'][stim_class] = mat
 
     return options
 
