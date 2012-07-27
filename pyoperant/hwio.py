@@ -361,16 +361,20 @@ class OperantBox(Box):
         toc = datetime.datetime.now()
         return (tic, toc)
 
-    def wait_for_peck(port_id=2):
+    def wait_for_peck(self,port_id=2):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-        device = self.m.dev_name(self.m.box_io[self.box_id][0])
+        date_fmt = '%Y-%m-%d %H:%M.%f'
+        device = self.m.dev_name[self.m.box_io[self.box_id][0]]
         sub_dev = self.m.box_io[self.box_id][1]
         chan = self.m.box_io[self.box_id][2] + port_id - 1
-        cmd = ['wait4peck', device, '-s', sub_dev, '-c', chan]
-        p = subprocess.Popen(cmd,stdin=PIPE,stderr=PIPE,stdout=PIPE)
-        (stdout, stderr) = p.communicate()
+        p = subprocess.Popen(['wait4peck', device, '-s', sub_dev, '-c', chan],
+                             stdout=subprocess.PIPE,
+                             stdin=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             )
+        stdout, stderr = p.communicate()
 
-        return dt.datetime.strptime(stdout.strip(),'%Y-%m-%d %H:%M.%f')
+        return datetime.datetime.strptime(stdout.strip(),date_fmt)
     
 
 class CueBox(OperantBox):
