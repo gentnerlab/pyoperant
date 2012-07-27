@@ -11,10 +11,6 @@ import numpy as np
 import datetime as dt
 from pyoperant import hwio, utils
 
-class GoodNite(Exception):
-    """ exception for when the lights should be off """
-    pass
-
 def get_stimulus(trial_class,options):
     """ take trial class and experimental options and return a tuple containing the wav filename & additional info to play 
 
@@ -113,17 +109,6 @@ def save_trial(trial, options):
         trialWriter = csv.DictWriter(data_fh,fieldnames=options['fields_to_save'],extrasaction='ignore')
         trialWriter.writerow(trial)
 
-def wait_for_peck(box, options):
-    """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-    no_peck = True
-    box.write(box.dio['LED_center'],True)
-    while no_peck:
-        time.sleep(0.0005)
-        no_peck = not box.read(box.dio['IR_center'])
-        if not utils.check_time(options['light_schedule']):
-            raise GoodNite()
-    return dt.datetime.now()
-
 if __name__ == "__main__":
 
     options = get_options(utils.parse_commandline())
@@ -167,7 +152,7 @@ if __name__ == "__main__":
         try:
             # first, check if we should be running trials, otherwise lightsout
             if not utils.check_time(options['light_schedule']):
-                raise GoodNite()
+                raise hwio.GoodNite()
 
             # make sure lights are on at the beginning of each trial, prep for trial
             box.lights_on()
@@ -366,7 +351,7 @@ if __name__ == "__main__":
             if trial['feed']:
                 trial['cum_correct'] = 0
 
-        except GoodNite:
+        except hwio.GoodNite:
             """ reset experimental parameters for the next day """
             poll_int = 60.0
             box.lights_off()
