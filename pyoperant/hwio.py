@@ -367,14 +367,9 @@ class OperantBox(Box):
         device = self.m.dev_name[self.m.box_io[self.box_id][0]]
         sub_dev = self.m.box_io[self.box_id][1]
         chan = self.m.box_io[self.box_id][2] + port_id - 1
-        p = subprocess.Popen(['wait4peck', device, '-s', sub_dev, '-c', chan],
-                             stdout=subprocess.PIPE,
-                             stdin=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             )
-        stdout, stderr = p.communicate()
+        timestamp = subprocess.check_output(['wait4peck', device, '-s', sub_dev, '-c', chan])
 
-        return datetime.datetime.strptime(stdout.strip(),date_fmt)
+        return datetime.datetime.strptime(timestamp.strip(),date_fmt)
     
 
 class CueBox(OperantBox):
