@@ -1,11 +1,10 @@
 import time, datetime, subprocess, comedi, socket
 
-## defining Error classes for operant HW control
-
 class GoodNite(Exception):
     """ exception for when the lights should be off """
     pass
 
+## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in this module'''
     pass
