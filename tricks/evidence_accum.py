@@ -172,7 +172,7 @@ if __name__ == "__main__":
             
             # wait for bird to peck
             log.debug('waiting for peck...')
-            trial['trial_start'] = wait_for_peck(box, options)
+            trial['trial_start'] = box.wait_for_peck()
 
             # record trial initiation
             summary['trials'] += 1
