@@ -201,12 +201,14 @@ if __name__ == "__main__":
                 elif box.read(box.dio['IR_left']):
                     trial['response_time'] = dt.datetime.now()
                     wave_proc.terminate()
+                    wave_proc.close()
                     trial['response'] = 'L'
                     check_peck = False
                     summary['responses'] += 1
                 elif box.read(box.dio['IR_right']):
                     trial['response_time'] = dt.datetime.now()
                     wave_proc.terminate()
+                    wave_proc.close()
                     trial['response'] = 'R'
                     check_peck = False 
                     summary['responses'] += 1
