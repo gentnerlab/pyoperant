@@ -1,4 +1,8 @@
-import time, datetime, subprocess, comedi, socket
+import time
+import datetime
+import comedi
+import socket
+import pyaudio
 
 class GoodNite(Exception):
     """ exception for when the lights should be off """
@@ -7,6 +11,10 @@ class GoodNite(Exception):
 ## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in this module'''
+    pass
+
+class AudioError(Error):
+    '''raised for problems with audio''' 
     pass
 
 class ComediError(Error):
@@ -32,6 +40,94 @@ class HopperDidntRaiseError(Error):
 class HopperDidntDropError(Error):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
     pass
+
+"""Classes of operant components"""
+class BoxPart():
+    pass
+
+class Input():
+    """Class which holds information about inputs"""
+    pass
+
+class Output():
+    """Class which holds information about inputs"""
+    pass
+
+class Hopper():
+    """Class which holds information about hopper"""
+    pass
+
+class PeckPort():
+    """Class which holds information about peck ports"""
+    pass
+
+class HouseLight():
+    """Class which holds information about the house light"""
+    pass
+
+class Perch():
+    """Class which holds information about a perch"""
+    pass
+
+class CueLight(Output):
+    """Class which holds information about a cue light"""
+    pass
+
+class StreamContainer():
+    def __init__(self,wf,stream):
+        self.wf = wf
+        self.stream = stream
+    
+    def close(self):
+        self.stream.close()
+        self.wf.terminate()
+
+    def play(self):
+        self.stream.start_stream()
+
+    def __del__(self):
+        self.close()
+
+class AudioDevice():
+    def __init__(self,box_id):
+        self.pa = pyaudio.PyAudio()
+        self.pa_dev = self.box_id + 4
+        self.dac = "dac%s" % self.box_id
+        if self.dac not in pa.get_device_info_by_index(self.pa_dev)['name']
+            raise AudioError(self.box_id)
+    
+    def __del__():
+        self.pa.terminate()  
+
+    def get_stream(self,wf,start=False):
+        """
+        """
+        def callback(in_data, frame_count, time_info, status):
+            data = wf.readframes(frame_count)
+            return (data, pyaudio.paContinue)
+
+        stream = self.pa.open(format=self.pa.get_format_from_width(wf.getsampwidth()),
+                              channels=wf.getnchannels(),
+                              rate=wf.getframerate(),
+                              output=True,
+                              output_device_index=self.pa_dev,
+                              start=start,
+                              stream_callback=callback)
+
+        return stream
+
+    def queue_wav(wav_file):
+        wf = wave.open(wav_file)
+        stream = self.get_stream(wf)
+        return StreamContainer(stream=stream,wf=wf)
+
+    def play_wav(wav_file):
+        wf = wave.open(wav_file)
+        stream = self.get_stream(wf,start=True)
+        return StreamContainer(stream=stream,wf=wf)
+
+
+
 
 class Machine():
     """Class which holds information about the computer which the code is running on.
@@ -137,24 +233,6 @@ def operant_write(m,box_id,port,val=None):
             return (not v)
         else:
             return s
-
-def play_wav(box_id,filename):
-    """Play wave file using ALSA aplay
-
-    box_id -- integer value of box to play file to
-    filename -- string of absolute path of wav file to play
-
-    Returns a process object (see subprocess.Popen)
-    
-    This lets you continue to run other code (say, to query for
-    responses during payback) but still have access to the aplay
-    process status through the process object (so you can run 
-    proc.kill() to terminate playback if the subject responded).
-    """
-    # takes box_id & filename and returns process object
-    alsadevice = 'dac%d' % box_id
-    proc = subprocess.Popen(['aplay','-q', '-D', alsadevice, filename],stdout=subprocess.PIPE,stdin=subprocess.PIPE,stderr=subprocess.PIPE)
-    return proc
 
 def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
     """Smartly wait for a given time period.
@@ -269,23 +347,8 @@ class OperantBox(Box):
                                self.dio['LED_center'],
                                self.dio['LED_right'],
                                )
-    
-    def play_wav(self, soundfname):
-        """Plays wave file to this box
-        
-        soundfname -- absolute path and filename to wav file to play
 
-        Returns a process object (see subprocess.Popen)
-                    
-        This lets you continue to run other code (say, to query for
-        responses during payback) but still have access to the aplay
-        process status through the process object (so you can run 
-        proc.kill() to terminate playback if the subject responded).
-        Returns Process object
-        """
-        
-        return play_wav(self.box_id,soundfname)
-        
+        self.audio = AudioDevice(self.box_id)   
         
     def feed(self, feedsecs=2.0, hopper_lag=0.3):
         """Performs a feed for this box.
