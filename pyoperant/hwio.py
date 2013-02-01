@@ -90,10 +90,11 @@ class StreamContainer():
 
 class AudioDevice():
     def __init__(self,box_id):
-        self.pa = pyaudio.PyAudio()
         self.pa_dev = self.box_id + 4
         self.dac = "dac%s" % self.box_id
         if self.dac not in pa.get_device_info_by_index(self.pa_dev)['name']
+            self.pa = pyaudio.PyAudio()
+        else:
             raise AudioError(self.box_id)
     
     def __del__():
