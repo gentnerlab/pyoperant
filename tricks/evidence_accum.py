@@ -170,6 +170,9 @@ if __name__ == "__main__":
                 trial_stim = get_stimulus(trial['class'],options)
                 log.debug("trial class is %s" % trial['class'])
             
+            #queue up wav playback
+            audio = box.audio.queue_wav(trial_stim['filename'])
+
             # wait for bird to peck
             log.debug('waiting for peck...')
             trial['trial_start'] = box.wait_for_peck()
@@ -181,7 +184,7 @@ if __name__ == "__main__":
 
             # play temp stimulus
             trial['stim_start'] = dt.datetime.now()
-            wave_proc = box.play_wav(trial_stim['filename'])
+            audio.stream.start_stream()
             box.write(box.dio['LED_center'],False)
 
             # wait for response
@@ -197,16 +200,17 @@ if __name__ == "__main__":
                 elapsed_time = dt.datetime.now() - trial['stim_start']
                 if elapsed_time > dt.timedelta(seconds=wait_max):
                     trial['response'] = 'none'
+                    audio.close()
                     check_peck = False
                 elif box.read(box.dio['IR_left']):
                     trial['response_time'] = dt.datetime.now()
-                    wave_proc.terminate()
+                    audio.close()
                     trial['response'] = 'L'
                     check_peck = False
                     summary['responses'] += 1
                 elif box.read(box.dio['IR_right']):
                     trial['response_time'] = dt.datetime.now()
-                    wave_proc.terminate()
+                    audio.close()
                     trial['response'] = 'R'
                     check_peck = False 
                     summary['responses'] += 1
