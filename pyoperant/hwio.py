@@ -3,6 +3,8 @@ import datetime
 import comedi
 import socket
 import pyaudio
+import wave
+import subprocess
 
 class GoodNite(Exception):
     """ exception for when the lights should be off """
@@ -80,7 +82,7 @@ class StreamContainer():
     
     def close(self):
         self.stream.close()
-        self.wf.terminate()
+        self.wf.close()
 
     def play(self):
         self.stream.start_stream()
@@ -90,14 +92,16 @@ class StreamContainer():
 
 class AudioDevice():
     def __init__(self,box_id):
+        self.box_id = box_id
+        self.pa = pyaudio.PyAudio()
         self.pa_dev = self.box_id + 4
         self.dac = "dac%s" % self.box_id
-        if self.dac not in pa.get_device_info_by_index(self.pa_dev)['name']
-            self.pa = pyaudio.PyAudio()
-        else:
+        __dev_info = self.pa.get_device_info_by_index(self.pa_dev)
+        
+        if self.dac not in __dev_info['name']:
             raise AudioError(self.box_id)
     
-    def __del__():
+    def __del__(self):
         self.pa.terminate()  
 
     def get_stream(self,wf,start=False):
@@ -117,12 +121,12 @@ class AudioDevice():
 
         return stream
 
-    def queue_wav(wav_file):
+    def queue_wav(self,wav_file):
         wf = wave.open(wav_file)
         stream = self.get_stream(wf)
         return StreamContainer(stream=stream,wf=wf)
 
-    def play_wav(wav_file):
+    def play_wav(self,wav_file):
         wf = wave.open(wav_file)
         stream = self.get_stream(wf,start=True)
         return StreamContainer(stream=stream,wf=wf)
