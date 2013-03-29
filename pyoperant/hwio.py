@@ -363,11 +363,11 @@ class OperantBox(Box):
 
     def wait_for_peck(self,port_id=2):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-        date_fmt = '%Y-%m-%d %H:%M.%f'
+        date_fmt = '%Y-%m-%d %H:%M:%S.%f'
         device = self.m.dev_name[self.m.box_io[self.box_id][0]]
         sub_dev = self.m.box_io[self.box_id][1]
         chan = self.m.box_io[self.box_id][2] + port_id - 1
-        timestamp = subprocess.check_output(['wait4peck', device, '-s', sub_dev, '-c', chan])
+        timestamp = subprocess.check_output(['wait4peck', device, '-s', str(sub_dev), '-c', str(chan)])
 
         return datetime.datetime.strptime(timestamp.strip(),date_fmt)
     
