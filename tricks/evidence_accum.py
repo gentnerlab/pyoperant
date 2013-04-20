@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
             # play temp stimulus
             trial['stim_start'] = dt.datetime.now()
-            wave_proc = box.play_wav(trial_stim['filename'])
+            wave_stream = box.audio.play_wav(trial_stim['filename'])
             box.write(box.dio['LED_center'],False)
 
             # wait for response
@@ -200,13 +200,13 @@ if __name__ == "__main__":
                     check_peck = False
                 elif box.read(box.dio['IR_left']):
                     trial['response_time'] = dt.datetime.now()
-                    wave_proc.terminate()
+                    wave_stream.close()
                     trial['response'] = 'L'
                     check_peck = False
                     summary['responses'] += 1
                 elif box.read(box.dio['IR_right']):
                     trial['response_time'] = dt.datetime.now()
-                    wave_proc.terminate()
+                    wave_stream.close()
                     trial['response'] = 'R'
                     check_peck = False 
                     summary['responses'] += 1
