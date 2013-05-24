@@ -16,11 +16,11 @@ class Error(Exception):
     pass
 
 class AudioError(Error):
-    '''raised for problems with audio''' 
+    '''raised for problems with audio'''
     pass
 
 class ComediError(Error):
-    '''raised for problems communicating with the comedi driver''' 
+    '''raised for problems communicating with the comedi driver'''
     pass
 
 class OperantError(Error):
@@ -49,37 +49,101 @@ class BoxPart():
 
 class Input():
     """Class which holds information about inputs"""
-    pass
+    def __init__():
+        pass
+
+    def get(self):
+        """get status"""
+        pass
 
 class Output():
     """Class which holds information about inputs"""
-    pass
+    def __init__():
+        pass
+
+    def get(self):
+        """get status"""
+        pass
+
+    def set(self):
+        """set status"""
+        pass
 
 class Hopper():
-    """Class which holds information about hopper"""
-    pass
+    """Class which holds information about hopper
+
+    has parts: IR Beam (Input) & Solenoid (output)
+    """
+    def __init__():
+        pass
+
+    def status(self):
+        """get status of solenoid & IR beam, throw hopper error if mismatch"""
+        pass
+
+    def reset(self):
+        """ drop hopper """
+        pass
+
+    def feed(self,feed_dur):
+        """move hopper up for feed_dur"""
+        pass
+
+
 
 class PeckPort():
-    """Class which holds information about peck ports"""
-    pass
+    """Class which holds information about peck ports
 
-class HouseLight():
-    """Class which holds information about the house light"""
+    has parts: IR Beam (Input) & LED (output)
+    """
+    def __init__():
+        pass
+
+    def status(self):
+        """get status of solenoid & IR beam, throw hopper error if mismatch"""
+        pass
+
+    def reset(self):
+        """ drop hopper """
+        pass
+
+    def feed(self,feed_dur):
+        """move hopper up for feed_dur"""
+        pass
+
+class HouseLight(Output):
+    """Class which holds information about the house light
+
+    Inherited from Output
+    """
     pass
 
 class Perch():
-    """Class which holds information about a perch"""
+    """Class which holds information about a perch
+
+    Has parts:
+    - IR Beam (input)
+    - Audio device
+    """
     pass
 
 class CueLight(Output):
-    """Class which holds information about a cue light"""
+    """Class which holds information about a cue light
+
+    Has parts:
+    - Red LED
+    - Green LED
+    - Blue LED
+
+
+    """
     pass
 
 class StreamContainer():
     def __init__(self,wf,stream):
         self.wf = wf
         self.stream = stream
-    
+
     def close(self):
         self.stream.close()
         self.wf.close()
@@ -91,18 +155,19 @@ class StreamContainer():
         self.close()
 
 class AudioDevice():
+    """Class which holds information about an audio device"""
     def __init__(self,box_id):
         self.box_id = box_id
         self.pa = pyaudio.PyAudio()
         self.pa_dev = self.box_id + 4
         self.dac = "dac%s" % self.box_id
         __dev_info = self.pa.get_device_info_by_index(self.pa_dev)
-        
+
         if self.dac not in __dev_info['name']:
             raise AudioError(self.box_id)
-    
+
     def __del__(self):
-        self.pa.terminate()  
+        self.pa.terminate()
 
     def get_stream(self,wf,start=False):
         """
@@ -142,7 +207,7 @@ class Machine():
     Methods:
     hostname -- hostname of computer
     device --  list of C pointers to comedi devices
-    box_io -- dictionary of port mappings for comedi device 
+    box_io -- dictionary of port mappings for comedi device
               box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
     """
     def __init__(self):
@@ -198,7 +263,7 @@ class Machine():
 
 def operant_read(m,box_id,port):
     """Read from operant input port.
-    
+
     m -- Machine() object
     box_id -- integer value of box to query
     port -- integer value of input port to query
@@ -213,7 +278,7 @@ def operant_read(m,box_id,port):
         return (not v)
     else:
         return s
-    
+
 def operant_write(m,box_id,port,val=None):
     """Write to or read from operant output port
 
@@ -221,7 +286,7 @@ def operant_write(m,box_id,port,val=None):
     box_id -- integer value of box to query
     port -- integer value of output port to query
     val -- value to assign to output (1=on,0=off)
-    
+
     Returns 1 for successful write or -1 for failure
 
     If val is omitted, operant_write returns the status of the output port (1=on,0=off)
@@ -244,7 +309,7 @@ def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
 
     secs -- total time to wait in seconds
     final_countdown -- time at end of secs to wait and constantly poll the clock
-    waitfunc -- optional function to run in a loop during hogCPUperiod 
+    waitfunc -- optional function to run in a loop during hogCPUperiod
 
     If secs=1.0 and final_countdown=0.2 then for 0.8s python's time.sleep function will be used,
     which is not especially precise, but allows the cpu to perform housekeeping. In
@@ -256,7 +321,7 @@ def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
         time.sleep(secs-final_countdown)
         secs=final_countdown # only this much is now left
 
-    #It's the Final Countdown!! 
+    #It's the Final Countdown!!
     #hog the cpu, checking time
     t0=time.time()
     while (time.time()-t0)<secs:
@@ -295,7 +360,7 @@ class Box():
 
     def write(self,port_id,val=None):
         """Writes value of output port on this box.
-        
+
         Keyword arguments:
         port_id -- int of port to write or query
         val     -- value to assign to port (default=None)
@@ -330,13 +395,13 @@ class OperantBox(Box):
     Inherited from Box() class.
 
     Major methods:
-    timeout --  
+    timeout --
     feed --
 
     """
     def __init__(self,box_id):
         Box.__init__(self,box_id)
-        # 
+        #
         self.dio = {'LED_left': 1,
                     'LED_center': 2,
                     'LED_right': 3,
@@ -353,8 +418,8 @@ class OperantBox(Box):
                                self.dio['LED_right'],
                                )
 
-        self.audio = AudioDevice(self.box_id)   
-        
+        self.audio = AudioDevice(self.box_id)
+
     def feed(self, feedsecs=2.0, hopper_lag=0.3):
         """Performs a feed for this box.
 
@@ -372,7 +437,7 @@ class OperantBox(Box):
             if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(self.dio['IR_hopper']):
                 raise HopperDidntRaiseError(self.box_id) # hopper not up during feed
             feed_timedelta = datetime.datetime.now() - tic
-        
+
         self.write(self.dio['hopper'], False)
         wait(hopper_lag) # let the hopper drop
         toc = datetime.datetime.now()
@@ -380,7 +445,7 @@ class OperantBox(Box):
             raise HopperDidntDropError(self.box_id) # hopper still up after feed
 
         return (tic, toc)
-    
+
     def timeout(self, timeoutsecs=10):
         """Turns off the light in the box temporarily
 
@@ -390,13 +455,13 @@ class OperantBox(Box):
         :return: epoch of timeout
         :rtype: (datetime, datetime)
         """
-        
+
         tic = datetime.datetime.now()
         self.write(self.dio['light'], False)
         wait(timeoutsecs)
         toc = datetime.datetime.now()
         self.write(self.dio['light'], True)
-    
+
         return (tic, toc)
 
     def lights_on(self,on=True):
@@ -404,7 +469,7 @@ class OperantBox(Box):
 
     def lights_off(self,off=True):
         on = not off
-        self.write(self.dio['light'],on) 
+        self.write(self.dio['light'],on)
 
     def LED(self, port_ids=(1,2,3), dur=2.0):
         for p in port_ids:
@@ -424,7 +489,7 @@ class OperantBox(Box):
             for p in port_ids:
                 self.toggle(p)
             wait(isi)
-        for i, p in enumerate(port_ids): 
+        for i, p in enumerate(port_ids):
             self.write(p,prior[i])
         toc = datetime.datetime.now()
         return (tic, toc)
@@ -438,7 +503,7 @@ class OperantBox(Box):
         timestamp = subprocess.check_output(['wait4peck', device, '-s', str(sub_dev), '-c', str(chan)])
 
         return datetime.datetime.strptime(timestamp.strip(),date_fmt)
-    
+
 
 class CueBox(OperantBox):
     def __init__(self,box_id):
