@@ -78,14 +78,14 @@ class Performance():
     """ use this to compute performance metrics """
     def __init__(self, expected, predicted):
         self.confusion_matrix = create_conf_matrix(expected, predicted)
-    def size(self):
-        return max(self.matrix.shape)
+    def n_classes(self):
+        return max(self.confusion_matrix.shape)
     def dprime(self):
-        return dprime(self.matrix)
+        return dprime(self.confusion_matrix)
     def acc(self):
-        return acc(self.matrix)
+        return acc(self.confusion_matrix)
     def mcc(self):
-        return mcc(self.matrix)
+        return mcc(self.confusion_matrix)
 
 
 
