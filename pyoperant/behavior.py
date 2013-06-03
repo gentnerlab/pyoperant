@@ -6,13 +6,13 @@ from matplotlib import mlab
 def dprime(confusion_matrix):
     """
     Function takes in a 2x2 confusion matrix and returns the d-prime value for the predictions.
-    
+
     d' = z(hit rate)-z(false alarm rate)
-    
+
     http://en.wikipedia.org/wiki/D'
     """
     if max(confusion_matrix.shape) > 2:
-        return False 
+        return False
     else:
         hit_rate = confusion_matrix[0, 0] / confusion_matrix[0, :].sum()
         fa_rate = confusion_matrix[1, 0] / confusion_matrix[1, :].sum()
@@ -22,7 +22,7 @@ def dprime(confusion_matrix):
         if (hit_rate <= 0): hit_rate = 0 + nudge
         if (fa_rate >= 1): fa_rate = 1 - nudge
         if (fa_rate <= 0): fa_rate = 0 + nudge
-        
+
         dp = norm.ppf(hit_rate)-norm.ppf(fa_rate)
         return dp
 
@@ -37,14 +37,14 @@ def acc(confusion_matrix):
 def mcc(confusion_matrix):
     """Function takes in a 2x2 confusion matrix
     and returns the Matthew's Correlation Coefficient for the predictions.
-    
+
     MCC = (TP*TN-FP*FN)/sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))
-    
+
     http://en.wikipedia.org/wiki/Matthews_correlation_coefficient
 
     """
     if max(confusion_matrix.shape) > 2:
-        return False 
+        return False
     else:
         true_pos = confusion_matrix[0, 0]
         true_neg = confusion_matrix[1, 1]
@@ -57,7 +57,7 @@ def create_conf_matrix(expected, predicted):
     """
     Function takes in a 1-D array of expected values and a 1-D array of predictions
     and returns a confusion matrix with size corresponding to the number of classes.
-    
+
     http://en.wikipedia.org/wiki/Confusion_matrix
 
     Keyword arguments:
@@ -65,9 +65,9 @@ def create_conf_matrix(expected, predicted):
     predicted -- list of predicted or response values
 
     Returns the confusion matrix as a numpy array m[expectation,prediction]
-    
+
     """
-    n_classes = max(len(set(expected)), len(set(predicted)))
+    n_classes = max(len(set(expected)), len(set(predicted)), 2)
 
     m = np.zeros((n_classes, n_classes))
     for exp, pred in zip(expected, predicted):
@@ -87,4 +87,4 @@ class ConfusionMatrix():
         return mcc(self.matrix)
 
 
-    
+
