@@ -74,9 +74,10 @@ def create_conf_matrix(expected, predicted):
         m[exp,pred] += 1
     return m
 
-class ConfusionMatrix():
+class Performance():
+    """ use this to compute performance metrics """
     def __init__(self, expected, predicted):
-        self.matrix = create_conf_matrix(expected, predicted)
+        self.confusion_matrix = create_conf_matrix(expected, predicted)
     def size(self):
         return max(self.matrix.shape)
     def dprime(self):
