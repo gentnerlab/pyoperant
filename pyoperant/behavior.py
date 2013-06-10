@@ -27,38 +27,6 @@ def dprime(confusion_matrix):
         dp = norm.ppf(hit_rate)-norm.ppf(fa_rate)
         return dp
 
-def exact_CI(x, N, alpha=0.95):
-    """
-    Calculate the exact confidence interval of a proportion
-    where there is a wide range in the sample size or the proportion.
-
-    This method avoids the assumption that data are normally distributed. The sample size
-    and proportion are desctibed by a beta distribution.
-
-    Parameters
-    ----------
-
-    x: the number of cases from which the proportion is calulated as a positive integer.
-
-    N: the sample size as a positive integer.
-
-    alpha : set at 0.95 for 95% confidence intervals.
-
-    Returns
-    -------
-    The proportion with the lower and upper confidence intervals as a dict.
-
-    """
-
-    x = float(x)
-    N = float(N)
-    p = round((x/N)*100,2)
-
-
-
-    result = {'Proportion': intervals[0], 'Lower CI': intervals[1], 'Upper CI': intervals[2]}
-
-    return result
 
 # accuracy (% correct)
 def acc(confusion_matrix):
@@ -80,7 +48,7 @@ def acc_ci(confusion_matrix, alpha=0.05):
     x = confusion_matrix.diagonal().sum()
     N = confusion_matrix.sum()
 
-    ci = [round(i,4)*100 for i in beta.interval(1-alpha,x,N-x+1)]
+    ci = beta.interval(1-alpha,x,N-x)
     return ci
 
 
