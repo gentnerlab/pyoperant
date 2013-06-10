@@ -103,6 +103,8 @@ class Performance():
         return dprime(self.confusion_matrix)
     def acc(self):
         return acc(self.confusion_matrix)
+    def acc_ci(self):
+        return acc_ci(self.confusion_matrix)
     def mcc(self):
         return mcc(self.confusion_matrix)
 
