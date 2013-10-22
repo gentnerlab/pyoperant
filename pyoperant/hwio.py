@@ -43,267 +43,6 @@ class HopperDidntDropError(Error):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
     pass
 
-"""Classes of operant components"""
-class BoxPart():
-    pass
-
-class Input():
-    """Class which holds information about inputs"""
-    def __init__():
-        pass
-
-    def get(self):
-        """get status"""
-        pass
-
-class Output():
-    """Class which holds information about inputs"""
-    def __init__():
-        pass
-
-    def get(self):
-        """get status"""
-        pass
-
-    def set(self):
-        """set status"""
-        pass
-
-class Hopper():
-    """Class which holds information about hopper
-
-    has parts: IR Beam (Input) & Solenoid (output)
-    """
-    def __init__():
-        pass
-
-    def status(self):
-        """get status of solenoid & IR beam, throw hopper error if mismatch"""
-        pass
-
-    def reset(self):
-        """ drop hopper """
-        pass
-
-    def feed(self,feed_dur):
-        """move hopper up for feed_dur"""
-        pass
-
-
-
-class PeckPort():
-    """Class which holds information about peck ports
-
-    has parts: IR Beam (Input) & LED (output)
-    """
-    def __init__():
-        pass
-
-    def status(self):
-        """get status of solenoid & IR beam, throw hopper error if mismatch"""
-        pass
-
-    def reset(self):
-        """ drop hopper """
-        pass
-
-    def feed(self,feed_dur):
-        """move hopper up for feed_dur"""
-        pass
-
-class HouseLight(Output):
-    """Class which holds information about the house light
-
-    Inherited from Output
-    """
-    pass
-
-class Perch():
-    """Class which holds information about a perch
-
-    Has parts:
-    - IR Beam (input)
-    - Audio device
-    """
-    pass
-
-class CueLight(Output):
-    """Class which holds information about a cue light
-
-    Has parts:
-    - Red LED
-    - Green LED
-    - Blue LED
-
-
-    """
-    pass
-
-class StreamContainer():
-    def __init__(self,wf,stream):
-        self.wf = wf
-        self.stream = stream
-
-    def close(self):
-        self.stream.close()
-        self.wf.close()
-
-    def play(self):
-        self.stream.start_stream()
-
-    def __del__(self):
-        self.close()
-
-class AudioDevice():
-    """Class which holds information about an audio device"""
-    def __init__(self,box_id):
-        self.box_id = box_id
-        self.pa = pyaudio.PyAudio()
-        self.pa_dev = self.box_id + 4
-        self.dac = "dac%s" % self.box_id
-        __dev_info = self.pa.get_device_info_by_index(self.pa_dev)
-
-        if self.dac not in __dev_info['name']:
-            raise AudioError(self.box_id)
-
-    def __del__(self):
-        self.pa.terminate()
-
-    def get_stream(self,wf,start=False):
-        """
-        """
-        def callback(in_data, frame_count, time_info, status):
-            data = wf.readframes(frame_count)
-            return (data, pyaudio.paContinue)
-
-        stream = self.pa.open(format=self.pa.get_format_from_width(wf.getsampwidth()),
-                              channels=wf.getnchannels(),
-                              rate=wf.getframerate(),
-                              output=True,
-                              output_device_index=self.pa_dev,
-                              start=start,
-                              stream_callback=callback)
-
-        return stream
-
-    def queue_wav(self,wav_file):
-        wf = wave.open(wav_file)
-        stream = self.get_stream(wf)
-        return StreamContainer(stream=stream,wf=wf)
-
-    def play_wav(self,wav_file):
-        wf = wave.open(wav_file)
-        stream = self.get_stream(wf,start=True)
-        return StreamContainer(stream=stream,wf=wf)
-
-
-
-
-class Machine():
-    """Class which holds information about the computer which the code is running on.
-
-    NOTE: "vogel" and "ndege" are the only hostnames this will work for.
-
-    Methods:
-    hostname -- hostname of computer
-    device --  list of C pointers to comedi devices
-    box_io -- dictionary of port mappings for comedi device
-              box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-    """
-    def __init__(self):
-        self.device = []
-        self.dev_name = []
-        self.hostname = socket.gethostname()
-        self.box_io = []
-        if self.hostname.find('vogel')>-1:
-            self.name = 'vogel'
-            self.box_io= {1:(0,2, 0,2, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                          2:(0,2, 4,2,16),
-                          3:(0,2,24,2,32),
-                          4:(0,2,28,2,40),
-                          5:(0,2,48,2,56),
-                          6:(0,2,52,2,64),
-                          7:(0,2,72,2,80),
-                          8:(0,2,76,2,88),
-                          }
-            try:
-                self.dev_name.append('/dev/comedi0')
-                self.device.append(comedi.comedi_open('/dev/comedi0'))
-            except:
-                raise ComediError("cannot connect to comedi device on vogel")
-        elif self.hostname.find('ndege')>-1:
-            self.name = 'ndege'
-            self.box_io= {1:(0,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                          2:(0,0,4,0,16),
-                          3:(0,1,0,1, 8),
-                          4:(0,1,4,1,16),
-                          5:(0,2,0,2, 8),
-                          6:(0,2,4,2,16),
-                          7:(0,3,0,3, 8),
-                          8:(0,3,4,3,16),
-                          9:(1,0,0,0, 8), # box_id:(card_num,in_dev,in_chan,out_dev,out_chan)
-                          10:(1,0,4,0,16),
-                          11:(1,1,0,1, 8),
-                          12:(1,1,4,1,16),
-                          13:(1,2,0,2, 8),
-                          14:(1,2,4,2,16),
-                          15:(1,3,0,3, 8),
-                          16:(1,3,4,3,16),
-                          }
-            try:
-                self.dev_name.append('/dev/comedi0')
-                self.dev_name.append('/dev/comedi1')
-                self.device.append(comedi.comedi_open('/dev/comedi0'))
-                self.device.append(comedi.comedi_open('/dev/comedi1'))
-            except:
-                raise ComediError("cannot connect to comedi device on ndege")
-        else:
-            raise Error("unknown hostname")
-
-
-def operant_read(m,box_id,port):
-    """Read from operant input port.
-
-    m -- Machine() object
-    box_id -- integer value of box to query
-    port -- integer value of input port to query
-
-    returns value of port (True=on,False=off) or negative error
-    """
-    device = m.device[m.box_io[box_id][0]]
-    in_dev = m.box_io[box_id][1]
-    in_chan= m.box_io[box_id][2]+port-1
-    (s,v) = comedi.comedi_dio_read(device,in_dev,in_chan)
-    if s:
-        return (not v)
-    else:
-        return s
-
-def operant_write(m,box_id,port,val=None):
-    """Write to or read from operant output port
-
-    m -- Machine() object
-    box_id -- integer value of box to query
-    port -- integer value of output port to query
-    val -- value to assign to output (1=on,0=off)
-
-    Returns 1 for successful write or -1 for failure
-
-    If val is omitted, operant_write returns the status of the output port (1=on,0=off)
-    """
-    out_dev = m.box_io[box_id][3]
-    out_chan= m.box_io[box_id][4]+port-1
-    device = m.device[m.box_io[box_id][0]]
-    if val > -1:
-        val = not val #invert the value for comedi
-    	return comedi.comedi_dio_write(device,out_dev,out_chan,val)
-    else:
-        (s,v) = comedi.comedi_dio_read(device,out_dev,out_chan)
-        if s:
-            return (not v)
-        else:
-            return s
-
 def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
     """Smartly wait for a given time period.
 
@@ -331,18 +70,377 @@ def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
         except:
             pass
 
+def comedi_read(device,subdevice,channel):
+    """ read from comedi port
+    """
+    (s,v) = comedi.comedi_dio_read(device,subdevice,channel)
+    if s:
+        return (not v)
+    else:
+        raise InputError('could not read from comedi device "%s", subdevice %s, channel %s' % (device,subdevice,channel))
 
-## Box classes
-class Box():
+def comedi_write(device,subdevice,channel,value):
+    """Write to comedi port
+    """
+    val = not value #invert the value for comedi
+    return comedi.comedi_dio_write(device,subdevice,channel,value)
+
+def time_in_range(start, end, x):
+    """Return true if x is in the range [start, end]"""
+    if start <= end:
+        return start <= x <= end
+    else:
+        return start <= x or x <= end
+
+
+def check_time(schedule,fmt="%H:%M"):
+    """ determine whether trials should be done given the current time and the light schedule
+
+    returns Boolean if current time meets schedule
+
+    schedule=['sun'] will change lights according to local sunrise and sunset
+
+    schedule=[('07:00','17:00')] will have lights on between 7am and 5pm
+    schedule=[('06:00','12:00'),('18:00','24:00')] will have lights on between
+
+    """
+    for epoch in schedule:
+        if 'sun' in epoch:
+            if is_day():
+                return True
+        else:
+            now = dt.datetime.time(dt.datetime.now())
+            start = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
+            end = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
+            if time_in_range(start,end,now):
+                return True
+    return False
+
+
+# Classes of operant components
+class IO(object):
+    """docstring for IO"""
+    def __init__(self,interface=None,*args,**kwargs):
+        super(IO, self).__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        if self.interface is 'comedi':
+            self.device = comedi.comedi_open(self.dev_name)
+        elif self.interface is None:
+            raise Error('you must specificy an interface')
+        else:
+            raise Error('unknown interface')
+
+class InputChannel(IO):
+    """Class which holds information about inputs"""
+    def __init__(self,interface=None,*args,**kwargs):
+        super(InputChannel, self).__init__()
+
+    def get(self):
+        """get status"""
+        if self.interface is 'comedi':
+            return comedi_read(self.device,self.subdevice,self.channel)
+        else:
+            raise Error('unknown interface')
+
+    def poll(self):
+        """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
+        if self.interface is 'comedi':
+            date_fmt = '%Y-%m-%d %H:%M:%S.%f'
+            timestamp = subprocess.check_output(['wait4peck', self.device_name, '-s', str(self.subdevice), '-c', str(self.channel)])
+            return datetime.datetime.strptime(timestamp.strip(),date_fmt)
+        else:
+            raise Error('unknown interface')
+
+class OutputChannel(IO):
+    """Class which holds information about inputs"""
+    def __init__(self,interface=None,*args,**kwargs):
+        super(OutputChannel, self).__init__()
+            setattr(self, key, value)
+
+    def get(self):
+        """get status"""
+        if self.interface is 'comedi':
+            return comedi_read(self.device,self.subdevice,self.channel)
+        else:
+            raise Error('unknown interface')
+
+    def set(self,value=False):
+        """set status"""        
+        if self.interface is 'comedi':
+            return comedi_write(self.device,self.subdevice,self.channel,value)
+        else:
+            raise Error('unknown interface')
+
+    def toggle(self):
+        value = not self.get()
+        return self.set(value=value)
+        
+
+class Component(object):
+    """docstring for Component"""
+    def __init__(self, arg):
+        super(Component, self).__init__()
+        pass
+
+class Hopper(Component):
+    """Class which holds information about hopper
+
+    has parts: IR Beam (Input) & Solenoid (output)
+    """
+    def __init__(self,IR,solenoid):
+        super(Hopper, self).__init__()
+        if isinstance(IR,InputChannel):
+            self.IR = IR
+        else:
+            raise Error('%s is not an input channel' % IR)
+        if isinstance(solenoid,OutputChannel):
+            self.solenoid = solenoid
+        else:
+            raise Error('%s is not an output channel' % solenoid)
+
+    def check(self):
+        """get status of solenoid & IR beam, throw hopper error if mismatch"""
+        IR_status = self.IR.get()
+        solenoid_status = self.solenoid.get()
+        if IR_status is not solenoid_status:
+            if IR_status: 
+                raise FeederActiveError
+            elif solenoid_status:
+                raise FeederInactiveError
+            else:
+                raise FeederError('IR:%s,solenoid:%s' % (IR_status,solenoid_status))
+        else:
+            return IR_status
+
+    def reset(self):
+        """ drop hopper """
+        self.solenoid.set(False)
+        wait(0.3)
+        self.check()
+        return True
+
+    def feed(self,dur=2.0,lag=0.3):
+        """Performs a feed
+
+        arguments:
+        feedsecs -- duration of feed in seconds (default: %default)
+        """
+        self.check()
+        feed_time = datetime.datetime.now()
+        self.solenoid.set(True)
+        feed_duration = datetime.datetime.now() - feed_time
+        while feed_duration < datetime.timedelta(seconds=dur):
+            self.check()
+            feed_duration = datetime.datetime.now() - feed_time
+        self.solenoid.set(False)
+        wait(lag) # let the hopper drop
+        self.check()
+        return (feed_time,feed_duration)
+
+    def reward(self,value=2.0):
+        return self.feed(dur=value)
+
+class PeckPort(Component):
+    """Class which holds information about peck ports
+
+    has parts: IR Beam (Input) & LED (output)
+    """
+    def __init__(self,IR,LED):
+        super(PeckPort, self).__init__()
+        if isinstance(IR,InputChannel):
+            self.IR = IR
+        else:
+            raise Error('%s is not an input channel' % IR)
+        if isinstance(LED,OutputChannel):
+            self.LED = LED
+        else:
+            raise Error('%s is not an output channel' % LED)
+
+    def status(self):
+        """get status of solenoid & IR beam, throw hopper error if mismatch"""
+        pass
+
+    def off(self):
+        """ drop  """
+        self.LED.set(False)
+        return True
+
+    def on(self):
+        """ drop  """
+        self.LED.set(True)
+        return True
+
+    def flash(self,dur=1.0,isi=0.1):
+        """ flash a set of LEDs """
+        LED_state = self.LED.get()
+        flash_time = datetime.datetime.now()
+        flash_duration = datetime.datetime.now() - flash_time
+        while flash_duration < datetime.timedelta(seconds=dur):
+            self.LED.toggle()
+            wait(isi)
+            flash_duration = datetime.datetime.now() - flash_time
+        self.LED.set(LED_state)
+        return (flash_time,flash_duration)
+
+
+class HouseLight(Component):
+    """Class which holds information about the house light
+
+    Inherited from Output
+    """    
+    def __init__(self,light,schedule=[]):
+        super(HouseLight, self).__init__()
+        if isinstance(light,OutputChannel):
+            self.light = light
+        else:
+            raise Error('%s is not an output channel' % light)
+        self.schedule = schedule
+
+    def off(self):
+        """ drop  """
+        self.light.set(False)
+        return True
+
+    def on(self):
+        """ drop  """
+        self.light.set(True)
+        return True
+
+    def check_schedule(self):
+        return self.light.set(check_time(self.schedule))
+
+    def timeout(self,dur=10.0):
+        """ turn off light for a few seconds """
+        timeout_time = datetime.datetime.now()
+        self.light.set(False)
+        timeout_duration = datetime.datetime.now() - timeout_time
+        while timeout_duration < datetime.timedelta(seconds=dur):
+            flash_duration = datetime.datetime.now() - flash_time
+        self.light.set(True)
+        return (flash_time,flash_duration)
+
+    def punish(self,value=10.0):
+        return self.timeout(dur=value)
+
+class Perch(Component):
+    """Class which holds information about a perch
+
+    Has parts:
+    - IR Beam (input)
+    - Audio device
+    """
+    def __init__(self):
+        super(Perch, self).__init__()
+
+class CueLight(Component):
+    """Class which holds information about a cue light
+
+    Has parts:
+    - Red LED
+    - Green LED
+    - Blue LED
+
+
+    """
+    def __init__(self,red_LED,green_LED,blue_LED):
+        super(CueLight, self).__init__()
+        if isinstance(red_LED,OutputChannel):
+            self.red_LED = red_LED
+        else:
+            raise Error('%s is not an output channel' % red_LED)
+        if isinstance(green_LED,OutputChannel):
+            self.green_LED = green_LED
+        else:
+            raise Error('%s is not an output channel' % green_LED)
+        if isinstance(blue_LED,OutputChannel):
+            self.blue_LED = blue_LED
+        else:
+            raise Error('%s is not an output channel' % blue_LED)
+
+    def red(self):
+        self.green_LED.set(False)
+        self.blue_LED.set(False)
+        return self.red_LED.set(True)
+    def green(self):
+        self.red_LED.set(False)
+        self.blue_LED.set(False)
+        return self.green_LED.set(True)
+    def blue(self):
+        self.red_LED.set(False)
+        self.green_LED.set(False)
+        return self.blue_LED.set(True)
+    def off(self):
+        self.red_LED.set(False)
+        self.green_LED.set(False)
+        self.blue_LED.set(False)
+
+class StreamContainer(object):
+    def __init__(self,wf,stream):
+        super(StreamContainer, self).__init__()
+        self.wf = wf
+        self.stream = stream
+
+    def close(self):
+        self.stream.close()
+        self.wf.close()
+
+    def play(self):
+        self.stream.start_stream()
+
+    def __del__(self):
+        self.close()
+
+class AudioDevice(Component):
+    """Class which holds information about an audio device"""
+    def __init__(self,name='',device_index=0):
+        super(AudioDevice, self).__init__()
+        self.pa = pyaudio.PyAudio()
+        self.device_index = device_index
+        self.device_info = self.pa.get_device_info_by_index(self.device_index)
+
+    def __del__(self):
+        self.pa.terminate()
+
+    def get_stream(self,wf,start=False):
+        """
+        """
+        def callback(in_data, frame_count, time_info, status):
+            data = wf.readframes(frame_count)
+            return (data, pyaudio.paContinue)
+
+        stream = self.pa.open(format=self.pa.get_format_from_width(wf.getsampwidth()),
+                              channels=wf.getnchannels(),
+                              rate=wf.getframerate(),
+                              output=True,
+                              output_device_index=self.device_index,
+                              start=start,
+                              stream_callback=callback)
+
+        return stream
+
+    def queue_wav(self,wav_file):
+        wf = wave.open(wav_file)
+        stream = self.get_stream(wf)
+        return StreamContainer(stream=stream,wf=wf)
+
+    def play_wav(self,wav_file):
+        wf = wave.open(wav_file)
+        stream = self.get_stream(wf,start=True)
+        return StreamContainer(stream=stream,wf=wf)
+
+
+## Panel classes
+class Panel(object):
     """Defines basic class for experiment box.
 
     This class has a minimal set of information to allow
     reading from input ports and writing to output ports
     of an experimental box.
     """
-    def __init__(self, box_id):
-        self.box_id = box_id
-        self.m = Machine()
+    def __init__(self, name='', **kwargs):
+        super(Panel, self).__init__()
+        self.name = name
 
     def read(self,port_id):
         """Reads value of input port on this box.
@@ -389,10 +487,10 @@ class Box():
         for p in ports:
             self.write(p,False)
 
-class OperantBox(Box):
+class OperantPanel(Panel):
     """Defines class for an operant box.
 
-    Inherited from Box() class.
+    Inherited from Panel() class.
 
     Major methods:
     timeout --
@@ -400,7 +498,7 @@ class OperantBox(Box):
 
     """
     def __init__(self,box_id):
-        Box.__init__(self,box_id)
+        Panel.__init__(self,box_id)
         #
         self.dio = {'LED_left': 1,
                     'LED_center': 2,
@@ -494,24 +592,14 @@ class OperantBox(Box):
         toc = datetime.datetime.now()
         return (tic, toc)
 
-    def wait_for_peck(self,port_id=2):
-        """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-        date_fmt = '%Y-%m-%d %H:%M:%S.%f'
-        device = self.m.dev_name[self.m.box_io[self.box_id][0]]
-        sub_dev = self.m.box_io[self.box_id][1]
-        chan = self.m.box_io[self.box_id][2] + port_id - 1
-        timestamp = subprocess.check_output(['wait4peck', device, '-s', str(sub_dev), '-c', str(chan)])
 
-        return datetime.datetime.strptime(timestamp.strip(),date_fmt)
-
-
-class CueBox(OperantBox):
+class CuePanel(OperantPanel):
     def __init__(self,box_id):
-        OperantBox.__init__(self,box_id)
+        OperantPanel.__init__(self,box_id)
         self.dio['cue_green'] = 6
         self.dio['cue_blue'] = 7
         self.dio['cue_red'] = 8
 
-class PerchChoiceBox(Box):
+class PerchChoicePanel(Panel):
     def __init__(self,box_id):
-        Box.__init__(self,box_id)
+        Panel.__init__(self,box_id)

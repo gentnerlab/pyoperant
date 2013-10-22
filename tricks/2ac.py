@@ -64,6 +64,18 @@ def run(exp,config):
     pass
   
 
+def main():
+
+    if trial.ready():
+        panel.reset() # reset everything
+        trial.time = panel.wait_for_start()
+        stimulus_event = panel.
+        trial.response = panel.response.poll(min=2.0,max=5.0) # poll for a response from anything w/ "response" role
+        panel.reward(value=2.0) # should cause hopper to raise for 2 seconds
+        panel.aversive(value=30.0) #should cause timeout for 30 seconds
+    else
+        wait()
+
 if __name__ == "__main__":
   
     # set path variables
