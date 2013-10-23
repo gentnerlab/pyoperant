@@ -27,19 +27,19 @@ class OperantError(Error):
     """raised for problems with the operant box"""
     pass
 
-class ResponseDuringFeedError(Error):
+class ResponseDuringHopperror(Error):
     """raised when subject response during feed, suggesting that hopper may be working improperly"""
     pass
 
-class HopperAlreadyUpError(Error):
+class HopperError(Error):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
     pass
 
-class HopperDidntRaiseError(Error):
+class HopperActiveError(HopperError):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
     pass
 
-class HopperDidntDropError(Error):
+class HopperInactiveError(HopperError):
     """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
     pass
 
@@ -56,14 +56,14 @@ def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
     is used for greater precision.
     """
     #initial relaxed period, using sleep (better for system resources etc)
-    if secs>final_countdown:
+    if secs > final_countdown:
         time.sleep(secs-final_countdown)
-        secs=final_countdown # only this much is now left
+        secs = final_countdown # only this much is now left
 
     #It's the Final Countdown!!
     #hog the cpu, checking time
-    t0=time.time()
-    while (time.time()-t0)<secs:
+    t0 = time.time()
+    while (time.time()-t0) < secs:
         #let's see if any events were collected in meantime
         try:
             waitfunc()
@@ -108,20 +108,21 @@ def check_time(schedule,fmt="%H:%M"):
         if 'sun' in epoch:
             if is_day():
                 return True
-        else:
+        elif len(epoch) is 2:
             now = dt.datetime.time(dt.datetime.now())
             start = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
             end = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
             if time_in_range(start,end,now):
                 return True
+        else:
+            raise Error('unknown epoch: %s' % epoch)
     return False
 
 
 # Classes of operant components
-class IO(object):
-    """docstring for IO"""
+class BaseIO(object):
+    """any type of IO device. maintains info on interface for query IO device"""
     def __init__(self,interface=None,*args,**kwargs):
-        super(IO, self).__init__()
         for key, value in kwargs.items():
             setattr(self, key, value)
         if self.interface is 'comedi':
@@ -131,10 +132,10 @@ class IO(object):
         else:
             raise Error('unknown interface')
 
-class InputChannel(IO):
-    """Class which holds information about inputs"""
-    def __init__(self,interface=None,*args,**kwargs):
-        super(InputChannel, self).__init__()
+class InputChannel(BaseIO):
+    """Class which holds information about inputs and abstracts the methods of querying them"""
+    def __init__(self,*args,**kwargs):
+        super(InputChannel, self).__init__(*args,**kwargs)
 
     def get(self):
         """get status"""
@@ -152,10 +153,10 @@ class InputChannel(IO):
         else:
             raise Error('unknown interface')
 
-class OutputChannel(IO):
-    """Class which holds information about inputs"""
-    def __init__(self,interface=None,*args,**kwargs):
-        super(OutputChannel, self).__init__()
+class OutputChannel(BaseIO):
+    """Class which holds information about inputs and abstracts the methods of querying them and setting them"""
+    def __init__(self,*args,**kwargs):
+        super(OutputChannel, self).__init__(*args,**kwargs)
             setattr(self, key, value)
 
     def get(self):
@@ -177,19 +178,18 @@ class OutputChannel(IO):
         return self.set(value=value)
         
 
-class Component(object):
-    """docstring for Component"""
-    def __init__(self, arg):
-        super(Component, self).__init__()
+class BaseComponent(object):
+    """Base class for physcal component"""
+    def __init__(self, *args, **kwargs):
         pass
 
-class Hopper(Component):
+class Hopper(BaseComponent):
     """Class which holds information about hopper
 
     has parts: IR Beam (Input) & Solenoid (output)
     """
-    def __init__(self,IR,solenoid):
-        super(Hopper, self).__init__()
+    def __init__(self,IR,solenoid,*args,**kwargs):
+        super(Hopper, self).__init__(*args,**kwargs)
         if isinstance(IR,InputChannel):
             self.IR = IR
         else:
@@ -205,11 +205,11 @@ class Hopper(Component):
         solenoid_status = self.solenoid.get()
         if IR_status is not solenoid_status:
             if IR_status: 
-                raise FeederActiveError
+                raise HopperActiveError
             elif solenoid_status:
-                raise FeederInactiveError
+                raise HopperInactiveError
             else:
-                raise FeederError('IR:%s,solenoid:%s' % (IR_status,solenoid_status))
+                raise HopperError('IR:%s,solenoid:%s' % (IR_status,solenoid_status))
         else:
             return IR_status
 
@@ -241,13 +241,13 @@ class Hopper(Component):
     def reward(self,value=2.0):
         return self.feed(dur=value)
 
-class PeckPort(Component):
+class PeckPort(BaseComponent):
     """Class which holds information about peck ports
 
     has parts: IR Beam (Input) & LED (output)
     """
-    def __init__(self,IR,LED):
-        super(PeckPort, self).__init__()
+    def __init__(self,IR,LED,*args,**kwargs):
+        super(PeckPort, self).__init__(*args,**kwargs)
         if isinstance(IR,InputChannel):
             self.IR = IR
         else:
@@ -284,13 +284,13 @@ class PeckPort(Component):
         return (flash_time,flash_duration)
 
 
-class HouseLight(Component):
+class HouseLight(BaseComponent):
     """Class which holds information about the house light
 
     Inherited from Output
     """    
-    def __init__(self,light,schedule=[]):
-        super(HouseLight, self).__init__()
+    def __init__(self,light,schedule=[],*args,**kwargs):
+        super(HouseLight, self).__init__(*args,**kwargs)
         if isinstance(light,OutputChannel):
             self.light = light
         else:
@@ -323,17 +323,17 @@ class HouseLight(Component):
     def punish(self,value=10.0):
         return self.timeout(dur=value)
 
-class Perch(Component):
+class Perch(BaseComponent):
     """Class which holds information about a perch
 
     Has parts:
     - IR Beam (input)
     - Audio device
     """
-    def __init__(self):
-        super(Perch, self).__init__()
+    def __init__(self,*args,**kwargs):
+        super(Perch, self).__init__(*args,**kwargs)
 
-class CueLight(Component):
+class CueLight(BaseComponent):
     """Class which holds information about a cue light
 
     Has parts:
@@ -343,8 +343,8 @@ class CueLight(Component):
 
 
     """
-    def __init__(self,red_LED,green_LED,blue_LED):
-        super(CueLight, self).__init__()
+    def __init__(self,red_LED,green_LED,blue_LED,*args,**kwargs):
+        super(CueLight, self).__init__(*args,**kwargs)
         if isinstance(red_LED,OutputChannel):
             self.red_LED = red_LED
         else:
@@ -377,7 +377,6 @@ class CueLight(Component):
 
 class StreamContainer(object):
     def __init__(self,wf,stream):
-        super(StreamContainer, self).__init__()
         self.wf = wf
         self.stream = stream
 
@@ -391,10 +390,10 @@ class StreamContainer(object):
     def __del__(self):
         self.close()
 
-class AudioDevice(Component):
+class AudioDevice(BaseComponent):
     """Class which holds information about an audio device"""
-    def __init__(self,name='',device_index=0):
-        super(AudioDevice, self).__init__()
+    def __init__(self,name='',device_index=0,*args,**kwargs):
+        super(AudioDevice, self).__init__(*args,**kwargs)
         self.pa = pyaudio.PyAudio()
         self.device_index = device_index
         self.device_info = self.pa.get_device_info_by_index(self.device_index)
@@ -431,175 +430,174 @@ class AudioDevice(Component):
 
 
 ## Panel classes
-class Panel(object):
+class BasePanel(object):
     """Defines basic class for experiment box.
 
     This class has a minimal set of information to allow
     reading from input ports and writing to output ports
     of an experimental box.
     """
-    def __init__(self, name='', **kwargs):
-        super(Panel, self).__init__()
+    def __init__(self, name='',*args,**kwargs):
         self.name = name
 
-    def read(self,port_id):
-        """Reads value of input port on this box.
+    # def read(self,port_id):
+    #     """Reads value of input port on this box.
 
-        Keyword arguments:
-        port_id -- int of port to query
+    #     Keyword arguments:
+    #     port_id -- int of port to query
 
-        Returns boolean value of port or raises OperantError
-        """
-        # port_id is the local port number 1-4
-        r =  operant_read(self.m,self.box_id,port_id)
-        if r < 0 :
-            raise OperantError("error reading from input port %i on %s box %i" % (port_id, self.m.name, self.box_id))
-        return r
+    #     Returns boolean value of port or raises OperantError
+    #     """
+    #     # port_id is the local port number 1-4
+    #     r =  operant_read(self.m,self.box_id,port_id)
+    #     if r < 0 :
+    #         raise OperantError("error reading from input port %i on %s box %i" % (port_id, self.m.name, self.box_id))
+    #     return r
 
-    def write(self,port_id,val=None):
-        """Writes value of output port on this box.
+    # def write(self,port_id,val=None):
+    #     """Writes value of output port on this box.
 
-        Keyword arguments:
-        port_id -- int of port to write or query
-        val     -- value to assign to port (default=None)
+    #     Keyword arguments:
+    #     port_id -- int of port to write or query
+    #     val     -- value to assign to port (default=None)
 
-        If no value is assigned for val, then current value is returned.
-        Returns 1 for successful write or raises OperantError
-        """
-        r = operant_write(self.m,self.box_id,port_id,val)
-        if r < 0 :
-            raise OperantError("error writing to output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
-        return r
+    #     If no value is assigned for val, then current value is returned.
+    #     Returns 1 for successful write or raises OperantError
+    #     """
+    #     r = operant_write(self.m,self.box_id,port_id,val)
+    #     if r < 0 :
+    #         raise OperantError("error writing to output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
+    #     return r
 
-    def toggle(self,port_id):
-        """ Toggles value of output port based on current value"""
-        current_val = self.write(port_id)
-        if current_val > -1:
-            r = self.write(port_id, not current_val)
-            if r < 0 :
-                raise OperantError("error writing to output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
-            return r
-        else:
-            raise OperantError("error reading from output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
+    # def toggle(self,port_id):
+    #     """ Toggles value of output port based on current value"""
+    #     current_val = self.write(port_id)
+    #     if current_val > -1:
+    #         r = self.write(port_id, not current_val)
+    #         if r < 0 :
+    #             raise OperantError("error writing to output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
+    #         return r
+    #     else:
+    #         raise OperantError("error reading from output port %i on %s box %i" % (port_id, self.m.name, self.box_id))
 
-    def reset(self):
-        ports = range(1,9)
-        for p in ports:
-            self.write(p,False)
+    # def reset(self):
+    #     ports = range(1,9)
+    #     for p in ports:
+    #         self.write(p,False)
 
-class OperantPanel(Panel):
-    """Defines class for an operant box.
+# class OperantPanel(Panel):
+#     """Defines class for an operant box.
 
-    Inherited from Panel() class.
+#     Inherited from Panel() class.
 
-    Major methods:
-    timeout --
-    feed --
+#     Major methods:
+#     timeout --
+#     feed --
 
-    """
-    def __init__(self,box_id):
-        Panel.__init__(self,box_id)
-        #
-        self.dio = {'LED_left': 1,
-                    'LED_center': 2,
-                    'LED_right': 3,
-                    'light': 4,
-                    'hopper': 5,
-                    'IR_left': 1,
-                    'IR_center': 2,
-                    'IR_right': 3,
-                    'IR_hopper': 4,
-                    }
+#     """
+#     def __init__(self,box_id):
+#         Panel.__init__(self,box_id)
+#         #
+#         self.dio = {'LED_left': 1,
+#                     'LED_center': 2,
+#                     'LED_right': 3,
+#                     'light': 4,
+#                     'hopper': 5,
+#                     'IR_left': 1,
+#                     'IR_center': 2,
+#                     'IR_right': 3,
+#                     'IR_hopper': 4,
+#                     }
 
-        self.dio['LED_all'] = (self.dio['LED_left'],
-                               self.dio['LED_center'],
-                               self.dio['LED_right'],
-                               )
+#         self.dio['LED_all'] = (self.dio['LED_left'],
+#                                self.dio['LED_center'],
+#                                self.dio['LED_right'],
+#                                )
 
-        self.audio = AudioDevice(self.box_id)
+#         self.audio = AudioDevice(self.box_id)
 
-    def feed(self, feedsecs=2.0, hopper_lag=0.3):
-        """Performs a feed for this box.
+#     def feed(self, feedsecs=2.0, hopper_lag=0.3):
+#         """Performs a feed for this box.
 
-        arguments:
-        feedsecs -- duration of feed in seconds (default: %default)
-        """
-        if self.read(self.dio['IR_hopper']):
-            raise HopperAlreadyUpError(self.box_id) # hopper already up
-        tic = datetime.datetime.now()
-        self.write(self.dio['hopper'], True)
-        feed_timedelta = datetime.datetime.now() - tic
-        while feed_timedelta < datetime.timedelta(seconds=feedsecs):
-            if self.read(self.dio['LED_center']):
-                raise ResponseDuringFeedError(self.box_id)
-            if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(self.dio['IR_hopper']):
-                raise HopperDidntRaiseError(self.box_id) # hopper not up during feed
-            feed_timedelta = datetime.datetime.now() - tic
+#         arguments:
+#         feedsecs -- duration of feed in seconds (default: %default)
+#         """
+#         if self.read(self.dio['IR_hopper']):
+#             raise HopperAlreadyUpError(self.box_id) # hopper already up
+#         tic = datetime.datetime.now()
+#         self.write(self.dio['hopper'], True)
+#         feed_timedelta = datetime.datetime.now() - tic
+#         while feed_timedelta < datetime.timedelta(seconds=feedsecs):
+#             if self.read(self.dio['LED_center']):
+#                 raise ResponseDuringHopperror(self.box_id)
+#             if feed_timedelta > datetime.timedelta(seconds=hopper_lag) and not self.read(self.dio['IR_hopper']):
+#                 raise HopperDidntRaiseError(self.box_id) # hopper not up during feed
+#             feed_timedelta = datetime.datetime.now() - tic
 
-        self.write(self.dio['hopper'], False)
-        wait(hopper_lag) # let the hopper drop
-        toc = datetime.datetime.now()
-        if self.read(self.dio['IR_hopper']):
-            raise HopperDidntDropError(self.box_id) # hopper still up after feed
+#         self.write(self.dio['hopper'], False)
+#         wait(hopper_lag) # let the hopper drop
+#         toc = datetime.datetime.now()
+#         if self.read(self.dio['IR_hopper']):
+#             raise HopperDidntDropError(self.box_id) # hopper still up after feed
 
-        return (tic, toc)
+#         return (tic, toc)
 
-    def timeout(self, timeoutsecs=10):
-        """Turns off the light in the box temporarily
+#     def timeout(self, timeoutsecs=10):
+#         """Turns off the light in the box temporarily
 
-        :param timeoutsecs: Duration of timeout in seconds
-        :type  timeoutsecs: float
+#         :param timeoutsecs: Duration of timeout in seconds
+#         :type  timeoutsecs: float
 
-        :return: epoch of timeout
-        :rtype: (datetime, datetime)
-        """
+#         :return: epoch of timeout
+#         :rtype: (datetime, datetime)
+#         """
 
-        tic = datetime.datetime.now()
-        self.write(self.dio['light'], False)
-        wait(timeoutsecs)
-        toc = datetime.datetime.now()
-        self.write(self.dio['light'], True)
+#         tic = datetime.datetime.now()
+#         self.write(self.dio['light'], False)
+#         wait(timeoutsecs)
+#         toc = datetime.datetime.now()
+#         self.write(self.dio['light'], True)
 
-        return (tic, toc)
+#         return (tic, toc)
 
-    def lights_on(self,on=True):
-        self.write(self.dio['light'],on)
+#     def lights_on(self,on=True):
+#         self.write(self.dio['light'],on)
 
-    def lights_off(self,off=True):
-        on = not off
-        self.write(self.dio['light'],on)
+#     def lights_off(self,off=True):
+#         on = not off
+#         self.write(self.dio['light'],on)
 
-    def LED(self, port_ids=(1,2,3), dur=2.0):
-        for p in port_ids:
-            self.write(p,True)
-        wait(dur)
-        for p in port_ids:
-            self.write(p,False)
-        return True
+#     def LED(self, port_ids=(1,2,3), dur=2.0):
+#         for p in port_ids:
+#             self.write(p,True)
+#         wait(dur)
+#         for p in port_ids:
+#             self.write(p,False)
+#         return True
 
-    def flash(self,port_ids=(1,2,3),dur=2.0,isi=0.1):
-        """ flash a set of LEDs """
-        if type(port_ids) is int:
-            port_ids = (port_ids,)
-        prior = [self.write(p) for p in port_ids]
-        tic = datetime.datetime.now()
-        while (datetime.datetime.now()-tic) < datetime.timedelta(seconds=dur):
-            for p in port_ids:
-                self.toggle(p)
-            wait(isi)
-        for i, p in enumerate(port_ids):
-            self.write(p,prior[i])
-        toc = datetime.datetime.now()
-        return (tic, toc)
+#     def flash(self,port_ids=(1,2,3),dur=2.0,isi=0.1):
+#         """ flash a set of LEDs """
+#         if type(port_ids) is int:
+#             port_ids = (port_ids,)
+#         prior = [self.write(p) for p in port_ids]
+#         tic = datetime.datetime.now()
+#         while (datetime.datetime.now()-tic) < datetime.timedelta(seconds=dur):
+#             for p in port_ids:
+#                 self.toggle(p)
+#             wait(isi)
+#         for i, p in enumerate(port_ids):
+#             self.write(p,prior[i])
+#         toc = datetime.datetime.now()
+#         return (tic, toc)
 
 
-class CuePanel(OperantPanel):
-    def __init__(self,box_id):
-        OperantPanel.__init__(self,box_id)
-        self.dio['cue_green'] = 6
-        self.dio['cue_blue'] = 7
-        self.dio['cue_red'] = 8
+# class CuePanel(OperantPanel):
+#     def __init__(self,box_id):
+#         OperantPanel.__init__(self,box_id)
+#         self.dio['cue_green'] = 6
+#         self.dio['cue_blue'] = 7
+#         self.dio['cue_red'] = 8
 
-class PerchChoicePanel(Panel):
-    def __init__(self,box_id):
-        Panel.__init__(self,box_id)
+# class PerchChoicePanel(Panel):
+#     def __init__(self,box_id):
+#         Panel.__init__(self,box_id)
