@@ -82,8 +82,12 @@ def comedi_read(device,subdevice,channel):
 def comedi_write(device,subdevice,channel,value):
     """Write to comedi port
     """
-    val = not value #invert the value for comedi
-    return comedi.comedi_dio_write(device,subdevice,channel,value)
+    value = not value #invert the value for comedi
+    s = comedi.comedi_dio_write(device,subdevice,channel,value)
+    if s:
+        return True
+    else:
+        raise OutputError()
 
 def time_in_range(start, end, x):
     """Return true if x is in the range [start, end]"""
@@ -98,20 +102,21 @@ def check_time(schedule,fmt="%H:%M"):
 
     returns Boolean if current time meets schedule
 
-    schedule=['sun'] will change lights according to local sunrise and sunset
+    schedule='sun' will change lights according to local sunrise and sunset
 
     schedule=[('07:00','17:00')] will have lights on between 7am and 5pm
     schedule=[('06:00','12:00'),('18:00','24:00')] will have lights on between
 
     """
-    for epoch in schedule:
-        if 'sun' in epoch:
-            if is_day():
-                return True
-        elif len(epoch) is 2:
-            now = dt.datetime.time(dt.datetime.now())
-            start = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
-            end = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
+    if schedule is 'sun':
+        if is_day():
+            return True
+    else:
+        for epoch in schedule:
+            assert len(epoch) is 2
+            now = datetime.datetime.time(datetime.datetime.now())
+            start = datetime.datetime.time(datetime.datetime.strptime(epoch[0],fmt))
+            end = datetime.datetime.time(datetime.datetime.strptime(epoch[1],fmt))
             if time_in_range(start,end,now):
                 return True
         else:
@@ -123,10 +128,11 @@ def check_time(schedule,fmt="%H:%M"):
 class BaseIO(object):
     """any type of IO device. maintains info on interface for query IO device"""
     def __init__(self,interface=None,*args,**kwargs):
+        self.interface = interface
         for key, value in kwargs.items():
             setattr(self, key, value)
         if self.interface is 'comedi':
-            self.device = comedi.comedi_open(self.dev_name)
+            self.device = comedi.comedi_open(self.device_name)
         elif self.interface is None:
             raise Error('you must specificy an interface')
         else:
@@ -134,8 +140,8 @@ class BaseIO(object):
 
 class InputChannel(BaseIO):
     """Class which holds information about inputs and abstracts the methods of querying them"""
-    def __init__(self,*args,**kwargs):
-        super(InputChannel, self).__init__(*args,**kwargs)
+    def __init__(self,interface=None,*args,**kwargs):
+        super(InputChannel, self).__init__(interface=interface,*args,**kwargs)
 
     def get(self):
         """get status"""
@@ -155,9 +161,8 @@ class InputChannel(BaseIO):
 
 class OutputChannel(BaseIO):
     """Class which holds information about inputs and abstracts the methods of querying them and setting them"""
-    def __init__(self,*args,**kwargs):
-        super(OutputChannel, self).__init__(*args,**kwargs)
-            setattr(self, key, value)
+    def __init__(self,interface=None,*args,**kwargs):
+        super(OutputChannel, self).__init__(interface=interface,*args,**kwargs)
 
     def get(self):
         """get status"""
@@ -167,7 +172,7 @@ class OutputChannel(BaseIO):
             raise Error('unknown interface')
 
     def set(self,value=False):
-        """set status"""        
+        """set status"""
         if self.interface is 'comedi':
             return comedi_write(self.device,self.subdevice,self.channel,value)
         else:
@@ -176,7 +181,7 @@ class OutputChannel(BaseIO):
     def toggle(self):
         value = not self.get()
         return self.set(value=value)
-        
+
 
 class BaseComponent(object):
     """Base class for physcal component"""
@@ -204,7 +209,7 @@ class Hopper(BaseComponent):
         IR_status = self.IR.get()
         solenoid_status = self.solenoid.get()
         if IR_status is not solenoid_status:
-            if IR_status: 
+            if IR_status:
                 raise HopperActiveError
             elif solenoid_status:
                 raise HopperInactiveError
@@ -226,11 +231,13 @@ class Hopper(BaseComponent):
         arguments:
         feedsecs -- duration of feed in seconds (default: %default)
         """
+        assert lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (lag,dur)
         self.check()
         feed_time = datetime.datetime.now()
         self.solenoid.set(True)
         feed_duration = datetime.datetime.now() - feed_time
         while feed_duration < datetime.timedelta(seconds=dur):
+            wait(lag)
             self.check()
             feed_duration = datetime.datetime.now() - feed_time
         self.solenoid.set(False)
@@ -288,8 +295,8 @@ class HouseLight(BaseComponent):
     """Class which holds information about the house light
 
     Inherited from Output
-    """    
-    def __init__(self,light,schedule=[],*args,**kwargs):
+    """
+    def __init__(self,light,schedule='sun',*args,**kwargs):
         super(HouseLight, self).__init__(*args,**kwargs)
         if isinstance(light,OutputChannel):
             self.light = light
@@ -308,7 +315,10 @@ class HouseLight(BaseComponent):
         return True
 
     def check_schedule(self):
-        return self.light.set(check_time(self.schedule))
+        return check_time(self.schedule)
+
+    def set_by_schedule(self):
+        return self.light.set(self.check_schedule())
 
     def timeout(self,dur=10.0):
         """ turn off light for a few seconds """
@@ -439,6 +449,16 @@ class BasePanel(object):
     """
     def __init__(self, name='',*args,**kwargs):
         self.name = name
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        self.inputs = []
+        self.outputs = []
+
+    def register(self,component,role):
+        """ registers an attribute of a component with the box """
+        setattr(self,role,getattr(component,role))
+        return True
 
     # def read(self,port_id):
     #     """Reads value of input port on this box.
