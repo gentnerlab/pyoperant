@@ -152,27 +152,66 @@ def concat_wav(input_file_list, output_filename='temp_concat.wav'):
     output.close()
     return (output_filename,epochs)
 
-def init_summary():
-    """ initializes an empty summary dictionary """
-    summary = {'trials': 0,
-               'feeds': 0,
-               'hopper_failures': 0,
-               'hopper_wont_go_down': 0,
-               'hopper_already_up': 0,
-               'responses_during_feed': 0,
-               'responses': 0,
-               'last_trial_time': [],
-               }
-    return summary
+class Experiment(object):
+    """docstring for Experiment"""
+    def __init__(self, *args, **kwargs):
+        super(Experiment,  *args, **kwargs).__init__()
 
-def write_summary(summary,summaryDAT_fname):
-    """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
-    with open(summaryDAT_fname,'wb') as f:
-        f.write("Trials this session: %s\n" % summary['trials'])
-        f.write("Last trial run @: %s\n" % summary['last_trial_time'])
-        f.write("Feeder ops today: %i\n" % summary['feeds'])
-        f.write("Hopper failures today: %i\n" % summary['hopper_failures'])
-        f.write("Hopper won't go down failures today: %i\n" % summary['hopper_wont_go_down'])
-        f.write("Hopper already up failures today: %i\n" % summary['hopper_already_up'])
-        f.write("Responses during feed: %i\n" % summary['responses_during_feed'])
-        f.write("Rf'd responses: %i\n" % summary['responses'])
+
+    def log_config(self):
+        if self.options['debug']:
+            self.log_level = logging.DEBUG
+        else:
+            self.log_level = logging.INFO
+
+        logging.basicConfig(filename=self.options['log_file'], 
+                            level=self.log_level,
+                            format='"%(asctime)s","%(levelname)s","%(message)s"')
+        self.log = logging.getLogger()
+        #email_handler = logging.handlers.SMTPHandler(mailhost='localhost',
+        #                                             fromaddr='bird@vogel.ucsd.edu',
+        #                                             toaddrs=[options['experimenter']['email'],],
+        #                                             subject='error notice',
+        #                                             )
+        #email_handler.setlevel(logging.ERROR)
+        #log.addHandler(email_handler)
+
+    def init_summary():
+        """ initializes an empty summary dictionary """
+        self.summary = {'trials': 0,
+                        'feeds': 0,
+                        'hopper_failures': 0,
+                        'hopper_wont_go_down': 0,
+                        'hopper_already_up': 0,
+                        'responses_during_feed': 0,
+                        'responses': 0,
+                        'last_trial_time': [],
+                        }
+
+    def write_summary(self):
+        """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
+        with open(self.options['summaryDAT'],'wb') as f:
+            f.write("Trials this session: %s\n" % summary['trials'])
+            f.write("Last trial run @: %s\n" % summary['last_trial_time'])
+            f.write("Feeder ops today: %i\n" % summary['feeds'])
+            f.write("Hopper failures today: %i\n" % summary['hopper_failures'])
+            f.write("Hopper won't go down failures today: %i\n" % summary['hopper_wont_go_down'])
+            f.write("Hopper already up failures today: %i\n" % summary['hopper_already_up'])
+            f.write("Responses during feed: %i\n" % summary['responses_during_feed'])
+            f.write("Rf'd responses: %i\n" % summary['responses'])
+
+
+class Event(object):
+    """docstring for Event"""
+    def __init__(self, time, duration=None, label, name=None, description=None, file_origin=None, **annotations):
+        super(Event, self).__init__()
+        assert isinstance(time, float)
+        assert isinstance(label, str)
+        self.time = time
+        self.duration = duration
+        self.label = label
+        self.name = name
+        self.description = description
+        self.file_origin = file_origin
+        self.annotations = annotations
+        
