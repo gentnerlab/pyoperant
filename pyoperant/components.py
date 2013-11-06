@@ -103,7 +103,7 @@ class PeckPort(BaseComponent):
 
     def status(self):
         """get status of solenoid & IR beam, throw hopper error if mismatch"""
-        pass
+        return self.IR.get()
 
     def off(self):
         """ drop  """
@@ -126,6 +126,10 @@ class PeckPort(BaseComponent):
             flash_duration = datetime.datetime.now() - flash_time
         self.LED.set(LED_state)
         return (flash_time,flash_duration)
+
+    def wait_for_peck():
+        """ poll peck port until there is a peck"""
+        return self.IR.poll()
 
 ## House Light ##
 
