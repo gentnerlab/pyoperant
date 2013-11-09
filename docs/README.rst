@@ -30,13 +30,14 @@ Operant logic is easy
 Operant code should be easy
 ---------------------------
 
-.. code::
+```
 	stimulus.play()
 	response.get()
 	if response.class is stimulus.class:
 	    reward.give()
 	else:
 	    punishment.give()
+```
 
 But in practice...
 ------------------
