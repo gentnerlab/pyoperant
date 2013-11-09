@@ -31,6 +31,7 @@ Operant code should be easy
 ---------------------------
 
 ::
+
 	stimulus.play()
 	response.get()
 	if response.class is stimulus.class:
