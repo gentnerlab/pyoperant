@@ -30,7 +30,7 @@ Operant logic is easy
 Operant code should be easy
 ---------------------------
 
-.. code-block ::
+::
 	stimulus.play()
 	response.get()
 	if response.class is stimulus.class:
