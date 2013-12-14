@@ -1,6 +1,7 @@
+import datetime
 import pyaudio
 from pyoperant.hwio import InputChannel, OutputChannel
-from pyoperant.utils import Error
+from pyoperant.utils import Error, wait
 
 
 class BaseComponent(object):

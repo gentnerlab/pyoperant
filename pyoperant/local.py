@@ -1,4 +1,4 @@
-from pyoperant.hwio import hwio, components, panels
+from pyoperant import hwio, components, panels
 
 VOGEL_MAP = {
     1: ('/dev/comedi0', 2, 0, 2, 8), # box_id:(subdevice,in_dev,in_chan,out_dev,out_chan)[ii

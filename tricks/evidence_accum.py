@@ -1,11 +1,5 @@
 #!/usr/bin/python
 
-## TODO:
-# Save rDAT and trial info
-# Implement Error Handling
-# Add support for correction trials
-# Add support for probe trials
-
 import os, sys, random, csv, logging, logging.handlers, json, time
 import numpy as np
 import datetime as dt
@@ -36,17 +30,10 @@ class EvidenceAccumExperiment(utils.Experiment):
     def __init__(self, *args, **kwargs):
         super(Experiment, self, *args, **kwargs).__init__()
 
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
         # assign stim files full names
         for name, filename in self.stims.items():
             filename_full = os.path.join(self.stim_path, filename)
             self.stims[name] = filename_full
-
-        # define log files, rDAT files
-        self.filetime_fmt = '%Y%m%d%H%M%S'
-        self.exp_timestamp = dt.datetime.now().strftime(self.filetime_fmt)
 
         # configure logging
         self.log_file = os.path.join(self.bird_path, self.subject_id + '.log')
@@ -67,7 +54,7 @@ class EvidenceAccumExperiment(utils.Experiment):
 
         self.summaryDAT = os.path.join(self.bird_path,self.subject_id + '.summaryDAT')
         self.init_summary()
-        
+
 
         # run through the transitions for each stimulus and generate transition matrixes
         n = len(self.stims)
@@ -91,7 +78,7 @@ class EvidenceAccumExperiment(utils.Experiment):
             self.transition_cdf[this_class] = trans
 
     def get_stimuli(self,trial_class):
-        """ take trial class and return a tuple containing the wav filename & additional info to play 
+        """ take trial class and return a tuple containing the wav filename & additional info to play
 
         take in the trial class and the options dict
         returns a stimulus dictionary
@@ -118,7 +105,7 @@ class EvidenceAccumExperiment(utils.Experiment):
         input_files = [(self.stims[motif_name], isi) for motif_name, isi in zip(motifs,motif_isi)]
         filename =  os.path.join(self.stim_path, ''.join(motifs) + '.wav')
         stim, epochs = utils.concat_wav(input_files,filename)
-      
+
         return stim, epochs
 
     def save_trial(self,trial_dict):
@@ -135,7 +122,7 @@ class EvidenceAccumExperiment(utils.Experiment):
 #     """docstring for Trial"""
 #     def __init__(self, correct=False,cum_correct=0,cum_correct_thresh=1, *args, **kwargs):
 #         super(Trial, self, *args, **kwargs).__init__()
-        
+
 
 def main(options):
 
@@ -145,9 +132,9 @@ def main(options):
     box = hwio.OperantBox(experiment.box_id)
     box.house_light.schedule = experiment.light_schedule
     box.reset()
-    
+
     experiment.log.debug('box %i initialized' % experiment.box_id)
-    
+
     trial = {
         'correct': False,
         'cum_correct': 0,
@@ -175,7 +162,7 @@ def main(options):
                 trial['class'] = random.choice(experiment.models.keys())
                 trial_stim = experiment.get_stimulus(trial['class'])
                 experiment.log.debug("trial class is %s" % trial['class'])
-            
+
             # wait for bird to peck
             experiment.log.debug('waiting for peck...')
             trial['trial_start'] = box.center.wait_for_peck()
@@ -191,7 +178,7 @@ def main(options):
             box.center.off()
 
             # wait for response
-            min_wait = trial_stim['epochs'][experiment.strlen_min]-1][-1]
+            min_wait = trial_stim['epochs'][experiment.strlen_min][-1][-1]
             utils.wait(min_wait)
 
             # check for responses
@@ -214,7 +201,7 @@ def main(options):
                     trial['response_time'] = dt.datetime.now()
                     wave_stream.close()
                     trial['response'] = 'R'
-                    check_peck = False 
+                    check_peck = False
                     experiment.summary['responses'] += 1
             # TODO: note response in event file
             box.left.off()
@@ -239,20 +226,20 @@ def main(options):
                     do_correction = False
 
                     if trial['type'] is not 'correction':
-                        trial['cum_correct'] += 1 
-                    
+                        trial['cum_correct'] += 1
+
                     if experiment.secondary_reinf:
                         # give secondary reinforcer
                         trial['flash_epoch'] = box.center.flash(dur=0.5)
 
-                    if (trial['cum_correct'] >= trial['cum_correct_thresh']): 
+                    if (trial['cum_correct'] >= trial['cum_correct_thresh']):
                         # if cum currect reaches feed threshold, then feed
                         experiment.summary['feeds'] += 1
                         trial['feed'] = True
 
                         try:
-                            trial['feed_epoch'] = box.reward(value=experiment.feed_dur][trial['class']])
-                        
+                            trial['feed_epoch'] = box.reward(value=experiment.feed_dur[trial['class']])
+
                         # but catch the feed errors
                         except hwio.ResponseDuringFeedError as err:
                             trial['feed'] = 'Error'
@@ -280,12 +267,12 @@ def main(options):
                             experiment.summary['hopper_wont_go_down'] += 1
                             experiment.log.warning("hopper didn't go down on box %s" % str(err))
                             box.reset()
-                        
+
                         finally:
                             box.house_light.on()
                             if trial['type'] is not 'correction':
                                 trial['cum_correct_thresh'] = random.randint(1, 2*experiment.variable_ratio-1)
-                
+
                 elif trial['response'] is 'none':
                     # ignore non-responses
                     pass
@@ -324,7 +311,11 @@ def main(options):
 
 if __name__ is "__main__":
 
-    options = get_options(utils.parse_commandline())
+    cmd_line = utils.parse_commandline()
+    print cmd_line
+    options = get_options(cmd_line)
+
+    print options
 
     main(options)
 

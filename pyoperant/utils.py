@@ -1,6 +1,7 @@
 import wave
 import sys
 import struct
+import time
 import datetime as dt
 from argparse import ArgumentParser
 
@@ -16,7 +17,7 @@ class Error(Exception):
 # consider importing this from python-neo
 class Event(object):
     """docstring for Event"""
-    def __init__(self, time, duration=None, label, name=None, description=None, file_origin=None, **annotations):
+    def __init__(self, time, duration=None, label=None, name=None, description=None, file_origin=None, **annotations):
         super(Event, self).__init__()
         assert isinstance(time, float)
         assert isinstance(label, str)
@@ -27,7 +28,7 @@ class Event(object):
         self.description = description
         self.file_origin = file_origin
         self.annotations = annotations
-        
+
 
 class Stimulus(Event):
     """docstring for Stimulus"""
@@ -35,8 +36,8 @@ class Stimulus(Event):
         super(Stimulus, self, *args, **kwargs).__init__()
         for key, value in kwargs.items():
             setattr(self, key, value)
-        
-        
+
+
 
 class AuditoryStimulus(Stimulus):
     """docstring for AuditoryStimulus"""
@@ -150,13 +151,13 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
 
     TODO: add checks for sampling rate, number of channels, etc.
     """
-    
+
     cursor = 0
     epochs = [] # list of tuples defining file epochs
     audio_data = ''
     output = wave.open(output_filename, 'wb')
 
-    try: 
+    try:
         for input_filename, isi in input_file_list:
 
             # read in the wav file
@@ -190,8 +191,8 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
             # add isi
             if isi > 0.0:
                 isi_frames = ''.join([struct.pack('h', fr) for fr in [0]*int(fs*isi)])
+                audio_data += isi_frames
                 cursor += len(isi_frames)/params[1]
-                audio_data += isi_frames)
 
         # concat all of the audio together and write to file
         output.writeframes(audio_data)
@@ -200,7 +201,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
         output.close()
 
     concat_wav = AuditoryStimulus(time=0.0,
-                                  duration=epochs[-1].time+epochs[-1]duration,
+                                  duration=epochs[-1].time+epochs[-1].duration,
                                   name=output_filename,
                                   label='wav',
                                   description=description,
@@ -217,6 +218,9 @@ class Experiment(object):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        self.filetime_fmt = '%Y-%m-%d-%H-%M-%S'
+        self.exp_timestamp = dt.datetime.now().strftime(self.filetime_fmt)
+
 
     def log_config(self):
         if self.debug:
@@ -224,7 +228,7 @@ class Experiment(object):
         else:
             self.log_level = logging.INFO
 
-        logging.basicConfig(filename=self.log_file, 
+        logging.basicConfig(filename=self.log_file,
                             level=self.log_level,
                             format='"%(asctime)s","%(levelname)s","%(message)s"')
         self.log = logging.getLogger()
