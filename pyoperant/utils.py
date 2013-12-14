@@ -3,6 +3,7 @@ import sys
 import struct
 import time
 import datetime as dt
+import logging
 from argparse import ArgumentParser
 
 import ephem
@@ -17,7 +18,7 @@ class Error(Exception):
 # consider importing this from python-neo
 class Event(object):
     """docstring for Event"""
-    def __init__(self, time, duration=None, label=None, name=None, description=None, file_origin=None, **annotations):
+    def __init__(self, time, duration=None, label='', name=None, description=None, file_origin=None, *args, **annotations):
         super(Event, self).__init__()
         assert isinstance(time, float)
         assert isinstance(label, str)
@@ -33,16 +34,15 @@ class Event(object):
 class Stimulus(Event):
     """docstring for Stimulus"""
     def __init__(self, *args, **kwargs):
-        super(Stimulus, self, *args, **kwargs).__init__()
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+        super(Stimulus, self).__init__(*args, **kwargs)
+        pass
 
 
 
 class AuditoryStimulus(Stimulus):
     """docstring for AuditoryStimulus"""
     def __init__(self, *args, **kwargs):
-        super(AuditoryStimulus, self, *args, **kwargs).__init__()
+        super(AuditoryStimulus, self).__init__(*args, **kwargs)
         pass
 
 
@@ -53,10 +53,10 @@ def parse_commandline(arg_str=sys.argv[1:]):
     """
     parser=ArgumentParser()
     parser.add_argument('-B', '--box',
-                      action='store', type=int, dest='box',
+                      action='store', type=int, dest='box', required=True,
                       help='(int) box identifier')
     parser.add_argument('-S', '--subject',
-                      action='store', type=str, dest='subj',
+                      action='store', type=str, dest='subj', required=True,
                       help='subject ID and folder name')
     parser.add_argument('-c','--config',
                       action='store', type=str, dest='config_file', default='config.json',
@@ -94,7 +94,7 @@ def check_time(schedule,fmt="%H:%M"):
     schedule=[('06:00','12:00'),('18:00','24:00')] will have lights on between
 
     """
-    if schedule is 'sun':
+    if schedule == 'sun':
         if is_day():
             return True
     else:
@@ -185,6 +185,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
                                            name=input_filename,
                                            file_origin=input_filename,
                                            annotations=params,
+                                           label='motif'
                                            ))
             cursor += part_dur # move cursor length of the duration
 
@@ -200,6 +201,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
     finally:
         output.close()
 
+    description = ''
     concat_wav = AuditoryStimulus(time=0.0,
                                   duration=epochs[-1].time+epochs[-1].duration,
                                   name=output_filename,
@@ -214,7 +216,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
 class Experiment(object):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
-        super(Experiment,  *args, **kwargs).__init__()
+        super(Experiment,  self).__init__()
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -240,7 +242,7 @@ class Experiment(object):
         #email_handler.setlevel(logging.ERROR)
         #log.addHandler(email_handler)
 
-    def init_summary():
+    def init_summary(self):
         """ initializes an empty summary dictionary """
         self.summary = {'trials': 0,
                         'feeds': 0,
@@ -254,13 +256,13 @@ class Experiment(object):
 
     def write_summary(self):
         """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
-        with open(self.options['summaryDAT'],'wb') as f:
-            f.write("Trials this session: %s\n" % summary['trials'])
-            f.write("Last trial run @: %s\n" % summary['last_trial_time'])
-            f.write("Feeder ops today: %i\n" % summary['feeds'])
-            f.write("Hopper failures today: %i\n" % summary['hopper_failures'])
-            f.write("Hopper won't go down failures today: %i\n" % summary['hopper_wont_go_down'])
-            f.write("Hopper already up failures today: %i\n" % summary['hopper_already_up'])
-            f.write("Responses during feed: %i\n" % summary['responses_during_feed'])
-            f.write("Rf'd responses: %i\n" % summary['responses'])
+        with open(self.summaryDAT,'wb') as f:
+            f.write("Trials this session: %s\n" % self.summary['trials'])
+            f.write("Last trial run @: %s\n" % self.summary['last_trial_time'])
+            f.write("Feeder ops today: %i\n" % self.summary['feeds'])
+            f.write("Hopper failures today: %i\n" % self.summary['hopper_failures'])
+            f.write("Hopper won't go down failures today: %i\n" % self.summary['hopper_wont_go_down'])
+            f.write("Hopper already up failures today: %i\n" % self.summary['hopper_already_up'])
+            f.write("Responses during feed: %i\n" % self.summary['responses_during_feed'])
+            f.write("Rf'd responses: %i\n" % self.summary['responses'])
 

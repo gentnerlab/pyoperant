@@ -1,7 +1,8 @@
 import datetime
 import pyaudio
+import wave
 from pyoperant.hwio import InputChannel, OutputChannel
-from pyoperant.utils import Error, wait
+from pyoperant.utils import Error, wait, check_time
 
 
 class BaseComponent(object):
@@ -128,7 +129,7 @@ class PeckPort(BaseComponent):
         self.LED.set(LED_state)
         return (flash_time,flash_duration)
 
-    def wait_for_peck():
+    def wait_for_peck(self):
         """ poll peck port until there is a peck"""
         return self.IR.poll()
 
@@ -176,9 +177,9 @@ class HouseLight(BaseComponent):
         self.light.set(False)
         timeout_duration = datetime.datetime.now() - timeout_time
         while timeout_duration < datetime.timedelta(seconds=dur):
-            flash_duration = datetime.datetime.now() - flash_time
+            timeout_duration = datetime.datetime.now() - timeout_time
         self.light.set(True)
-        return (flash_time,flash_duration)
+        return (timeout_time,timeout_duration)
 
     def punish(self,value=10.0):
         return self.timeout(dur=value)
@@ -260,10 +261,16 @@ class StreamContainer(object):
 
 class Audio(BaseComponent):
     """Class which holds information about an audio device"""
-    def __init__(self,name='',device_index=0,*args,**kwargs):
+    def __init__(self,name='',device_name='',*args,**kwargs):
         super(Audio, self).__init__(*args,**kwargs)
         self.pa = pyaudio.PyAudio()
-        self.device_index = device_index
+        self.device_name = device_name
+        for index in range(self.pa.get_device_count()):
+            if self.device_name == self.pa.get_device_info_by_index(index)['name']:
+                self.device_index = index
+                break
+            else:
+                self.device_index = None
         self.device_info = self.pa.get_device_info_by_index(self.device_index)
 
     def __del__(self):

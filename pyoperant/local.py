@@ -27,7 +27,7 @@ class VogelBox(panels.BasePanel):
                                               subdevice=VOGEL_MAP[self.id][3],
                                               channel=out_chan))
 
-        self.speaker = components.Audio(device_index=self.id+4)
+        self.speaker = components.Audio(device_name='dac%i'%self.id)
 
         self.left = components.PeckPort(IR=self.inputs[0],LED=self.outputs[0])
         self.center = components.PeckPort(IR=self.inputs[1],LED=self.outputs[1])
