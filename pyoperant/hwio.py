@@ -146,7 +146,7 @@ class InputChannel(BaseIO):
     def get(self):
         """get status"""
         if self.interface is 'comedi':
-            return comedi_read(self.device,self.subdevice,self.channel)
+              return comedi_read(self.device,self.subdevice,self.channel)
         else:
             raise Error('unknown interface')
 
