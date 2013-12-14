@@ -13,6 +13,38 @@ class Error(Exception):
     pass
 
 
+# consider importing this from python-neo
+class Event(object):
+    """docstring for Event"""
+    def __init__(self, time, duration=None, label, name=None, description=None, file_origin=None, **annotations):
+        super(Event, self).__init__()
+        assert isinstance(time, float)
+        assert isinstance(label, str)
+        self.time = time
+        self.duration = duration
+        self.label = label
+        self.name = name
+        self.description = description
+        self.file_origin = file_origin
+        self.annotations = annotations
+        
+
+class Stimulus(Event):
+    """docstring for Stimulus"""
+    def __init__(self, *args, **kwargs):
+        super(Stimulus, self, *args, **kwargs).__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        
+        
+
+class AuditoryStimulus(Stimulus):
+    """docstring for AuditoryStimulus"""
+    def __init__(self, *args, **kwargs):
+        super(AuditoryStimulus, self, *args, **kwargs).__init__()
+        pass
+
+
 def parse_commandline(arg_str=sys.argv[1:]):
     """ parse command line arguments
     note: optparse is depreciated w/ v2.7 in favor of argparse
@@ -103,7 +135,7 @@ def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
         except:
             pass
 
-def concat_wav(input_file_list, output_filename='temp_concat.wav'):
+def concat_wav(input_file_list, output_filename='concat.wav'):
     """ concat a set of wav files into a single wav file and return the output filename
 
     takes in a tuple list of files and duration of pause after the file
@@ -114,57 +146,85 @@ def concat_wav(input_file_list, output_filename='temp_concat.wav'):
         ('c.wav', 0.0),
         ]
 
+    returns a list of AuditoryStimulus objects
+
     TODO: add checks for sampling rate, number of channels, etc.
     """
-    output = wave.open(output_filename, 'wb')
-    toe = 0
+    
+    cursor = 0
     epochs = [] # list of tuples defining file epochs
-    audio_data = []
-    for input_filename, post_quiet in input_file_list:
+    audio_data = ''
+    output = wave.open(output_filename, 'wb')
 
-        wav_part = wave.open(input_filename,'rb')
+    try: 
+        for input_filename, isi in input_file_list:
 
-        # TODO: add some checks in here
-        try:
-            params = wav_part.getparams()
-            output.setparams(params)
-            fs = output.getframerate()
-        except:
-            pass
+            # read in the wav file
+            wav_part = wave.open(input_filename,'rb')
 
-        frames = wav_part.readframes(wav_part.getnframes())
-        wav_part.close
 
-        start_time = toe
-        toe += len(frames)/params[1]
+            try:
+                params = wav_part.getparams()
+                output.setparams(params)
+                fs = output.getframerate()
+            except: # TODO: what was I trying to except here? be more specific
+                pass
 
-        audio_data.append(frames)
-        epochs.append((float(start_time)/fs,float(toe)/fs))
+            audio_frames = wav_part.readframes(wav_part.getnframes())
+            wav_part.close
 
-        if post_quiet > 0.0:
-            isi_frames = ''.join([struct.pack('h', fr) for fr in [0]*int(fs*post_quiet)])
-            toe += len(isi_frames)/params[1]
-            audio_data.append(isi_frames)
+            # append the audio data
+            audio_data += audio_frames
 
-    data = ''.join(audio_data)
-    output.writeframes(data)
+            part_start = cursor
+            part_dur = len(audio_frames)/params[1]
 
-    output.close()
-    return (output_filename,epochs)
+            epochs.append(AuditoryStimulus(time=float(part_start)/fs,
+                                           duration=float(part_dur)/fs,
+                                           name=input_filename,
+                                           file_origin=input_filename,
+                                           annotations=params,
+                                           ))
+            cursor += part_dur # move cursor length of the duration
+
+            # add isi
+            if isi > 0.0:
+                isi_frames = ''.join([struct.pack('h', fr) for fr in [0]*int(fs*isi)])
+                cursor += len(isi_frames)/params[1]
+                audio_data += isi_frames)
+
+        # concat all of the audio together and write to file
+        output.writeframes(audio_data)
+
+    finally:
+        output.close()
+
+    concat_wav = AuditoryStimulus(time=0.0,
+                                  duration=epochs[-1].time+epochs[-1]duration,
+                                  name=output_filename,
+                                  label='wav',
+                                  description=description,
+                                  file_origin=output_filename,
+                                  annotations=output.getparams(),
+                                  )
+
+    return (concat_wav,epochs)
 
 class Experiment(object):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
         super(Experiment,  *args, **kwargs).__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 
     def log_config(self):
-        if self.options['debug']:
+        if self.debug:
             self.log_level = logging.DEBUG
         else:
             self.log_level = logging.INFO
 
-        logging.basicConfig(filename=self.options['log_file'], 
+        logging.basicConfig(filename=self.log_file, 
                             level=self.log_level,
                             format='"%(asctime)s","%(levelname)s","%(message)s"')
         self.log = logging.getLogger()
@@ -200,18 +260,3 @@ class Experiment(object):
             f.write("Responses during feed: %i\n" % summary['responses_during_feed'])
             f.write("Rf'd responses: %i\n" % summary['responses'])
 
-
-class Event(object):
-    """docstring for Event"""
-    def __init__(self, time, duration=None, label, name=None, description=None, file_origin=None, **annotations):
-        super(Event, self).__init__()
-        assert isinstance(time, float)
-        assert isinstance(label, str)
-        self.time = time
-        self.duration = duration
-        self.label = label
-        self.name = name
-        self.description = description
-        self.file_origin = file_origin
-        self.annotations = annotations
-        

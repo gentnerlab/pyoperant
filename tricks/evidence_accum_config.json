@@ -1,0 +1,67 @@
+{
+	"comments": "json doesn't support comments",
+	"experimenter": {
+		"name": "Justin T Kiggins",
+		"email": "justin.kiggins@gmail.com"
+		},
+	"debug": false,
+	"stims": {
+		"a": "JKevaccum_a.wav",
+		"b": "JKevaccum_b.wav",
+		"c": "JKevaccum_c.wav",
+		"d": "JKevaccum_d.wav",
+		"e": "JKevaccum_e.wav",
+		},
+	"stim_map": {
+		"a": 1,
+		"b": 2,
+		"c": 3,
+		"d": 4,
+		"e": 5,
+		},
+	"odds": 4.0,
+	"model_evidence": {
+		"L":[
+			[1,2],
+			[1,4],
+			[2,3],
+			[2,5],
+			[3,1],
+			[3,4],
+			[4,3],
+			[4,5],
+			[5,1],
+			[5,3],
+			],
+		"L":[
+			[2,1],
+			[4,1],
+			[3,2],
+			[5,2],
+			[1,3],
+			[4,3],
+			[3,4],
+			[5,4],
+			[1,5],
+			[3,5],
+			],
+		},
+	"strlen_max": 10,
+	"strlen_min": 3,
+	"isi_mean": 0.100,
+	"isi_stdev": 0.015,
+	"variable_ratio": 3,
+	"correction_trials": false,
+	"reward_val": { 
+		"L": 3.0,
+		"R": 3.0
+		},
+	"punish_val": {
+		"L": 10.0,
+		"R": 10.0
+		},
+	"response_win": 2.0,
+	"punish_non_resp": false,
+	"secondary_reinf": true,
+	"light_schedule": "sun"
+}
