@@ -1,4 +1,4 @@
-from pyoperant.hwio import BasePanel, AudioDevice, InputChannel, OutputChannel, PeckPort, HouseLight, Hopper
+from pyoperant.hwio import hwio, components, panels
 
 VOGEL_MAP = {
     1: ('/dev/comedi0', 2, 0, 2, 8), # box_id:(subdevice,in_dev,in_chan,out_dev,out_chan)[ii
@@ -11,40 +11,33 @@ VOGEL_MAP = {
     8: ('/dev/comedi0', 2, 76, 2, 88),
     }
 
-class VogelBox(BasePanel):
+class VogelBox(panels.BasePanel):
     """docstring for Vogel1"""
     def __init__(self, *args, **kwargs):
         super(VogelBox, self).__init__(*args, **kwargs)
         for in_chan in [ii+VOGEL_MAP[self.id][2] for ii in range(4)]:
-            self.inputs.append(InputChannel(interface='comedi',
+            self.inputs.append(hwio.InputChannel(interface='comedi',
                                             device_name=VOGEL_MAP[self.id][0],
                                             subdevice=VOGEL_MAP[self.id][1],
                                             channel=in_chan
                                             ))
         for out_chan in [ii+VOGEL_MAP[self.id][4] for ii in range(5)]:
-            self.outputs.append(OutputChannel(interface='comedi',
+            self.outputs.append(hwio.OutputChannel(interface='comedi',
                                               device_name=VOGEL_MAP[self.id][0],
                                               subdevice=VOGEL_MAP[self.id][3],
                                               channel=out_chan))
 
-        self.speaker = AudioDevice(device_index=self.id+4)
+        self.speaker = components.Audio(device_index=self.id+4)
 
-        self.left = PeckPort(IR=self.inputs[0],LED=self.outputs[0])
-        self.center = PeckPort(IR=self.inputs[1],LED=self.outputs[1])
-        self.right = PeckPort(IR=self.inputs[2],LED=self.outputs[2])
-        self.house_light = HouseLight(light=self.outputs[3])
-        self.hopper = Hopper(IR=self.inputs[3],solenoid=self.outputs[4])
+        self.left = components.PeckPort(IR=self.inputs[0],LED=self.outputs[0])
+        self.center = components.PeckPort(IR=self.inputs[1],LED=self.outputs[1])
+        self.right = components.PeckPort(IR=self.inputs[2],LED=self.outputs[2])
+        self.house_light = components.HouseLight(light=self.outputs[3])
+        self.hopper = components.Hopper(IR=self.inputs[3],solenoid=self.outputs[4])
 
         self.register(self.hopper,'reward')
         self.register(self.house_light,'punish')
         self.register(self.speaker,'play_wav')
-    # def reward(self,value=2.0):
-    #     self.hopper.reward(value=value)
-    # def punish(self,value=10.0):
-    #     self.house_light.punish(value=value)
-    def reset(self):
-        for output in self.outputs:
-            output.set(False)
 
 
 class Vogel1(VogelBox):

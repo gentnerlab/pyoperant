@@ -1,6 +1,16 @@
-import ephem, wave, sys, struct
+import wave
+import sys
+import struct
 import datetime as dt
 from argparse import ArgumentParser
+
+import ephem
+
+
+## defining Error classes for operant HW control
+class Error(Exception):
+    '''base class for exceptions in this module'''
+    pass
 
 
 def parse_commandline(arg_str=sys.argv[1:]):
@@ -47,33 +57,51 @@ def check_time(schedule,fmt="%H:%M"):
 
     schedule='sun' will change lights according to local sunrise and sunset
 
-    schedule=('07:00','17:00') will have lights on between 7am and 5pm
+    schedule=[('07:00','17:00')] will have lights on between 7am and 5pm
     schedule=[('06:00','12:00'),('18:00','24:00')] will have lights on between
 
     """
-    if (type(schedule) is str) or (type(schedule) is unicode):
-        if 'sun' in schedule:
-            if is_day():
-                return True
-    elif type(schedule) is tuple:
-        now_time = dt.datetime.time(dt.datetime.now())
-        on_time = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
-        off_time = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
-        if (now_time > on_time) and (now_time < off_time):
+    if schedule is 'sun':
+        if is_day():
             return True
-
-    elif type(schedule) is list:
+    else:
         for epoch in schedule:
-            if 'sun' in epoch:
-                if is_day():
-                    return True
-            else:
-                now_time = dt.datetime.time(dt.datetime.now())
-                on_time = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
-                off_time = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
-                if (now_time > on_time) and (now_time < off_time):
-                    return True
+            assert len(epoch) is 2
+            now = datetime.datetime.time(datetime.datetime.now())
+            start = datetime.datetime.time(datetime.datetime.strptime(epoch[0],fmt))
+            end = datetime.datetime.time(datetime.datetime.strptime(epoch[1],fmt))
+            if time_in_range(start,end,now):
+                return True
+        else:
+            raise Error('unknown epoch: %s' % epoch)
     return False
+
+def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
+    """Smartly wait for a given time period.
+
+    secs -- total time to wait in seconds
+    final_countdown -- time at end of secs to wait and constantly poll the clock
+    waitfunc -- optional function to run in a loop during hogCPUperiod
+
+    If secs=1.0 and final_countdown=0.2 then for 0.8s python's time.sleep function will be used,
+    which is not especially precise, but allows the cpu to perform housekeeping. In
+    the final hogCPUsecs the more precise method of constantly polling the clock
+    is used for greater precision.
+    """
+    #initial relaxed period, using sleep (better for system resources etc)
+    if secs > final_countdown:
+        time.sleep(secs-final_countdown)
+        secs = final_countdown # only this much is now left
+
+    #It's the Final Countdown!!
+    #hog the cpu, checking time
+    t0 = time.time()
+    while (time.time()-t0) < secs:
+        #let's see if any events were collected in meantime
+        try:
+            waitfunc()
+        except:
+            pass
 
 def concat_wav(input_file_list, output_filename='temp_concat.wav'):
     """ concat a set of wav files into a single wav file and return the output filename
@@ -124,27 +152,66 @@ def concat_wav(input_file_list, output_filename='temp_concat.wav'):
     output.close()
     return (output_filename,epochs)
 
-def init_summary():
-    """ initializes an empty summary dictionary """
-    summary = {'trials': 0,
-               'feeds': 0,
-               'hopper_failures': 0,
-               'hopper_wont_go_down': 0,
-               'hopper_already_up': 0,
-               'responses_during_feed': 0,
-               'responses': 0,
-               'last_trial_time': [],
-               }
-    return summary
+class Experiment(object):
+    """docstring for Experiment"""
+    def __init__(self, *args, **kwargs):
+        super(Experiment,  *args, **kwargs).__init__()
 
-def write_summary(summary,summaryDAT_fname):
-    """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
-    with open(summaryDAT_fname,'wb') as f:
-        f.write("Trials this session: %s\n" % summary['trials'])
-        f.write("Last trial run @: %s\n" % summary['last_trial_time'])
-        f.write("Feeder ops today: %i\n" % summary['feeds'])
-        f.write("Hopper failures today: %i\n" % summary['hopper_failures'])
-        f.write("Hopper won't go down failures today: %i\n" % summary['hopper_wont_go_down'])
-        f.write("Hopper already up failures today: %i\n" % summary['hopper_already_up'])
-        f.write("Responses during feed: %i\n" % summary['responses_during_feed'])
-        f.write("Rf'd responses: %i\n" % summary['responses'])
+
+    def log_config(self):
+        if self.options['debug']:
+            self.log_level = logging.DEBUG
+        else:
+            self.log_level = logging.INFO
+
+        logging.basicConfig(filename=self.options['log_file'], 
+                            level=self.log_level,
+                            format='"%(asctime)s","%(levelname)s","%(message)s"')
+        self.log = logging.getLogger()
+        #email_handler = logging.handlers.SMTPHandler(mailhost='localhost',
+        #                                             fromaddr='bird@vogel.ucsd.edu',
+        #                                             toaddrs=[options['experimenter']['email'],],
+        #                                             subject='error notice',
+        #                                             )
+        #email_handler.setlevel(logging.ERROR)
+        #log.addHandler(email_handler)
+
+    def init_summary():
+        """ initializes an empty summary dictionary """
+        self.summary = {'trials': 0,
+                        'feeds': 0,
+                        'hopper_failures': 0,
+                        'hopper_wont_go_down': 0,
+                        'hopper_already_up': 0,
+                        'responses_during_feed': 0,
+                        'responses': 0,
+                        'last_trial_time': [],
+                        }
+
+    def write_summary(self):
+        """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
+        with open(self.options['summaryDAT'],'wb') as f:
+            f.write("Trials this session: %s\n" % summary['trials'])
+            f.write("Last trial run @: %s\n" % summary['last_trial_time'])
+            f.write("Feeder ops today: %i\n" % summary['feeds'])
+            f.write("Hopper failures today: %i\n" % summary['hopper_failures'])
+            f.write("Hopper won't go down failures today: %i\n" % summary['hopper_wont_go_down'])
+            f.write("Hopper already up failures today: %i\n" % summary['hopper_already_up'])
+            f.write("Responses during feed: %i\n" % summary['responses_during_feed'])
+            f.write("Rf'd responses: %i\n" % summary['responses'])
+
+
+class Event(object):
+    """docstring for Event"""
+    def __init__(self, time, duration=None, label, name=None, description=None, file_origin=None, **annotations):
+        super(Event, self).__init__()
+        assert isinstance(time, float)
+        assert isinstance(label, str)
+        self.time = time
+        self.duration = duration
+        self.label = label
+        self.name = name
+        self.description = description
+        self.file_origin = file_origin
+        self.annotations = annotations
+        
