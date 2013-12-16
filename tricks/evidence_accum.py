@@ -322,7 +322,7 @@ def main(options):
         except components.GoodNite:
             """ reset experimental parameters for the next day """
             poll_int = 60.0
-            box.lights_off()
+            box.house_light.off()
             experiment.init_summary()
             experiment.log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
             utils.wait(poll_int)
