@@ -46,7 +46,7 @@ class EvidenceAccumExperiment(utils.Experiment):
 
         # configure csv file for data
         self.data_csv = os.path.join(self.bird_path, self.subject_id + '_' + self.script_fname + '_trials_' + self.exp_timestamp + '.csv')
-        self.fields_to_save = ['number','type','trial_start','class','stim_start','stim_string','response','response_time','feed','timeout','cum_correct','cum_correct_thresh']
+        self.fields_to_save = ['index','type','trial_start','class','stim_start','stim_string','response','response_time','feed','timeout','cum_correct','cum_correct_thresh']
         with open(self.data_csv, 'wb') as data_fh:
             trialWriter = csv.writer(data_fh)
             trialWriter.writerow(self.fields_to_save)
@@ -82,6 +82,55 @@ class EvidenceAccumExperiment(utils.Experiment):
             trans = trans / trans[:,-1][:,None] # I don't get why this works
             self.transition_cdf[this_class] = trans
 
+        self.trials = []
+        self.panel = None
+
+    def reward(self):
+        try:
+            trial['feed_epoch'] = self.panel.reward(value=self.feed_dur[trial['class']])
+
+        # but catch the feed errors
+        # except components.ResponseDuringFeedError as err:
+        #     trial['feed'] = 'Error'
+        #     exp.summary['responses_during_feed'] += 1
+        #     exp.log.error("response during feed on panel %s" % str(err))
+        #     utils.wait(exp.feed_dur[trial['class']])
+        #     panel.reset()
+
+        except components.HopperActiveError as err:
+            trial['feed'] = 'Error'
+            self.summary['hopper_already_up'] += 1
+            self.log.warning("hopper already up on panel %s" % str(err))
+            utils.wait(exp.feed_dur[trial['class']])
+            self.panel.reset()
+
+        except components.HopperInactiveError as err:
+            trial['feed'] = 'Error'
+            self.summary['hopper_failures'] += 1
+            self.log.error("hopper didn't come up on panel %s" % str(err))
+            utils.wait(exp.feed_dur[trial['class']])
+            self.panel.reset()
+
+        # except components.HopperDidntDropError as err:
+        #     trial['feed'] = 'Error'
+        #     exp.summary['hopper_wont_go_down'] += 1
+        #     exp.log.warning("hopper didn't go down on panel %s" % str(err))
+        #     panel.reset()
+
+        finally:
+            self.panel.house_light.on()
+            if trial['type'] is not 'correction':
+                trial['cum_correct_thresh'] = random.randint(1, 2*exp.variable_ratio-1)
+
+    def punish(self):
+        trial['timeout_epoch'] = self.panel.punish(value=self.timeout_dur[trial['class']])
+        trial['timeout'] = True
+        trial['cum_correct'] = 0
+        do_correction = True
+
+    def present_stimulus(self):
+        pass
+
     def get_stimuli(self,trial_class):
         """ take trial class and return a tuple containing the wav filename & additional info to play
 
@@ -113,10 +162,180 @@ class EvidenceAccumExperiment(utils.Experiment):
         return stim, epochs
 
     def save_trial(self,trial_dict):
-        # write trial results to CSV
+        '''write trial results to CSV'''
         with open(self.data_csv,'ab') as data_fh:
             trialWriter = csv.DictWriter(data_fh,fieldnames=self.fields_to_save,extrasaction='ignore')
             trialWriter.writerow(trial_dict)
+
+    def new_trial(self):
+        '''create a new trial and append it to the trial list'''
+        trial = {}
+        try:
+            if self.correction_trials:
+                if self.trials[-1]['response'] and self.trials[-1]['correct']:
+                    trial['type'] = 'correction'
+                    trial['class'] = self.trials[-1]['class']
+                    exp.log.debug("correction trial: class is %s" % trial['class'])
+                else:
+                    trial['type'] = 'normal'
+                    trial['class'] = random.choice(exp.models.keys())
+                    trial_stim, trial_motifs = exp.get_stimuli(trial['class'])
+
+            trial['index'] = self.trials[-1]['index'] + 1
+
+        except IndexError:
+            trial['index'] = 0
+
+        self.trials.append(trial)
+
+        self.log.debug("trial %i: %s, %s" % (trial['index'],trial['type'],trial['class']))
+
+        return True
+
+    def run(self):
+
+        self.do_correction = False
+
+        # start exp
+        while True:
+            try:
+                # make sure lights are on at the beginning of each trial, prep for trial
+                self.panel.house_light.set_by_schedule()
+
+                
+                trial['index'] += 1
+
+                self.new_trial()
+
+                min_epoch = trial_motifs[exp.strlen_min-1]
+                min_wait = min_epoch.time + min_epoch.duration
+
+                max_wait = trial_stim.time + trial_stim.duration + exp.response_win
+
+                # wait for bird to peck
+                utils.wait(exp.intertrial_min)
+                self.log.debug('waiting for peck...')
+                self.panel.center.on()
+                trial['trial_start'] = panel.center.wait_for_peck()
+                self.panel.center.off()
+
+                # record trial initiation
+                self.summary['trials'] += 1
+                self.summary['last_trial_time'] = trial['trial_start'].ctime()
+                self.log.info("trial started at %s" % trial['trial_start'].ctime())
+
+                # play stimulus
+                stim_start = dt.datetime.now()
+                trial['stim_start'] = (stim_start- trial['trial_start']).total_seconds()
+                wave_stream = panel.speaker.play_wav(trial_stim.file_origin)
+                utils.wait(min_wait)
+
+                # check for responses
+                check_peck = True
+                self.panel.left.on()
+                self.panel.right.on()
+                while check_peck:
+                    elapsed_time = (dt.datetime.now() - stim_start).total_seconds()
+                    if elapsed_time > max_wait:
+                        trial['response'] = 'none'
+                        check_peck = False
+                    elif panel.left.status():
+                        trial['response_time'] = trial['stim_start'] + elapsed_time
+                        wave_stream.close()
+                        trial['response'] = 'L'
+                        check_peck = False
+                        exp.summary['responses'] += 1
+                    elif panel.right.status():
+                        trial['response_time'] = trial['stim_start'] + elapsed_time
+                        wave_stream.close()
+                        trial['response'] = 'R'
+                        check_peck = False
+                        exp.summary['responses'] += 1
+                # TODO: note response in event file
+                self.panel.left.off()
+                self.panel.right.off()
+
+
+                trial_stim.time = trial_stim.time + trial['stim_start']
+                for motif in trial_motifs:
+                    motif.time = motif.time + trial['stim_start']
+
+                # calculate the number of motifs the bird heard
+                if trial['response'] == 'none':
+                    num_mots = len(trial_motifs)
+                else:
+                    num_mots = 0
+                    for motif in trial_motifs:
+                        if trial['response_time'] > motif.time:
+                            num_mots += 1
+                # determine the string of motifs the bird heard
+
+                trial['stim_motifs'] = trial_motifs[:num_mots]
+
+                trial['stim_string'] = ''
+                for motif in trial['stim_motifs']:
+                    trial['stim_string'] += next((name for name, wav in exp.stims.iteritems() if wav == motif.name), '')
+
+                # decide how to respond to the subject for normal trials
+                if trial['type'] is 'normal':
+                    if trial['response'] is trial['class']:
+                        # correct response
+                        self.do_correction = False
+
+                        if trial['type'] is not 'correction':
+                            trial['cum_correct'] += 1
+
+                        if exp.secondary_reinf:
+                            # give secondary reinforcer
+                            trial['flash_epoch'] = panel.center.flash(dur=0.5)
+
+                        if (trial['cum_correct'] >= trial['cum_correct_thresh']):
+                            # if cum currect reaches feed threshold, then feed
+                            exp.summary['feeds'] += 1
+                            trial['feed'] = True
+
+                            self.reward()
+
+                    elif trial['response'] is 'none':
+                        # ignore non-responses
+                        pass
+
+                    else:
+                        self.punish()
+
+                trial['trial_duration'] = (dt.datetime.now() - trial['trial_start']).total_seconds()
+                exp.save_trial(trial)
+
+                if trial['feed']:
+                    trial['cum_correct'] = 0
+
+            except components.GoodNite:
+                """ reset expal parameters for the next day """
+                poll_int = 60.0
+                panel.lights_off()
+                exp.init_summary()
+                exp.log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
+                utils.wait(poll_int)
+
+            except hwio.ComediError as err:
+                exp.log.critical(str(err) + ", terminating operant control script")
+                do_exp = False
+
+<<<<<<< Updated upstream
+        except components.GoodNite:
+            """ reset experimental parameters for the next day """
+            poll_int = 60.0
+            box.house_light.off()
+            experiment.init_summary()
+            experiment.log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
+            utils.wait(poll_int)
+=======
+            except hwio.AudioError as err:
+                exp.log.error(str(err))
+>>>>>>> Stashed changes
+
+            finally:
+                exp.write_summary()
 
 
 # def run_trial(trial, options):
@@ -130,214 +349,28 @@ class EvidenceAccumExperiment(utils.Experiment):
 
 def main(options):
 
-    experiment = EvidenceAccumExperiment(**options)
+    exp = EvidenceAccumExperiment(**options)
 
     # initialize box
-    if experiment.box_id == 1:
-        box = local.Vogel1()
-    elif experiment.box_id == 2:
-        box = local.Vogel2()
-    if experiment.box_id == 3:
-        box = local.Vogel3()
-    elif experiment.box_id == 4:
-        box = local.Vogel4()
-    if experiment.box_id == 7:
-        box = local.Vogel7()
-    elif experiment.box_id == 8:
-        box = local.Vogel8()
+    if exp.box_id == 1:
+        exp.panel = local.Vogel1()
+    elif exp.box_id == 2:
+        exp.panel = local.Vogel2()
+    if exp.box_id == 3:
+        exp.panel = local.Vogel3()
+    elif exp.box_id == 4:
+        exp.panel = local.Vogel4()
+    if exp.box_id == 7:
+        exp.panel = local.Vogel7()
+    elif exp.box_id == 8:
+        exp.panel = local.Vogel8()
 
-    box.house_light.schedule = experiment.light_schedule
-    box.reset()
+    panel.house_light.schedule = exp.light_schedule
+    exp.panel.reset()
 
-    experiment.log.debug('box %i initialized' % experiment.box_id)
+    exp.log.debug('panel %i initialized' % exp.box_id)
 
-    trial = {
-        'correct': False,
-        'cum_correct': 0,
-        'cum_correct_thresh': 1,
-        'number': 0,
-        }
-
-    do_correction = False
-
-    # start experiment
-    while True:
-        try:
-            # make sure lights are on at the beginning of each trial, prep for trial
-            box.house_light.set_by_schedule()
-
-            trial['feed'] = False
-            trial['timeout'] = False
-            trial['number'] += 1
-
-            if do_correction and experiment.correction_trials:
-                trial['type'] = 'correction'
-                experiment.log.debug("correction trial: class is %s" % trial['class'])
-            else:
-                trial['type'] = 'normal'
-                trial['class'] = random.choice(experiment.models.keys())
-                trial_stim, trial_motifs = experiment.get_stimuli(trial['class'])
-                experiment.log.debug("trial class is %s" % trial['class'])
-
-
-            min_epoch = trial_motifs[experiment.strlen_min-1]
-            min_wait = min_epoch.time + min_epoch.duration
-
-            max_wait = trial_stim.time + trial_stim.duration + experiment.response_win
-
-            # wait for bird to peck
-            utils.wait(experiment.intertrial_min)
-            experiment.log.debug('waiting for peck...')
-            box.center.on()
-            trial['trial_start'] = box.center.wait_for_peck()
-            box.center.off()
-
-            # record trial initiation
-            experiment.summary['trials'] += 1
-            experiment.summary['last_trial_time'] = trial['trial_start'].ctime()
-            experiment.log.info("trial started at %s" % trial['trial_start'].ctime())
-
-            # play stimulus
-            stim_start = dt.datetime.now()
-            trial['stim_start'] = (stim_start- trial['trial_start']).total_seconds()
-            wave_stream = box.speaker.play_wav(trial_stim.file_origin)
-            utils.wait(min_wait)
-
-            # check for responses
-            check_peck = True
-            box.left.on()
-            box.right.on()
-            while check_peck:
-                elapsed_time = (dt.datetime.now() - stim_start).total_seconds()
-                if elapsed_time > max_wait:
-                    trial['response'] = 'none'
-                    check_peck = False
-                elif box.left.status():
-                    trial['response_time'] = trial['stim_start'] + elapsed_time
-                    wave_stream.close()
-                    trial['response'] = 'L'
-                    check_peck = False
-                    experiment.summary['responses'] += 1
-                elif box.right.status():
-                    trial['response_time'] = trial['stim_start'] + elapsed_time
-                    wave_stream.close()
-                    trial['response'] = 'R'
-                    check_peck = False
-                    experiment.summary['responses'] += 1
-            # TODO: note response in event file
-            box.left.off()
-            box.right.off()
-
-
-            trial_stim.time = trial_stim.time + trial['stim_start']
-            for motif in trial_motifs:
-                motif.time = motif.time + trial['stim_start']
-
-            # calculate the number of motifs the bird heard
-            if trial['response'] == 'none':
-                num_mots = len(trial_motifs)
-            else:
-                num_mots = 0
-                for motif in trial_motifs:
-                    if trial['response_time'] > motif.time:
-                        num_mots += 1
-            # determine the string of motifs the bird heard
-
-            trial['stim_motifs'] = trial_motifs[:num_mots]
-
-            trial['stim_string'] = ''
-            for motif in trial['stim_motifs']:
-                trial['stim_string'] += next((name for name, wav in experiment.stims.iteritems() if wav == motif.name), '')
-
-            # decide how to respond to the subject for normal trials
-            if trial['type'] is 'normal':
-                if trial['response'] is trial['class']:
-                    # correct response
-                    do_correction = False
-
-                    if trial['type'] is not 'correction':
-                        trial['cum_correct'] += 1
-
-                    if experiment.secondary_reinf:
-                        # give secondary reinforcer
-                        trial['flash_epoch'] = box.center.flash(dur=0.5)
-
-                    if (trial['cum_correct'] >= trial['cum_correct_thresh']):
-                        # if cum currect reaches feed threshold, then feed
-                        experiment.summary['feeds'] += 1
-                        trial['feed'] = True
-
-                        try:
-                            trial['feed_epoch'] = box.reward(value=experiment.feed_dur[trial['class']])
-
-                        # but catch the feed errors
-                        # except components.ResponseDuringFeedError as err:
-                        #     trial['feed'] = 'Error'
-                        #     experiment.summary['responses_during_feed'] += 1
-                        #     experiment.log.error("response during feed on box %s" % str(err))
-                        #     utils.wait(experiment.feed_dur[trial['class']])
-                        #     box.reset()
-
-                        except components.HopperActiveError as err:
-                            trial['feed'] = 'Error'
-                            experiment.summary['hopper_already_up'] += 1
-                            experiment.log.warning("hopper already up on box %s" % str(err))
-                            utils.wait(experiment.feed_dur[trial['class']])
-                            box.reset()
-
-                        except components.HopperInactiveError as err:
-                            trial['feed'] = 'Error'
-                            experiment.summary['hopper_failures'] += 1
-                            experiment.log.error("hopper didn't come up on box %s" % str(err))
-                            utils.wait(experiment.feed_dur[trial['class']])
-                            box.reset()
-
-                        # except components.HopperDidntDropError as err:
-                        #     trial['feed'] = 'Error'
-                        #     experiment.summary['hopper_wont_go_down'] += 1
-                        #     experiment.log.warning("hopper didn't go down on box %s" % str(err))
-                        #     box.reset()
-
-                        finally:
-                            box.house_light.on()
-                            if trial['type'] is not 'correction':
-                                trial['cum_correct_thresh'] = random.randint(1, 2*experiment.variable_ratio-1)
-
-                elif trial['response'] is 'none':
-                    # ignore non-responses
-                    pass
-
-                else:
-                    trial['timeout_epoch'] = box.punish(value=experiment.timeout_dur[trial['class']])
-                    trial['timeout'] = True
-                    trial['cum_correct'] = 0
-                    do_correction = True
-
-            trial['trial_duration'] = (dt.datetime.now() - trial['trial_start']).total_seconds()
-            experiment.save_trial(trial)
-
-            if trial['feed']:
-                trial['cum_correct'] = 0
-
-        except components.GoodNite:
-            """ reset experimental parameters for the next day """
-            poll_int = 60.0
-            box.house_light.off()
-            experiment.init_summary()
-            experiment.log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
-            utils.wait(poll_int)
-
-        except hwio.ComediError as err:
-            experiment.log.critical(str(err) + ", terminating operant control script")
-            do_experiment = False
-
-        except hwio.AudioError as err:
-            experiment.log.error(str(err))
-
-        finally:
-            experiment.write_summary()
-
-
+    exp.run()
 
 if __name__ == "__main__":
 
