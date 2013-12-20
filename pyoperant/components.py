@@ -30,8 +30,9 @@ class Hopper(BaseComponent):
 
     has parts: IR Beam (Input) & Solenoid (output)
     """
-    def __init__(self,IR,solenoid,*args,**kwargs):
+    def __init__(self,IR,solenoid,lag=0.3,*args,**kwargs):
         super(Hopper, self).__init__(*args,**kwargs)
+        self.lag = lag
         if isinstance(IR,InputChannel):
             self.IR = IR
         else:
@@ -58,27 +59,27 @@ class Hopper(BaseComponent):
     def reset(self):
         """ drop hopper """
         self.solenoid.set(False)
-        wait(0.3)
+        wait(self.lag)
         self.check()
         return True
 
-    def feed(self,dur=2.0,lag=0.3):
+    def feed(self,dur=2.0):
         """Performs a feed
 
         arguments:
         feedsecs -- duration of feed in seconds (default: %default)
         """
-        assert lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (lag,dur)
+        assert self.lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
         self.check()
         feed_time = datetime.datetime.now()
         self.solenoid.set(True)
         feed_duration = datetime.datetime.now() - feed_time
         while feed_duration < datetime.timedelta(seconds=dur):
-            wait(lag)
+            wait(self.lag)
             self.check()
             feed_duration = datetime.datetime.now() - feed_time
         self.solenoid.set(False)
-        wait(lag) # let the hopper drop
+        wait(self.lag) # let the hopper drop
         self.check()
         return (feed_time,feed_duration)
 
