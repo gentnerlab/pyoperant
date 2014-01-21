@@ -75,3 +75,12 @@ class Vogel8(VogelBox):
     def __init__(self, *args, **kwargs):
         self.id = 8
         super(Vogel8, self).__init__(*args, **kwargs)
+
+
+PANELS = {"Vogel1": Vogel1,
+          "Vogel2": Vogel2,
+          "Vogel3": Vogel3,
+          "Vogel4": Vogel4,
+          "Vogel7": Vogel7,
+          "Vogel8": Vogel8,
+          }

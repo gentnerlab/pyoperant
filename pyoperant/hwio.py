@@ -1,43 +1,13 @@
 import datetime
 import subprocess
-import comedi
-from pyoperant.utils import is_day, Error
+from pyoperant.utils import is_day, time_in_range, Error
+from pyoperant.interfaces import console
 
 
 class AudioError(Error):
     '''raised for problems with audio'''
     pass
 
-class ComediError(Error):
-    '''raised for problems communicating with the comedi driver'''
-    pass
-
-
-def comedi_read(device,subdevice,channel):
-    """ read from comedi port
-    """
-    (s,v) = comedi.comedi_dio_read(device,subdevice,channel)
-    if s:
-        return (not v)
-    else:
-        raise InputError('could not read from comedi device "%s", subdevice %s, channel %s' % (device,subdevice,channel))
-
-def comedi_write(device,subdevice,channel,value):
-    """Write to comedi port
-    """
-    value = not value #invert the value for comedi
-    s = comedi.comedi_dio_write(device,subdevice,channel,value)
-    if s:
-        return True
-    else:
-        raise OutputError()
-
-def time_in_range(start, end, x):
-    """Return true if x is in the range [start, end]"""
-    if start <= end:
-        return start <= x <= end
-    else:
-        return start <= x or x <= end
 
 # Classes of operant components
 class BaseIO(object):
@@ -46,12 +16,9 @@ class BaseIO(object):
         self.interface = interface
         for key, value in kwargs.items():
             setattr(self, key, value)
-        if self.interface is 'comedi':
-            self.device = comedi.comedi_open(self.device_name)
-        elif self.interface is None:
-            raise Error('you must specificy an interface')
-        else:
-            raise Error('unknown interface')
+
+        if self.interface is None:
+            interface = console.ConsoleInterface()
 
 class InputChannel(BaseIO):
     """Class which holds information about inputs and abstracts the methods of querying them"""

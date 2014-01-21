@@ -18,33 +18,32 @@ class Error(Exception):
 # consider importing this from python-neo
 class Event(object):
     """docstring for Event"""
-    def __init__(self, time, duration=None, label='', name=None, description=None, file_origin=None, *args, **annotations):
+    def __init__(self, time, duration=None, label='', name=None, description=None, file_origin=None, *args, **kwargs):
         super(Event, self).__init__()
-        assert isinstance(time, float)
-        assert isinstance(label, str)
         self.time = time
         self.duration = duration
         self.label = label
         self.name = name
         self.description = description
         self.file_origin = file_origin
-        self.annotations = annotations
+        self.annotations = {}
+        self.annotate(**kwargs)
 
+    def annotate(self,**kwargs):
+        self.annotations.update(annotations)
+        
 
 class Stimulus(Event):
     """docstring for Stimulus"""
     def __init__(self, *args, **kwargs):
         super(Stimulus, self).__init__(*args, **kwargs)
-        pass
-
-
+        self.label = 'stimulus'
 
 class AuditoryStimulus(Stimulus):
     """docstring for AuditoryStimulus"""
     def __init__(self, *args, **kwargs):
         super(AuditoryStimulus, self).__init__(*args, **kwargs)
-        pass
-
+        self.label = 'auditory_stimulus'
 
 def parse_commandline(arg_str=sys.argv[1:]):
     """ parse command line arguments
@@ -63,6 +62,14 @@ def parse_commandline(arg_str=sys.argv[1:]):
                       help='configuration file [default: %(default)s]')
     args = parser.parse_args(arg_str)
     return vars(args)
+
+
+def time_in_range(start, end, x):
+    """Return true if x is in the range [start, end]"""
+    if start <= end:
+        return start <= x <= end
+    else:
+        return start <= x or x <= end
 
 def is_day((latitude, longitude) = ('32.82', '-117.14')):
     """Is it daytime?
