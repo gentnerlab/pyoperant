@@ -30,6 +30,92 @@ def get_options(cmd_line):
 
     return options
 
+class Flow(object):
+    """docstring for Flow"""
+    def __init__(self, *args, **kwargs):
+        super(Flow, self).__init__()
+        self.state = 'init'
+        self.flow_map = {'init': self.init,
+                          'main': self.main,
+                          'post': self.post,
+                          }
+
+    def init(self):
+        return 'main'
+
+    def main(self):
+        return 'post'
+
+    def post(self):
+        return None
+
+    def run(self):
+        while self.state is not None:
+            self.state = self.flow_map[self.state]()
+        
+
+class ReinforcementSchedule(object):
+    """docstring for ReinforcementSchedule"""
+    def __init__(self):
+        super(ReinforcementSchedule, self).__init__()
+
+    def consequate(self,correct):
+        if correct:
+            return True
+        else:
+            return False
+
+class FixedRatioSchedule(ReinforcementSchedule):
+    """docstring for FixedSchedule"""
+    def __init__(self, ratio=1):
+        super(FixedSchedule, self).__init__()
+        self.ratio = ratio
+        self.cum_correct = 0
+        self.update()
+
+    def update(self):
+        self.min_correct = ratio
+
+    def consequate(self,correct):
+        if correct:
+            self.cum_correct += 1
+            if self.cum_correct >= self.min_correct:
+                self.update()
+                return True
+            else:
+                return False
+        else:
+            self.cum_correct = 0
+            return False
+
+class VariableRatioSchedule(FixedRatioSchedule):
+    """docstring for VariableRatioSchedule"""
+    def __init__(self, ratio=1):
+        super(VariableRatioSchedule, self).__init__(ratio=ratio)
+
+    def update(self):
+        ''' update min correct by randomly sampling from interval [1:2*ratio-1)'''
+        self.min_correct = random.randint(1, 2*exp.variable_ratio-1)
+
+
+class Trial(utils.Event):
+    """docstring for Trial"""
+    def __init__(self,
+                 state='queued',
+                 correct=False,
+                 trial_type='normal', 
+                 *args, **kwargs):
+        super(Trial, self).__init__(*args, **kwargs)
+        self.state = state
+        self.correct = correct
+        self.trial_type = trial_type
+        self.events = []
+        self.stimulus = None
+        self.response = None
+        self.reward = None
+        self.punish = None
+    
+
 class EvidenceAccumExperiment(utils.Experiment):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
@@ -60,7 +146,12 @@ class EvidenceAccumExperiment(utils.Experiment):
         self.summaryDAT = os.path.join(self.bird_path,self.subject_id + '.summaryDAT')
         self.init_summary()
 
+        self.reinf_sched = VariableRatioSchedule(VR=self.variable_ratio)
+        self.trials = []
+        self.panel = None
 
+
+    def build_transition_matrices(self): 
         # run through the transitions for each stimulus and generate transition matrixes
         n = len(self.stim_map)
         self.evidence_arrays = {}
@@ -79,13 +170,11 @@ class EvidenceAccumExperiment(utils.Experiment):
             trans = self.odds * self.evidence_arrays[stim_class] + self.evidence_arrays[other_class]
             trans[0,1:] = 1.0
             trans = np.cumsum(trans,axis=1)
-            trans = trans / trans[:,-1][:,None] # I don't get why this works
+            trans = trans / trans[:,-1][:,None] # I don't get why it suddenly works to append '[:,None]'
             self.transition_cdf[this_class] = trans
 
-        self.trials = []
-        self.panel = None
-
     def reward(self):
+        self.summary['feeds'] += 1
         try:
             trial['feed_epoch'] = self.panel.reward(value=self.feed_dur[trial['class']])
 
@@ -119,17 +208,16 @@ class EvidenceAccumExperiment(utils.Experiment):
 
         finally:
             self.panel.house_light.on()
-            if trial['type'] is not 'correction':
-                trial['cum_correct_thresh'] = random.randint(1, 2*exp.variable_ratio-1)
+                
+
+    def secondary_reinforcement(self,value=1.0):
+        return self.panel.center.flash(dur=value)
 
     def punish(self):
         trial['timeout_epoch'] = self.panel.punish(value=self.timeout_dur[trial['class']])
         trial['timeout'] = True
         trial['cum_correct'] = 0
         do_correction = True
-
-    def present_stimulus(self):
-        pass
 
     def get_stimuli(self,trial_class):
         """ take trial class and return a tuple containing the wav filename & additional info to play
@@ -161,12 +249,6 @@ class EvidenceAccumExperiment(utils.Experiment):
 
         return stim, epochs
 
-    def save_trial(self,trial_dict):
-        '''write trial results to CSV'''
-        with open(self.data_csv,'ab') as data_fh:
-            trialWriter = csv.DictWriter(data_fh,fieldnames=self.fields_to_save,extrasaction='ignore')
-            trialWriter.writerow(trial_dict)
-
     def new_trial(self):
         '''create a new trial and append it to the trial list'''
         trial = {}
@@ -192,159 +274,186 @@ class EvidenceAccumExperiment(utils.Experiment):
 
         return True
 
+    def trial_init(self):
+        ''' this is where we initialize a trial'''
+        # make sure lights are on at the beginning of each trial, prep for trial
+        self.panel.house_light.set_by_schedule()
+
+        self.new_trial()
+
+        self.this_trial = self.trials[-1]
+
+        trial.min_epoch = trial_motifs[self.strlen_min-1]
+        trial.min_wait = min_epoch.time + min_epoch.duration
+
+        trial.max_wait = trial_stim.time + trial_stim.duration + self.response_win
+
+    def trial_run(self,trial):
+
+        self.stimulus_init()
+        self.stimulus_run()
+        self.stimulus_end()
+
+        self.response_init()
+        self.response_run()
+        self.response_end()
+
+        self.consequence_init()
+        self.consequence_run()
+        self.consequence_end()
+
+    def stimulus_init(self):
+        # wait for bird to peck
+        self.log.debug('waiting for peck...')
+        self.panel.center.on()
+        trial['trial_start'] = panel.center.wait_for_peck()
+        self.panel.center.off()
+
+        # record trial initiation
+        self.summary['trials'] += 1
+        self.summary['last_trial_time'] = trial['trial_start'].ctime()
+        self.log.info("trial started at %s" % trial['trial_start'].ctime())
+
+    def stimulus_run(self):
+        ## 1. play stimulus
+        stim_start = dt.datetime.now()
+        trial['stim_start'] = (stim_start- trial['trial_start']).total_seconds()
+        self.wave_stream = panel.speaker.play_wav(trial_stim.file_origin)
+        utils.wait(min_wait)
+
+    def stimulus_post(self):
+        pass
+
+    def response_init(self):
+        self.panel.left.on()
+        self.panel.right.on()
+
+    def response_run(self):
+        while True:
+            elapsed_time = (dt.datetime.now() - stim_start).total_seconds()
+            if elapsed_time > max_wait:
+                trial['response'] = 'none'
+                break
+            elif panel.left.status():
+                trial['response_time'] = trial['stim_start'] + elapsed_time
+                wave_stream.close()
+                trial['response'] = 'L'
+                self.summary['responses'] += 1
+                break
+            elif panel.right.status():
+                trial['response_time'] = trial['stim_start'] + elapsed_time
+                wave_stream.close()
+                trial['response'] = 'R'
+                self.summary['responses'] += 1
+                break
+    def response_post(self):
+        self.panel.left.off()
+        self.panel.right.off()
+
+    def consequence_init(self):
+        pass
+
+    def consequence_run(self):
+        # correct trial
+        if trial['response'] is trial['class']:
+            
+            if self.secondary_reinf:
+                trial['flash_epoch'] = self.secondary_reinforcement()
+
+            self.do_correction = False # we don't want the next trial to be a correction trial
+
+            if trial['type'] == 'correction':
+                pass
+
+            elif self.reinf_sched.consequate(correct=True):
+                trial['feed'] = True
+                self.reward()
+        # no response
+        elif trial['response'] is 'none':
+            pass
+
+        # incorrect trial
+        else:
+            self.reinf_sched.cum_correct = 0
+            self.punish()
+
+    def consequence_post(self):
+        trial['trial_duration'] = (dt.datetime.now() - trial['trial_start']).total_seconds()
+        
+
+    def analyze_trial(self,trial):
+        '''after the trial is complete, perform additional analyses that will be saved'''
+        trial_stim.time = trial_stim.time + trial['stim_start']
+        for motif in trial_motifs:
+            motif.time = motif.time + trial['stim_start']
+
+        # calculate the number of motifs the bird heard
+        if trial['response'] == 'none':
+            num_mots = len(trial_motifs)
+        else:
+            num_mots = 0
+            for motif in trial_motifs:
+                if trial['response_time'] > motif.time:
+                    num_mots += 1
+        # determine the string of motifs the bird heard
+        trial['stim_motifs'] = trial_motifs[:num_mots]
+
+        trial['stim_string'] = ''
+        for motif in trial['stim_motifs']:
+            trial['stim_string'] += next((name for name, wav in self.stims.iteritems() if wav == motif.name), '')
+
+
+    def save_trial(self,trial_dict):
+        '''write trial results to CSV'''
+        with open(self.data_csv,'ab') as data_fh:
+            trialWriter = csv.DictWriter(data_fh,fieldnames=self.fields_to_save,extrasaction='ignore')
+            trialWriter.writerow(trial_dict)
+
+    def trial_post(self):
+        '''things to do at the end of a trial'''
+
+        self.analyze_trial()
+        self.save_trial(trial)
+        self.write_summary()
+        utils.wait(self.intertrial_min)
+
+    def sleep_init(self):
+        self.sleep_poll_interval = 60.0
+
+    def sleep_run(self):
+        """ reset expal parameters for the next day """
+        poll_int = self.sleep_poll_interval
+        panel.lights_off()
+        self.log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
+        utils.wait(poll_int)
+
+    def sleep_post(self):
+        self.init_summary()
+
     def run(self):
 
         self.do_correction = False
 
         # start exp
         while True:
+
+            # trial loop
             try:
-                # make sure lights are on at the beginning of each trial, prep for trial
-                self.panel.house_light.set_by_schedule()
-
-                
-                trial['index'] += 1
-
-                self.new_trial()
-
-                min_epoch = trial_motifs[exp.strlen_min-1]
-                min_wait = min_epoch.time + min_epoch.duration
-
-                max_wait = trial_stim.time + trial_stim.duration + exp.response_win
-
-                # wait for bird to peck
-                utils.wait(exp.intertrial_min)
-                self.log.debug('waiting for peck...')
-                self.panel.center.on()
-                trial['trial_start'] = panel.center.wait_for_peck()
-                self.panel.center.off()
-
-                # record trial initiation
-                self.summary['trials'] += 1
-                self.summary['last_trial_time'] = trial['trial_start'].ctime()
-                self.log.info("trial started at %s" % trial['trial_start'].ctime())
-
-                # play stimulus
-                stim_start = dt.datetime.now()
-                trial['stim_start'] = (stim_start- trial['trial_start']).total_seconds()
-                wave_stream = panel.speaker.play_wav(trial_stim.file_origin)
-                utils.wait(min_wait)
-
-                # check for responses
-                check_peck = True
-                self.panel.left.on()
-                self.panel.right.on()
-                while check_peck:
-                    elapsed_time = (dt.datetime.now() - stim_start).total_seconds()
-                    if elapsed_time > max_wait:
-                        trial['response'] = 'none'
-                        check_peck = False
-                    elif panel.left.status():
-                        trial['response_time'] = trial['stim_start'] + elapsed_time
-                        wave_stream.close()
-                        trial['response'] = 'L'
-                        check_peck = False
-                        exp.summary['responses'] += 1
-                    elif panel.right.status():
-                        trial['response_time'] = trial['stim_start'] + elapsed_time
-                        wave_stream.close()
-                        trial['response'] = 'R'
-                        check_peck = False
-                        exp.summary['responses'] += 1
-                # TODO: note response in event file
-                self.panel.left.off()
-                self.panel.right.off()
-
-
-                trial_stim.time = trial_stim.time + trial['stim_start']
-                for motif in trial_motifs:
-                    motif.time = motif.time + trial['stim_start']
-
-                # calculate the number of motifs the bird heard
-                if trial['response'] == 'none':
-                    num_mots = len(trial_motifs)
-                else:
-                    num_mots = 0
-                    for motif in trial_motifs:
-                        if trial['response_time'] > motif.time:
-                            num_mots += 1
-                # determine the string of motifs the bird heard
-
-                trial['stim_motifs'] = trial_motifs[:num_mots]
-
-                trial['stim_string'] = ''
-                for motif in trial['stim_motifs']:
-                    trial['stim_string'] += next((name for name, wav in exp.stims.iteritems() if wav == motif.name), '')
-
-                # decide how to respond to the subject for normal trials
-                if trial['type'] is 'normal':
-                    if trial['response'] is trial['class']:
-                        # correct response
-                        self.do_correction = False
-
-                        if trial['type'] is not 'correction':
-                            trial['cum_correct'] += 1
-
-                        if exp.secondary_reinf:
-                            # give secondary reinforcer
-                            trial['flash_epoch'] = panel.center.flash(dur=0.5)
-
-                        if (trial['cum_correct'] >= trial['cum_correct_thresh']):
-                            # if cum currect reaches feed threshold, then feed
-                            exp.summary['feeds'] += 1
-                            trial['feed'] = True
-
-                            self.reward()
-
-                    elif trial['response'] is 'none':
-                        # ignore non-responses
-                        pass
-
-                    else:
-                        self.punish()
-
-                trial['trial_duration'] = (dt.datetime.now() - trial['trial_start']).total_seconds()
-                exp.save_trial(trial)
-
-                if trial['feed']:
-                    trial['cum_correct'] = 0
-
+                self.trial_init()
+                self.trial_run()
             except components.GoodNite:
-                """ reset expal parameters for the next day """
-                poll_int = 60.0
-                panel.lights_off()
-                exp.init_summary()
-                exp.log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
-                utils.wait(poll_int)
+                self.sleep_init()
+                self.sleep_run()
+                self.sleep_post()
 
             except hwio.ComediError as err:
-                exp.log.critical(str(err) + ", terminating operant control script")
-                do_exp = False
+                self.log.critical(str(err))
 
-<<<<<<< Updated upstream
-        except components.GoodNite:
-            """ reset experimental parameters for the next day """
-            poll_int = 60.0
-            box.house_light.off()
-            experiment.init_summary()
-            experiment.log.debug('waiting %f seconds before checking light schedule...' % (poll_int))
-            utils.wait(poll_int)
-=======
             except hwio.AudioError as err:
-                exp.log.error(str(err))
->>>>>>> Stashed changes
+                self.log.error(str(err))
 
             finally:
-                exp.write_summary()
-
-
-# def run_trial(trial, options):
-#     pass
-
-# class VRTrial(utils.Event):
-#     """docstring for Trial"""
-#     def __init__(self, correct=False,cum_correct=0,cum_correct_thresh=1, *args, **kwargs):
-#         super(Trial, self, *args, **kwargs).__init__()
+                self.trial_post()
 
 
 def main(options):
