@@ -7,12 +7,12 @@ class ConsoleInterface(base.BaseInterface):
         super(ConsoleInterface, self).__init__(*args,**kwargs)
         pass
 
-    def read(self,prompt=''):
+    def _read(self,prompt=''):
         """ read from keyboard input
         """
         return raw_input(prompt)
 
-    def write(self,value):
+    def _write(self,value):
         """Write to console
         """
         print value
