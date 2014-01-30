@@ -42,8 +42,8 @@ class Hopper(BaseComponent):
 
     def check(self):
         """get status of solenoid & IR beam, throw hopper error if mismatch"""
-        IR_status = self.IR.get()
-        solenoid_status = self.solenoid.get()
+        IR_status = self.IR.read()
+        solenoid_status = self.solenoid.read()
         if IR_status is not solenoid_status:
             if IR_status:
                 raise HopperActiveError
@@ -54,9 +54,9 @@ class Hopper(BaseComponent):
         else:
             return IR_status
 
-    def reset(self):
+    def rewrite(self):
         """ drop hopper """
-        self.solenoid.set(False)
+        self.solenoid.write(False)
         wait(self.lag)
         self.check()
         return True
@@ -70,13 +70,13 @@ class Hopper(BaseComponent):
         assert self.lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
         self.check()
         feed_time = datetime.datetime.now()
-        self.solenoid.set(True)
+        self.solenoid.write(True)
         feed_duration = datetime.datetime.now() - feed_time
         while feed_duration < datetime.timedelta(seconds=dur):
             wait(self.lag)
             self.check()
             feed_duration = datetime.datetime.now() - feed_time
-        self.solenoid.set(False)
+        self.solenoid.write(False)
         wait(self.lag) # let the hopper drop
         self.check()
         return (feed_time,feed_duration)
@@ -104,28 +104,28 @@ class PeckPort(BaseComponent):
 
     def status(self):
         """get status of solenoid & IR beam, throw hopper error if mismatch"""
-        return self.IR.get()
+        return self.IR.read()
 
     def off(self):
         """ drop  """
-        self.LED.set(False)
+        self.LED.write(False)
         return True
 
     def on(self):
         """ drop  """
-        self.LED.set(True)
+        self.LED.write(True)
         return True
 
     def flash(self,dur=1.0,isi=0.1):
         """ flash a set of LEDs """
-        LED_state = self.LED.get()
+        LED_state = self.LED.read()
         flash_time = datetime.datetime.now()
         flash_duration = datetime.datetime.now() - flash_time
         while flash_duration < datetime.timedelta(seconds=dur):
             self.LED.toggle()
             wait(isi)
             flash_duration = datetime.datetime.now() - flash_time
-        self.LED.set(LED_state)
+        self.LED.write(LED_state)
         return (flash_time,flash_duration)
 
     def wait_for_peck(self):
@@ -133,51 +133,38 @@ class PeckPort(BaseComponent):
         return self.IR.poll()
 
 ## House Light ##
-
-class GoodNite(Exception):
-    """ exception for when the lights should be off """
-    pass
-
 class HouseLight(BaseComponent):
     """Class which holds information about the house light
 
     Inherited from Output
     """
-    def __init__(self,light,schedule='sun',*args,**kwargs):
+    def __init__(self,light,*args,**kwargs):
         super(HouseLight, self).__init__(*args,**kwargs)
         if isinstance(light,OutputChannel):
             self.light = light
         else:
             raise Error('%s is not an output channel' % light)
-        self.schedule = schedule
 
     def off(self):
         """ drop  """
-        self.light.set(False)
+        self.light.write(False)
         return True
 
     def on(self):
         """ drop  """
-        self.light.set(True)
+        self.light.write(True)
         return True
 
-    def check_schedule(self):
-        return check_time(self.schedule)
 
-    def set_by_schedule(self):
-        if self.check_schedule():
-            return self.light.set(True)
-        else:
-            raise GoodNite()
 
     def timeout(self,dur=10.0):
         """ turn off light for a few seconds """
         timeout_time = datetime.datetime.now()
-        self.light.set(False)
+        self.light.write(False)
         timeout_duration = datetime.datetime.now() - timeout_time
         while timeout_duration < datetime.timedelta(seconds=dur):
             timeout_duration = datetime.datetime.now() - timeout_time
-        self.light.set(True)
+        self.light.write(True)
         return (timeout_time,timeout_duration)
 
     def punish(self,value=10.0):
@@ -212,21 +199,21 @@ class CueLight(BaseComponent):
             raise Error('%s is not an output channel' % blue_LED)
 
     def red(self):
-        self.green_LED.set(False)
-        self.blue_LED.set(False)
-        return self.red_LED.set(True)
+        self.green_LED.write(False)
+        self.blue_LED.write(False)
+        return self.red_LED.write(True)
     def green(self):
-        self.red_LED.set(False)
-        self.blue_LED.set(False)
-        return self.green_LED.set(True)
+        self.red_LED.write(False)
+        self.blue_LED.write(False)
+        return self.green_LED.write(True)
     def blue(self):
-        self.red_LED.set(False)
-        self.green_LED.set(False)
-        return self.blue_LED.set(True)
+        self.red_LED.write(False)
+        self.green_LED.write(False)
+        return self.blue_LED.write(True)
     def off(self):
-        self.red_LED.set(False)
-        self.green_LED.set(False)
-        self.blue_LED.set(False)
+        self.red_LED.write(False)
+        self.green_LED.write(False)
+        self.blue_LED.write(False)
 
 
 ## Perch ##
