@@ -3,17 +3,18 @@ import sys
 import struct
 import time
 import datetime as dt
-import logging
 from argparse import ArgumentParser
 
 import ephem
-
 
 ## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in this module'''
     pass
 
+class GoodNite(Exception):
+    """ exception for when the lights should be off """
+    pass
 
 # consider importing this from python-neo
 class Event(object):
@@ -45,6 +46,38 @@ class AuditoryStimulus(Stimulus):
         super(AuditoryStimulus, self).__init__(*args, **kwargs)
         self.label = 'auditory_stimulus'
 
+
+def do_flow(pre,main,post):
+    machine = {'pre': self.pre,
+               'main': self.main,
+               'post': self.post,
+               }
+    state = 'pre'
+    while state is not None:
+        state = machine[state]()
+
+
+class Trial(utils.Event):
+    """docstring for Trial"""
+    def __init__(self,
+                 index=None,
+                 state='queued',
+                 tr_type='normal', 
+                 tr_class=None,
+                 *args, **kwargs):
+        super(Trial, self).__init__(*args, **kwargs)
+        self.label = 'trial'
+        self.index = index
+        self.tr_type = tr_type
+        self.tr_class = tr_class
+        self.state = state
+        self.tr_class = None
+        self.response = None
+        self.correct = None
+        self.events = []
+        self.stimulus = None
+
+
 def parse_commandline(arg_str=sys.argv[1:]):
     """ parse command line arguments
     note: optparse is depreciated w/ v2.7 in favor of argparse
@@ -52,13 +85,13 @@ def parse_commandline(arg_str=sys.argv[1:]):
     """
     parser=ArgumentParser()
     parser.add_argument('-B', '--box',
-                      action='store', type=int, dest='box', required=True,
+                      action='store', type=int, dest='box', required=False,
                       help='(int) box identifier')
     parser.add_argument('-S', '--subject',
-                      action='store', type=str, dest='subj', required=True,
+                      action='store', type=str, dest='subj', required=False,
                       help='subject ID and folder name')
     parser.add_argument('-c','--config',
-                      action='store', type=str, dest='config_file', default='config.json',
+                      action='store', type=str, dest='config_file', default='config.json', required=True,
                       help='configuration file [default: %(default)s]')
     args = parser.parse_args(arg_str)
     return vars(args)
@@ -219,57 +252,4 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
                                   )
 
     return (concat_wav,epochs)
-
-class Experiment(object):
-    """docstring for Experiment"""
-    def __init__(self, *args, **kwargs):
-        super(Experiment,  self).__init__()
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-        self.filetime_fmt = '%Y-%m-%d-%H-%M-%S'
-        self.exp_timestamp = dt.datetime.now().strftime(self.filetime_fmt)
-
-
-    def log_config(self):
-        if self.debug:
-            self.log_level = logging.DEBUG
-        else:
-            self.log_level = logging.INFO
-
-        logging.basicConfig(filename=self.log_file,
-                            level=self.log_level,
-                            format='"%(asctime)s","%(levelname)s","%(message)s"')
-        self.log = logging.getLogger()
-        #email_handler = logging.handlers.SMTPHandler(mailhost='localhost',
-        #                                             fromaddr='bird@vogel.ucsd.edu',
-        #                                             toaddrs=[options['experimenter']['email'],],
-        #                                             subject='error notice',
-        #                                             )
-        #email_handler.setlevel(logging.ERROR)
-        #log.addHandler(email_handler)
-
-    def init_summary(self):
-        """ initializes an empty summary dictionary """
-        self.summary = {'trials': 0,
-                        'feeds': 0,
-                        'hopper_failures': 0,
-                        'hopper_wont_go_down': 0,
-                        'hopper_already_up': 0,
-                        'responses_during_feed': 0,
-                        'responses': 0,
-                        'last_trial_time': [],
-                        }
-
-    def write_summary(self):
-        """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
-        with open(self.summaryDAT,'wb') as f:
-            f.write("Trials this session: %s\n" % self.summary['trials'])
-            f.write("Last trial run @: %s\n" % self.summary['last_trial_time'])
-            f.write("Feeder ops today: %i\n" % self.summary['feeds'])
-            f.write("Hopper failures today: %i\n" % self.summary['hopper_failures'])
-            f.write("Hopper won't go down failures today: %i\n" % self.summary['hopper_wont_go_down'])
-            f.write("Hopper already up failures today: %i\n" % self.summary['hopper_already_up'])
-            f.write("Responses during feed: %i\n" % self.summary['responses_during_feed'])
-            f.write("Rf'd responses: %i\n" % self.summary['responses'])
 
