@@ -17,12 +17,7 @@ class BasePanel(object):
         self.inputs = []
         self.outputs = []
 
-    def register(self,component,role):
-        """ registers an attribute of a component with the box """
-        setattr(self,role,getattr(component,role))
-        return True
-
     def reset(self):
         for output in self.outputs:
-            output.set(False)
+            output.write(False)
         return True
