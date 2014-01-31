@@ -1,8 +1,14 @@
-from distutils.core import setup
+from distutils.core import setup, Extension
 import os
 
-def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+# def read(fname):
+#     return open(os.path.join(os.path.dirname(__file__), fname)).read()
+
+wait4peck = Extension('wait4peck',
+                    # include_dirs = ['/usr/local/include'],
+                    libraries = ['comedi'],
+                    # library_dirs = ['/usr/local/lib'],
+                    sources = ['wait4peck.c'])
 
 setup(
     name = 'pyoperant',
@@ -24,4 +30,5 @@ setup(
         "Programming Language :: Python :: 2.7",
         "Topic :: Scientific/Engineering",
         ],
+    ext_modules = [wait4peck]
     )
