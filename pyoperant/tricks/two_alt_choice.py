@@ -22,8 +22,7 @@ class TwoAltChoiceExp(base.BaseExp):
                                     'punish',
                                     ])
 
-                # configure csv file for data
-        
+        # configure csv file for data
         self.fields_to_save = ['index',
                                'type',
                                'trial_start',
@@ -348,6 +347,7 @@ class TwoAltChoiceExp(base.BaseExp):
         return do_flow(pre=self.punish_pre,
                        main=self.punish_main,
                        post=self.punish_post)
+
 
             
 

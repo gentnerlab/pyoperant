@@ -4,11 +4,6 @@ from pyoperant.utils import is_day, time_in_range, Error
 from pyoperant.interfaces import console
 
 
-class AudioError(Error):
-    '''raised for problems with audio'''
-    pass
-
-
 # Classes of operant components
 class BaseIO(object):
     """any type of IO device. maintains info on interface for query IO device"""
@@ -20,7 +15,17 @@ class BaseIO(object):
             interface = console.ConsoleInterface()
 
 class BooleanInput(BaseIO):
-    """Class which holds information about inputs and abstracts the methods of querying them"""
+    """Class which holds information about inputs and abstracts the methods of 
+    querying their values
+
+    Keyword arguments:
+    interface -- Interface() instance. Must have '_read_bool' method.
+    params -- dictionary of keyword:value pairs needed by the interface
+
+    Methods:
+    read() -- reads value of the input. Returns a boolean
+    poll() -- polls the input until value is True. Returns the time of the change
+    """
     def __init__(self,interface=None,params={},*args,**kwargs):
         super(InputChannel, self).__init__(interface=interface,params=params,*args,**kwargs)
 
@@ -30,12 +35,25 @@ class BooleanInput(BaseIO):
         """read status"""
         return self.interface._read_bool(**self.params)
 
-    # def poll(self):
-    #     """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-    #     return self.interface._poll(**self.params)
+    def poll(self):
+        """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
+        return self.interface._poll(**self.params)
 
 class BooleanOutput(BaseIO):
-    """Class which holds information about inputs and abstracts the methods of querying them and writeting them"""
+    """Class which holds information about outputs and abstracts the methods of 
+    writing to them
+
+    Keyword arguments:
+    interface -- Interface() instance. Must have '_write_bool' method.
+    params -- dictionary of keyword:value pairs needed by the interface
+
+    Methods:
+    write(value) -- writes a value to the output. Returns the value
+    read() -- if the interface supports '_read_bool' for this output, returns
+        the current value of the output from the interface. Otherwise this
+        returns the last passed by write(value)
+    toggle() -- flips the value from the current value
+    """
     def __init__(self,interface=None,*args,**kwargs):
         super(OutputChannel, self).__init__(interface=interface,params=params,*args,**kwargs)
 
@@ -59,7 +77,21 @@ class BooleanOutput(BaseIO):
         return self.write(value=value)
 
 class AudioOutput(BaseIO):
-    """docstring for AudioOutput"""
+    """Class which holds information about audio outputs and abstracts the 
+    methods of writing to them
+
+    Keyword arguments:
+    interface -- Interface() instance. Must have the methods '_queue_wav',
+        '_play_wav', '_stop_wav'
+    params -- dictionary of keyword:value pairs needed by the interface
+
+    Methods:
+    queue(wav_filename) -- queues
+    read() -- if the interface supports '_read_bool' for this output, returns
+        the current value of the output from the interface. Otherwise this
+        returns the last passed by write(value)
+    toggle() -- flips the value from the current value
+    """
     def __init__(self, interface=None,*args,**kwargs):
         super(AudioOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
         

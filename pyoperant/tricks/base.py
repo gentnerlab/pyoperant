@@ -7,7 +7,24 @@ try: import simplejson as json
 except ImportError: import json
 
 class BaseExp(object):
-    """docstring for Experiment"""
+    """Base class for an experiment.
+
+    Keyword arguments:
+    name -- name of this experiment
+    desc -- long description of this experiment
+    debug -- (bool) flag for debugging (default=False)
+    light_schedule  -- the light schedule for the experiment. either 'sun' or 
+        a tuple of (starttime,endtime) tuples in (hhmm,hhmm) form defining
+        time intervals for the lights to be on
+    experiment_path -- path to the experiment
+    stim_path -- path to stimuli (default = <experiment_path>/stims)
+    subject_id -- identifier of the subject
+    panel -- instance of local Panel() object
+
+    Methods:
+    run() -- runs the experiment
+
+    """
     def __init__(self,
                  name='',
                  description=''
@@ -17,7 +34,7 @@ class BaseExp(object):
                  idle_poll_interval = 60.0,
                  experiment_path='',
                  stim_path='',
-                 subject_id='x',
+                 subject_id='',
                  panel=None,
                  *args, **kwargs):
         super(Experiment,  self).__init__()
@@ -31,15 +48,17 @@ class BaseExp(object):
         self.parameters['idle_poll_interval'] = idle_poll_interval
 
         self.parameters['experiment_path'] = experiment_path
-        self.parameters['stim_path'] = stim_path
+        if stim_path == '':
+            self.parameters['stim_path'] = os.path.join(experiment_path,'stims')
+        else:
+            self.parameters['stim_path'] = stim_path
         self.parameters['subject_id'] = subject_id
 
         # configure logging
         self.log_file = os.path.join(self.parameters['experiment_path'], self.parameters['subject_id'] + '.log')
         self.log_config()
 
-        self.req_panel_attr: ['lights_on',
-                              'lights_off',
+        self.req_panel_attr: ['house_light',
                               'reset',
                               ]
         self.log.debug('panel %i initialized' % parameters['panel'])
@@ -110,7 +129,7 @@ class BaseExp(object):
     def sleep_main(self):
         """ reset expal parameters for the next day """
         self.log.debug('sleeping...')
-        self.panel.lights_off()
+        self.panel.house_light.off()
         utils.wait(self.parameters['sleep_poll_interval'])
         if self.check_light_schedule()
             return 'post'
@@ -119,7 +138,7 @@ class BaseExp(object):
 
     def sleep_post(self):
         self.log.debug('ending sleep')
-        self.panel.lights_on()
+        self.panel.house_light.on()
         self.init_summary()
         return None
 

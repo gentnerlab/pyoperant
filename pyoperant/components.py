@@ -1,5 +1,5 @@
 import datetime
-from pyoperant.hwio import InputChannel, OutputChannel
+from pyoperant import hwio
 from pyoperant.utils import Error, wait, check_time
 
 
@@ -16,26 +16,53 @@ class HopperError(Error):
     pass
 
 class HopperActiveError(HopperError):
-    """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
+    """raised when the hopper is up when it shouldn't be"""
     pass
 
 class HopperInactiveError(HopperError):
-    """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
+    """raised when the hopper is down when it shouldn't be"""
+    pass
+
+class HopperAlreadyUpError(HopperActiveError):
+    """raised when the hopper is already up before it goes up"""
+    pass
+
+class HopperWontComeUpError(HopperInactiveError):
+    """raised when the hopper won't come up"""
+    pass
+
+class HopperWontDropError(HopperActiveError):
+    """raised when the hopper won't drop"""
     pass
 
 class Hopper(BaseComponent):
-    """Class which holds information about hopper
+    """ Class which holds information about a hopper
 
-    has parts: IR Beam (Input) & Solenoid (output)
+    Keyword arguments:
+    solenoid(hwio.BooleanOutput) -- output channel to activate the solenoid & 
+        raise the hopper
+    IR(hwio.BooleanInput) -- input channel for the IR beam to check if the 
+        hopper is up
+    lag(float) -- time in seconds to wait before checking to make sure the 
+        hopper is up (default=0.3)
+
+    Methods:
+    check() -- reads the status of solenoid & IR beam, then throws an error 
+        if the don't match
+    up() -- raises the hopper up
+    down() -- drops the hopper down
+    feed(dur) -- delivers a feed for 'dur' seconds
+    reward(value) -- calls 'feed' for 'value' as 'dur'
+
     """
     def __init__(self,IR,solenoid,lag=0.3,*args,**kwargs):
         super(Hopper, self).__init__(*args,**kwargs)
         self.lag = lag
-        if isinstance(IR,InputChannel):
+        if isinstance(IR,hwio.BooleanInput):
             self.IR = IR
         else:
             raise Error('%s is not an input channel' % IR)
-        if isinstance(solenoid,OutputChannel):
+        if isinstance(solenoid,hwio.BooleanOutput):
             self.solenoid = solenoid
         else:
             raise Error('%s is not an output channel' % solenoid)
@@ -54,11 +81,23 @@ class Hopper(BaseComponent):
         else:
             return IR_status
 
-    def rewrite(self):
+    def up(self):
+        self.solenoid.write(True)
+        wait(self.lag)
+        try:
+            self.check()
+        except HopperInactiveError as e:
+            raise HopperWontComeUpError(e)
+        return True
+
+    def down(self):
         """ drop hopper """
         self.solenoid.write(False)
         wait(self.lag)
-        self.check()
+        try:
+            self.check()
+        except HopperActiveError as e:
+            raise HopperWontDropError(e)
         return True
 
     def feed(self,dur=2.0):
@@ -68,17 +107,18 @@ class Hopper(BaseComponent):
         feedsecs -- duration of feed in seconds (default: %default)
         """
         assert self.lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
-        self.check()
+        try:
+            self.check()
+        except HopperInactiveError as e:
+            raise HopperAlreadyUpError(e)
         feed_time = datetime.datetime.now()
-        self.solenoid.write(True)
+        self.up()
         feed_duration = datetime.datetime.now() - feed_time
         while feed_duration < datetime.timedelta(seconds=dur):
             wait(self.lag)
             self.check()
             feed_duration = datetime.datetime.now() - feed_time
-        self.solenoid.write(False)
-        wait(self.lag) # let the hopper drop
-        self.check()
+        self.down()
         return (feed_time,feed_duration)
 
     def reward(self,value=2.0):
@@ -87,37 +127,49 @@ class Hopper(BaseComponent):
 ## Peck Port ##
 
 class PeckPort(BaseComponent):
-    """Class which holds information about peck ports
+    """ Class which holds information about peck ports
 
-    has parts: IR Beam (Input) & LED (output)
+    Keyword arguments:
+    LED(hwio.BooleanOutput) -- output channel to activate the LED in the peck
+        port
+    IR(hwio.BooleanInput) -- input channel for the IR beam to check for a peck
+
+    Methods:
+    status() -- reads the status of the IR beam
+    on() -- turns the LED on
+    off() -- turns the LED off
+    flash(dur,isi) -- flashes the LED for 'dur' seconds (default=1.0) with an 
+        'isi' (default=0.1) 
+    wait_for_peck() -- waits for a peck. returns the peck time.
+
     """
     def __init__(self,IR,LED,*args,**kwargs):
         super(PeckPort, self).__init__(*args,**kwargs)
-        if isinstance(IR,InputChannel):
+        if isinstance(IR,hwio.BooleanInput):
             self.IR = IR
         else:
             raise Error('%s is not an input channel' % IR)
-        if isinstance(LED,OutputChannel):
+        if isinstance(LED,hwio.BooleanOutput):
             self.LED = LED
         else:
             raise Error('%s is not an output channel' % LED)
 
     def status(self):
-        """get status of solenoid & IR beam, throw hopper error if mismatch"""
+        """get the status of the IR beam """
         return self.IR.read()
 
     def off(self):
-        """ drop  """
+        """ turn off the LED  """
         self.LED.write(False)
         return True
 
     def on(self):
-        """ drop  """
+        """ turn on the LED  """
         self.LED.write(True)
         return True
 
     def flash(self,dur=1.0,isi=0.1):
-        """ flash a set of LEDs """
+        """ flash the LED """
         LED_state = self.LED.read()
         flash_time = datetime.datetime.now()
         flash_duration = datetime.datetime.now() - flash_time
@@ -134,13 +186,21 @@ class PeckPort(BaseComponent):
 
 ## House Light ##
 class HouseLight(BaseComponent):
-    """Class which holds information about the house light
+    """ Class which holds information about the house light
 
-    Inherited from Output
+    Keyword arguments:
+    light(hwio.BooleanOutput) -- output channel to turn the light on and off
+
+    Methods:
+    on() -- turns the house light on
+    off() -- turns the house light off
+    timeout(dur) -- turns off the house light for 'dur' seconds (default=10.0) 
+    punish() -- calls timeout() for 'value' as 'dur'
+
     """
     def __init__(self,light,*args,**kwargs):
         super(HouseLight, self).__init__(*args,**kwargs)
-        if isinstance(light,OutputChannel):
+        if isinstance(light,BooleanOutput):
             self.light = light
         else:
             raise Error('%s is not an output channel' % light)
@@ -154,8 +214,6 @@ class HouseLight(BaseComponent):
         """ drop  """
         self.light.write(True)
         return True
-
-
 
     def timeout(self,dur=10.0):
         """ turn off light for a few seconds """
@@ -173,63 +231,63 @@ class HouseLight(BaseComponent):
 
 ## Cue Light ##
 
-class CueLight(BaseComponent):
-    """Class which holds information about a cue light
+class RGBLight(BaseComponent):
+    """ Class which holds information about an RGB cue light
 
-    Has parts:
-    - Red LED
-    - Green LED
-    - Blue LED
+    Keyword arguments:
+    red(hwio.BooleanOutput) -- output channel for the red LED
+    green(hwio.BooleanOutput) -- output channel for the green LED
+    blue(hwio.BooleanOutput) -- output channel for the blue LED
 
+    Methods:
+    red() -- turns the light red
+    green() -- turns the light green
+    blue() -- turns the light blue
+    off() -- turns the light off
 
     """
-    def __init__(self,red_LED,green_LED,blue_LED,*args,**kwargs):
+    def __init__(self,red,green,blue,*args,**kwargs):
         super(CueLight, self).__init__(*args,**kwargs)
-        if isinstance(red_LED,OutputChannel):
-            self.red_LED = red_LED
+        if isinstance(red,hwio.BooleanOutput):
+            self._red = red
         else:
-            raise Error('%s is not an output channel' % red_LED)
-        if isinstance(green_LED,OutputChannel):
-            self.green_LED = green_LED
+            raise Error('%s is not an output channel' % red)
+        if isinstance(green,hwio.BooleanOutput):
+            self._green = green
         else:
-            raise Error('%s is not an output channel' % green_LED)
-        if isinstance(blue_LED,OutputChannel):
-            self.blue_LED = blue_LED
+            raise Error('%s is not an output channel' % green)
+        if isinstance(blue,hwio.BooleanOutput):
+            self._blue = blue
         else:
-            raise Error('%s is not an output channel' % blue_LED)
+            raise Error('%s is not an output channel' % blue)
 
     def red(self):
-        self.green_LED.write(False)
-        self.blue_LED.write(False)
-        return self.red_LED.write(True)
+        self._green.write(False)
+        self._blue.write(False)
+        return self._red.write(True)
     def green(self):
-        self.red_LED.write(False)
-        self.blue_LED.write(False)
-        return self.green_LED.write(True)
+        self._red.write(False)
+        self._blue.write(False)
+        return self._green.write(True)
     def blue(self):
-        self.red_LED.write(False)
-        self.green_LED.write(False)
-        return self.blue_LED.write(True)
+        self._red.write(False)
+        self._green.write(False)
+        return self._blue.write(True)
     def off(self):
-        self.red_LED.write(False)
-        self.green_LED.write(False)
-        self.blue_LED.write(False)
+        self._red.write(False)
+        self._green.write(False)
+        self._blue.write(False)
 
 
-## Perch ##
+# ## Perch ##
 
-class Perch(BaseComponent):
-    """Class which holds information about a perch
+# class Perch(BaseComponent):
+#     """Class which holds information about a perch
 
-    Has parts:
-    - IR Beam (input)
-    - Audio device
-    """
-    def __init__(self,*args,**kwargs):
-        super(Perch, self).__init__(*args,**kwargs)
-
-class Speaker(BaseComponent):
-    """docstring for Speaker"""
-    def __init__(self,audio,*args,**kwargs):
-        super(Speaker, self).__init__(*args,**kwargs)
+#     Has parts:
+#     - IR Beam (input)
+#     - speaker
+#     """
+#     def __init__(self,*args,**kwargs):
+#         super(Perch, self).__init__(*args,**kwargs)
         

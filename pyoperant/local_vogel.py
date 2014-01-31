@@ -12,16 +12,16 @@ _VOGEL_MAP = {
     8: ('/dev/comedi0', 2, 76, 2, 88),
     }
 
-class VogelBox(panels.BasePanel):
-    """docstring for Vogel1"""
-    def __init__(self,id, *args, **kwargs):
-        super(VogelBox, self).__init__(*args, **kwargs)
+class VogelPanel(panels.BasePanel):
+    """class for vogel boxes """
+    def __init__(self,id=None, *args, **kwargs):
+        super(VogelPanel, self).__init__(*args, **kwargs)
         self.id = id
 
         # define interfaces
-        self.interfaces = {'comedi': comedi.ComediInterface(device_name=_VOGEL_MAP[self.id][0]),
-                           'pyaudio': pyaudio.PyAudioInterface(device_name='dac%i'%self.id),
-                           }
+        self.interfaces['comedi'] = comedi.ComediInterface(device_name=_VOGEL_MAP[self.id][0])
+        self.interfaces['pyaudio'] = pyaudio.PyAudioInterface(device_name='dac%i'%self.id)
+                    
 
         # define inputs
         for in_chan in [ii+VOGEL_MAP[self.id][2] for ii in range(4)]:
@@ -58,33 +58,33 @@ class VogelBox(panels.BasePanel):
         return True
 
 
-class Vogel1(VogelBox):
-    """docstring for Vogel1"""
+class Vogel1(VogelPanel):
+    """Vogel1 panel"""
     def __init__(self):
         super(Vogel1, self).__init__(id=1)
 
-class Vogel2(VogelBox):
-    """docstring for Vogel2"""
+class Vogel2(VogelPanel):
+    """Vogel2 panel"""
     def __init__(self):
         super(Vogel2, self).__init__(id=2)
 
-class Vogel3(VogelBox):
-    """docstring for Vogel1"""
+class Vogel3(VogelPanel):
+    """Vogel3 panel"""
     def __init__(self):
         super(Vogel3, self).__init__(id=3)
 
-class Vogel4(VogelBox):
-    """docstring for Vogel4"""
+class Vogel4(VogelPanel):
+    """Vogel4 panel"""
     def __init__(self):
         super(Vogel4, self).__init__(id=4)
 
-class Vogel7(VogelBox):
-    """docstring for Vogel7"""
+class Vogel7(VogelPanel):
+    """Vogel7 panel"""
     def __init__(self):
         super(Vogel7, self).__init__(id=7)
 
-class Vogel8(VogelBox):
-    """docstring for Vogel8"""
+class Vogel8(VogelPanel):
+    """Vogel8 panel"""
     def __init__(self):
         super(Vogel8, self).__init__(id=8)
 
