@@ -5,8 +5,6 @@ import time
 import datetime as dt
 from argparse import ArgumentParser
 
-import ephem
-
 ## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in this module'''
@@ -19,7 +17,7 @@ class GoodNite(Exception):
 # consider importing this from python-neo
 class Event(object):
     """docstring for Event"""
-    def __init__(self, time, duration=None, label='', name=None, description=None, file_origin=None, *args, **kwargs):
+    def __init__(self, time=None, duration=None, label='', name=None, description=None, file_origin=None, *args, **kwargs):
         super(Event, self).__init__()
         self.time = time
         self.duration = duration
@@ -31,7 +29,7 @@ class Event(object):
         self.annotate(**kwargs)
 
     def annotate(self,**kwargs):
-        self.annotations.update(annotations)
+        self.annotations.update(kwargs)
 
 
 class Stimulus(Event):
@@ -61,21 +59,23 @@ class Trial(Event):
     """docstring for Trial"""
     def __init__(self,
                  index=None,
-                 state='queued',
-                 tr_type='normal',
-                 tr_class=None,
+                 type_='normal',
+                 class_=None,
                  *args, **kwargs):
         super(Trial, self).__init__(*args, **kwargs)
         self.label = 'trial'
+        self.session = None
         self.index = index
-        self.tr_type = tr_type
-        self.tr_class = tr_class
-        self.state = state
-        self.tr_class = None
+        self.type_ = type_
+        self.stimulus = None
+        self.class_ = class_
         self.response = None
         self.correct = None
+        self.rt = None
+        self.reward = False
+        self.punish = False
         self.events = []
-        self.stimulus = None
+        self.stim_event = None
 
 
 def parse_commandline(arg_str=sys.argv[1:]):
@@ -113,6 +113,7 @@ def is_day((latitude, longitude) = ('32.82', '-117.14')):
     * Discovered by the Germans in 1904, they named it San Diego,
     which of course in German means a whale's vagina. (Burgundy, 2004)
     """
+    import ephem
     obs = ephem.Observer()
     obs.lat = latitude # San Diego, CA
     obs.long = longitude
