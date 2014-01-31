@@ -10,11 +10,22 @@ class Lights(base.BaseExp):
 
 if __name__ == "__main__":
 
-    cmd_line = utils.parse_commandline()
-    parameters = cmd_line['config']
+    try: import simplejson as json
+    except ImportError: import json
+
 
     from pyoperant.local import PANELS
-    panel = PANELS[parameters['panel']]()
+
+    cmd_line = utils.parse_commandline()
+    with open(cmd_line['config_file'], 'rb') as config:
+            parameters = json.load(config)
+
+
+    if parameters['debug']:
+        print parameters
+        print PANELS
+
+    panel = PANELS[parameters['panel_name']]()
 
     exp = Lights(panel=panel,**parameters)
     exp.run()

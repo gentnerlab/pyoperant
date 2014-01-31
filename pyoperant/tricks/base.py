@@ -1,6 +1,7 @@
 import logging
+import os
+import datetime as dt
 from pyoperant import utils, components, local, hwio
-import cPickle as pickle
 
 
 try: import simplejson as json
@@ -13,7 +14,7 @@ class BaseExp(object):
     name -- name of this experiment
     desc -- long description of this experiment
     debug -- (bool) flag for debugging (default=False)
-    light_schedule  -- the light schedule for the experiment. either 'sun' or 
+    light_schedule  -- the light schedule for the experiment. either 'sun' or
         a tuple of (starttime,endtime) tuples in (hhmm,hhmm) form defining
         time intervals for the lights to be on
     experiment_path -- path to the experiment
@@ -27,7 +28,7 @@ class BaseExp(object):
     """
     def __init__(self,
                  name='',
-                 description=''
+                 description='',
                  debug=False,
                  filetime_fmt='%Y%m%d%H%M%S',
                  light_schedule='sun',
@@ -37,12 +38,13 @@ class BaseExp(object):
                  subject_id='',
                  panel=None,
                  *args, **kwargs):
-        super(Experiment,  self).__init__()
+        super(BaseExp,  self).__init__()
 
         self.name = name
         self.description = description
         self.debug = debug
         self.timestamp = dt.datetime.now().strftime(filetime_fmt)
+        self.parameters = kwargs
         self.parameters['filetime_fmt'] = filetime_fmt
         self.parameters['light_schedule'] = light_schedule
         self.parameters['idle_poll_interval'] = idle_poll_interval
@@ -58,16 +60,17 @@ class BaseExp(object):
         self.log_file = os.path.join(self.parameters['experiment_path'], self.parameters['subject_id'] + '.log')
         self.log_config()
 
-        self.req_panel_attr: ['house_light',
+        self.req_panel_attr= ['house_light',
                               'reset',
                               ]
-        self.log.debug('panel %i initialized' % parameters['panel'])
+        self.panel = panel
+        self.log.debug('panel %s initialized' % self.parameters['panel_name'])
 
     def save(self):
         snapshot_f = os.path.join(self.parameters['experiment_path'], self.timestamp+'.json')
         with open(snapshot_f, 'wb') as config_snap:
             json.dump(self.parameters, config_snap, sort_keys=True, indent=4)
-        
+
     def log_config(self):
         if self.debug:
             self.log_level = logging.DEBUG
@@ -109,14 +112,15 @@ class BaseExp(object):
         while state is not None:
             state = machine[state]()
 
-    def _idle(self): 
+    def _idle(self):
         if not self.check_light_schedule():
             return 'sleep'
         elif self.check_session_schedule():
             return 'session'
         else:
             self.panel.reset()
-            utils.wait(self.parameters['sleep_poll_interval']):
+            self.log.debug('idling...')
+            utils.wait(self.parameters['idle_poll_interval'])
             return 'idle'
 
 
@@ -131,7 +135,7 @@ class BaseExp(object):
         self.log.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['sleep_poll_interval'])
-        if self.check_light_schedule()
+        if self.check_light_schedule():
             return 'main'
         else:
             return 'post'
@@ -151,7 +155,7 @@ class BaseExp(object):
         while state is not None:
             state = machine[state]()
         return 'idle'
-            
+
     # session flow
 
     def check_session_schedule(self):
