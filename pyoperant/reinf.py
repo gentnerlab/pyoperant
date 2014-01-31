@@ -1,4 +1,4 @@
-
+from numpy import random
 
 class BaseSchedule(object):
     """Maintains logic for deciding whether to consequate trials.
@@ -40,7 +40,7 @@ class ContinuousReinforcement(BaseSchedule):
         else:
             return True
 
-class FixedRatioSchedule(ReinforcementSchedule):
+class FixedRatioSchedule(BaseSchedule):
     """Maintains logic for deciding whether to consequate trials.
 
     This class implements a fixed ratio schedule, where a reward reinforcement 
@@ -54,25 +54,27 @@ class FixedRatioSchedule(ReinforcementSchedule):
 
     """
     def __init__(self, ratio=1):
-        super(FixedSchedule, self).__init__()
+        super(FixedRatioSchedule, self).__init__()
         self.ratio = ratio
-        self.cumulative_correct = 0
         self._update()
 
     def _update(self):
-        self.min_correct = ratio
+        self.cumulative_correct = 0
+        self.threshold = self.ratio
 
     def consequate(self,trial):
-        if trial.correct:
+        if trial.correct==True:
             self.cumulative_correct += 1
-            if self.cumulative_correct >= self.min_correct:
+            if self.cumulative_correct >= self.threshold:
                 self._update()
                 return True
             else:
                 return False
-        else:
+        elif trial.correct==False:
             self.cumulative_correct = 0
             return True
+        else:
+            return False
 
     def __unicode__(self):
         return "FR%i" % self.ratio
@@ -101,7 +103,8 @@ class VariableRatioSchedule(FixedRatioSchedule):
 
     def _update(self):
         ''' update min correct by randomly sampling from interval [1:2*ratio-1)'''
-        self.min_correct = random.randint(1, 2*self.ratio-1)
+        self.cumulative_correct = 0
+        self.threshold = random.randint(1, 2*self.ratio-1)
 
     def __unicode__(self):
         return "VR%i" % self.ratio
