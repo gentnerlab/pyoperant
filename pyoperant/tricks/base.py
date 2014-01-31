@@ -132,9 +132,9 @@ class BaseExp(object):
         self.panel.house_light.off()
         utils.wait(self.parameters['sleep_poll_interval'])
         if self.check_light_schedule()
-            return 'post'
-        else:
             return 'main'
+        else:
+            return 'post'
 
     def sleep_post(self):
         self.log.debug('ending sleep')
@@ -167,9 +167,9 @@ class BaseExp(object):
         return None
 
     def _session_flow(self):
-        return do_flow(pre=self.session_pre,
-                       main=self.session_main,
-                       post=self.session_post)
+        utils.do_flow(pre=self.session_pre,
+                      main=self.session_main,
+                      post=self.session_post)
         return 'idle'
 
 

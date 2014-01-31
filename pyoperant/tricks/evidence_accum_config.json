@@ -3,9 +3,9 @@
 	"experimenter": {
 		"name": "Justin T Kiggins",
 		"email": "justin.kiggins@gmail.com"
-		},
+	},
 	"subject": "B957",
-	"panel": "vogel1",
+	"panel": "Vogel1",
 	"experiment_path": "/home/bird/opdat/B957",
 	"data_path": "/home/bird/opdat/B957/data",
     "stim_path": "/home/bird/opdat/B957/stimuli",
@@ -22,35 +22,45 @@
 		"g": "B1-2 211_s_37 @1_trim820-1220_68dbmean_5mstaper.wav",
 		"h": "F2 165_s_48 @2_trim0-400_68dbmean_5mstaper.wav",
 		"i": "K1 211_s_19 @1_trim515-915_68dbmean_5mstaper.wav"
-		},
+	},
 	"stim_map": [null, "a","b","c","d","e"],
 	"odds": 100.0,
-	"models": {
-		"L":[
-			[1,2],
-			[1,4],
-			[2,3],
-			[2,5],
-			[3,1],
-			[3,4],
-			[4,3],
-			[4,5],
-			[5,1],
-			[5,3]
-			],
-		"R":[
-			[2,1],
-			[4,1],
-			[3,2],
-			[5,2],
-			[1,3],
-			[4,3],
-			[3,4],
-			[5,4],
-			[1,5],
-			[3,5]
-			]
+	"classes": {
+		"L": {
+			"transitions": [
+				[1,2],
+				[1,4],
+				[2,3],
+				[2,5],
+				[3,1],
+				[3,4],
+				[4,3],
+				[4,5],
+				[5,1],
+				[5,3]
+				],
+			"reward_value": 2.0,
+			"punish_value": 10.0,
+			"component": "left"
+			},
+		"R": {
+			"transitions": [
+				[2,1],
+				[4,1],
+				[3,2],
+				[5,2],
+				[1,3],
+				[4,3],
+				[3,4],
+				[5,4],
+				[1,5],
+				[3,5]
+				],
+			"reward_value": 2.0,
+			"punish_value": 10.0,
+			"component": "right"
 		},
+	},
 	"strlen_max": 10,
 	"strlen_min": 10,
 	"isi_mean": 0.100,
@@ -59,18 +69,9 @@
 		              "ratio": 1,
 					  "secondary": true
 					  },
-	"variable_ratio": 1,
 	"correction_trials": false,
-	"feed_dur": {
-		"L": 2.0,
-		"R": 2.0
-		},
-	"timeout_dur": {
-		"L": 10.0,
-		"R": 10.0
-		},
 	"response_win": 2.0,
 	"intertrial_min": 5.0,
-	"punish_non_resp": false,
+	"forced_choice": false,
 	"light_schedule": "sun"
 }
