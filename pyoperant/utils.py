@@ -46,9 +46,9 @@ class AuditoryStimulus(Stimulus):
 
 
 def do_flow(pre,main,post):
-    machine = {'pre': self.pre,
-               'main': self.main,
-               'post': self.post,
+    machine = {'pre': pre,
+               'main': main,
+               'post': post,
                }
     state = 'pre'
     while state is not None:
