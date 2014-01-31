@@ -1,14 +1,15 @@
 import comedi
-import base
+from pyoperant.interfaces import base_
+from pyoperant import utils
 
-class ComediError(Error):
+class ComediError(utils.Error):
     '''raised for problems communicating with the comedi driver'''
     pass
 
 
-class ComediInterface(base.BaseInterface):
+class ComediInterface(base_.BaseInterface):
     """docstring for ComediInterface"""
-    def __init__(self,device_name,subdevice,channel,*args,**kwargs):
+    def __init__(self,device_name,*args,**kwargs):
         super(ComediInterface, self).__init__(*args,**kwargs)
         self.device_name = device_name
         self.read_params = ('subdevice',
@@ -24,7 +25,7 @@ class ComediInterface(base.BaseInterface):
     def close(self):
         s = comedi.comedi_close(self.device)
         if s < 0:
-            raise ComediError('could not close device %s(%s)' % (self.device_name, self.device)
+            raise ComediError('could not close device %s(%s)' % (self.device_name, self.device))
 
     def _read_bool(self,subdevice,channel):
         """ read from comedi port
@@ -51,6 +52,6 @@ class ComediInterface(base.BaseInterface):
         else:
             raise ComediError('could not write to device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
 
-        
+
 
 

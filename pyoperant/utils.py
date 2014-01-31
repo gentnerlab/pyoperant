@@ -32,7 +32,7 @@ class Event(object):
 
     def annotate(self,**kwargs):
         self.annotations.update(annotations)
-        
+
 
 class Stimulus(Event):
     """docstring for Stimulus"""
@@ -57,12 +57,12 @@ def do_flow(pre,main,post):
         state = machine[state]()
 
 
-class Trial(utils.Event):
+class Trial(Event):
     """docstring for Trial"""
     def __init__(self,
                  index=None,
                  state='queued',
-                 tr_type='normal', 
+                 tr_type='normal',
                  tr_class=None,
                  *args, **kwargs):
         super(Trial, self).__init__(*args, **kwargs)

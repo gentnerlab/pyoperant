@@ -1,7 +1,6 @@
 import datetime
 import subprocess
 from pyoperant.utils import is_day, time_in_range, Error
-from pyoperant.interfaces import console
 
 
 # Classes of operant components
@@ -11,11 +10,8 @@ class BaseIO(object):
         self.interface = interface
         self.params = params
 
-        if self.interface is None:
-            interface = console.ConsoleInterface()
-
 class BooleanInput(BaseIO):
-    """Class which holds information about inputs and abstracts the methods of 
+    """Class which holds information about inputs and abstracts the methods of
     querying their values
 
     Keyword arguments:
@@ -27,7 +23,7 @@ class BooleanInput(BaseIO):
     poll() -- polls the input until value is True. Returns the time of the change
     """
     def __init__(self,interface=None,params={},*args,**kwargs):
-        super(InputChannel, self).__init__(interface=interface,params=params,*args,**kwargs)
+        super(BooleanInput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
         assert hasattr(self.interface,'_read_bool')
 
@@ -40,7 +36,7 @@ class BooleanInput(BaseIO):
         return self.interface._poll(**self.params)
 
 class BooleanOutput(BaseIO):
-    """Class which holds information about outputs and abstracts the methods of 
+    """Class which holds information about outputs and abstracts the methods of
     writing to them
 
     Keyword arguments:
@@ -54,8 +50,8 @@ class BooleanOutput(BaseIO):
         returns the last passed by write(value)
     toggle() -- flips the value from the current value
     """
-    def __init__(self,interface=None,*args,**kwargs):
-        super(OutputChannel, self).__init__(interface=interface,params=params,*args,**kwargs)
+    def __init__(self,interface=None,params={},*args,**kwargs):
+        super(BooleanOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
         assert hasattr(self.interface,'_write_bool')
         self.last_value = None
@@ -77,7 +73,7 @@ class BooleanOutput(BaseIO):
         return self.write(value=value)
 
 class AudioOutput(BaseIO):
-    """Class which holds information about audio outputs and abstracts the 
+    """Class which holds information about audio outputs and abstracts the
     methods of writing to them
 
     Keyword arguments:
@@ -92,9 +88,9 @@ class AudioOutput(BaseIO):
         returns the last passed by write(value)
     toggle() -- flips the value from the current value
     """
-    def __init__(self, interface=None,*args,**kwargs):
+    def __init__(self, interface=None,params={},*args,**kwargs):
         super(AudioOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
-        
+
         assert hasattr(self.interface,'_queue_wav')
         assert hasattr(self.interface,'_play_wav')
         assert hasattr(self.interface,'_stop_wav')
@@ -107,7 +103,7 @@ class AudioOutput(BaseIO):
 
     def stop(self):
         return self.interface._stop_wav()
-        
+
 
 
 

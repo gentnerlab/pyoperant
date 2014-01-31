@@ -39,15 +39,15 @@ class Hopper(BaseComponent):
     """ Class which holds information about a hopper
 
     Keyword arguments:
-    solenoid(hwio.BooleanOutput) -- output channel to activate the solenoid & 
+    solenoid(hwio.BooleanOutput) -- output channel to activate the solenoid &
         raise the hopper
-    IR(hwio.BooleanInput) -- input channel for the IR beam to check if the 
+    IR(hwio.BooleanInput) -- input channel for the IR beam to check if the
         hopper is up
-    lag(float) -- time in seconds to wait before checking to make sure the 
+    lag(float) -- time in seconds to wait before checking to make sure the
         hopper is up (default=0.3)
 
     Methods:
-    check() -- reads the status of solenoid & IR beam, then throws an error 
+    check() -- reads the status of solenoid & IR beam, then throws an error
         if the don't match
     up() -- raises the hopper up
     down() -- drops the hopper down
@@ -138,8 +138,8 @@ class PeckPort(BaseComponent):
     status() -- reads the status of the IR beam
     on() -- turns the LED on
     off() -- turns the LED off
-    flash(dur,isi) -- flashes the LED for 'dur' seconds (default=1.0) with an 
-        'isi' (default=0.1) 
+    flash(dur,isi) -- flashes the LED for 'dur' seconds (default=1.0) with an
+        'isi' (default=0.1)
     wait_for_peck() -- waits for a peck. returns the peck time.
 
     """
@@ -194,13 +194,13 @@ class HouseLight(BaseComponent):
     Methods:
     on() -- turns the house light on
     off() -- turns the house light off
-    timeout(dur) -- turns off the house light for 'dur' seconds (default=10.0) 
+    timeout(dur) -- turns off the house light for 'dur' seconds (default=10.0)
     punish() -- calls timeout() for 'value' as 'dur'
 
     """
     def __init__(self,light,*args,**kwargs):
         super(HouseLight, self).__init__(*args,**kwargs)
-        if isinstance(light,BooleanOutput):
+        if isinstance(light,hwio.BooleanOutput):
             self.light = light
         else:
             raise Error('%s is not an output channel' % light)
@@ -290,4 +290,4 @@ class RGBLight(BaseComponent):
 #     """
 #     def __init__(self,*args,**kwargs):
 #         super(Perch, self).__init__(*args,**kwargs)
-        
+

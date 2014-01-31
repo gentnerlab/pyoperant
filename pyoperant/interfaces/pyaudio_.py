@@ -1,6 +1,6 @@
 import pyaudio
 import wave
-from interfaces import base
+from pyoperant.interfaces import base_
 
 class _StreamContainer(object):
     def __init__(self,wf,stream):
@@ -17,7 +17,7 @@ class _StreamContainer(object):
     def __del__(self):
         self.close()
 
-class PyAudioInterface(base.BaseInterface):
+class PyAudioInterface(base_.BaseInterface):
     """Class which holds information about an audio device"""
     def __init__(self,device_name,*args,**kwargs):
         super(PyAudioInterface, self).__init__(*args,**kwargs)
@@ -35,7 +35,8 @@ class PyAudioInterface(base.BaseInterface):
         self.device_info = self.pa.get_device_info_by_index(self.device_index)
 
     def close(self):
-        self.stream.close()
+        if hasattr(self,'stream'):
+            self.stream.close()
         self.pa.terminate()
 
     def _get_stream(self,wf,start=False):
@@ -61,5 +62,5 @@ class PyAudioInterface(base.BaseInterface):
     def _play_wav(self):
         self.stream.play()
 
-    def _stop_wav(self)
+    def _stop_wav(self):
         self.stream.close()

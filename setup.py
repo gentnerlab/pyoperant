@@ -8,7 +8,7 @@ wait4peck = Extension('wait4peck',
                     # include_dirs = ['/usr/local/include'],
                     libraries = ['comedi'],
                     # library_dirs = ['/usr/local/lib'],
-                    sources = ['wait4peck.c'])
+                    sources = ['src/wait4peck.c'])
 
 setup(
     name = 'pyoperant',

@@ -1,9 +1,9 @@
-from pyoperant import hwio, components, panels
-from pyoperant.interfaces import comedi, pyaudio
+from pyoperant import hwio, components, panels, utils
+from pyoperant.interfaces import comedi_, pyaudio_
 
 _VOGEL_MAP = {
-    1: ('/dev/comedi0', 2, 00, 2, 08), # box_id:(subdevice,in_dev,in_chan,out_dev,out_chan)
-    2: ('/dev/comedi0', 2, 04, 2, 16),
+    1: ('/dev/comedi0', 2, 0, 2, 8), # box_id:(subdevice,in_dev,in_chan,out_dev,out_chan)
+    2: ('/dev/comedi0', 2, 4, 2, 16),
     3: ('/dev/comedi0', 2, 24, 2, 32),
     4: ('/dev/comedi0', 2, 28, 2, 40),
     5: ('/dev/comedi0', 2, 48, 2, 56),
@@ -19,21 +19,21 @@ class VogelPanel(panels.BasePanel):
         self.id = id
 
         # define interfaces
-        self.interfaces['comedi'] = comedi.ComediInterface(device_name=_VOGEL_MAP[self.id][0])
-        self.interfaces['pyaudio'] = pyaudio.PyAudioInterface(device_name='dac%i'%self.id)
-                    
+        self.interfaces['comedi'] = comedi_.ComediInterface(device_name=_VOGEL_MAP[self.id][0])
+        self.interfaces['pyaudio'] = pyaudio_.PyAudioInterface(device_name='dac%i'%self.id)
+
 
         # define inputs
-        for in_chan in [ii+VOGEL_MAP[self.id][2] for ii in range(4)]:
+        for in_chan in [ii+_VOGEL_MAP[self.id][2] for ii in range(4)]:
             self.inputs.append(hwio.BooleanInput(interface=self.interfaces['comedi'],
-                                                 params = {'subdevice': VOGEL_MAP[self.id][1],
+                                                 params = {'subdevice': _VOGEL_MAP[self.id][1],
                                                            'channel': in_chan
                                                            },
                                                  )
                                )
-        for out_chan in [ii+VOGEL_MAP[self.id][4] for ii in range(5)]:
+        for out_chan in [ii+_VOGEL_MAP[self.id][4] for ii in range(5)]:
             self.outputs.append(hwio.BooleanOutput(interface=self.interfaces['comedi'],
-                                                 params = {'subdevice': VOGEL_MAP[self.id][3],
+                                                 params = {'subdevice': _VOGEL_MAP[self.id][3],
                                                            'channel': out_chan
                                                            },
                                                    )
@@ -53,8 +53,20 @@ class VogelPanel(panels.BasePanel):
 
     def reset(self):
         for output in self.outputs:
-            output.set(False)
-        self.house_light.write(True)
+            output.write(False)
+        self.house_light.on()
+        self.hopper.down()
+
+    def test(self):
+        self.reset()
+        for output in self.outputs:
+            output.write(True)
+            utils.wait(2.0)
+            output.write(False)
+        self.reset()
+        self.reward(value=1.0)
+        self.punish(value=1.0)
+
         return True
 
 
