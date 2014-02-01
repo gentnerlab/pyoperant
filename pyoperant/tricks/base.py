@@ -134,7 +134,7 @@ class BaseExp(object):
         """ reset expal parameters for the next day """
         self.log.debug('sleeping...')
         self.panel.house_light.off()
-        utils.wait(self.parameters['sleep_poll_interval'])
+        utils.wait(self.parameters['idle_poll_interval'])
         if self.check_light_schedule():
             return 'main'
         else:
