@@ -1,11 +1,16 @@
 import logging
-import os
+import os, sys
 import datetime as dt
 from pyoperant import utils, components, local, hwio
 
 
 try: import simplejson as json
 except ImportError: import json
+
+def _log_except_hook(*exc_info):
+    text = "".join(traceback.format_exception(*exc_info))
+    logging.error("Unhandled exception: %s", text)
+
 
 class BaseExp(object):
     """Base class for an experiment.
@@ -77,6 +82,8 @@ class BaseExp(object):
         else:
             self.log_level = logging.INFO
 
+        sys.excepthook = _log_except_hook # send uncaught exceptions to log file
+        
         logging.basicConfig(filename=self.log_file,
                             level=self.log_level,
                             format='"%(asctime)s","%(levelname)s","%(message)s"')
