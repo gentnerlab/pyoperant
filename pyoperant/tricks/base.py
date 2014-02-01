@@ -19,7 +19,7 @@ class BaseExp(object):
         time intervals for the lights to be on
     experiment_path -- path to the experiment
     stim_path -- path to stimuli (default = <experiment_path>/stims)
-    subject_id -- identifier of the subject
+    subject -- identifier of the subject
     panel -- instance of local Panel() object
 
     Methods:
@@ -35,7 +35,7 @@ class BaseExp(object):
                  idle_poll_interval = 60.0,
                  experiment_path='',
                  stim_path='',
-                 subject_id='',
+                 subject='',
                  panel=None,
                  *args, **kwargs):
         super(BaseExp,  self).__init__()
@@ -54,10 +54,10 @@ class BaseExp(object):
             self.parameters['stim_path'] = os.path.join(experiment_path,'stims')
         else:
             self.parameters['stim_path'] = stim_path
-        self.parameters['subject_id'] = subject_id
+        self.parameters['subject'] = subject
 
         # configure logging
-        self.log_file = os.path.join(self.parameters['experiment_path'], self.parameters['subject_id'] + '.log')
+        self.log_file = os.path.join(self.parameters['experiment_path'], self.parameters['subject'] + '.log')
         self.log_config()
 
         self.req_panel_attr= ['house_light',
@@ -67,8 +67,8 @@ class BaseExp(object):
         self.log.debug('panel %s initialized' % self.parameters['panel_name'])
 
     def save(self):
-        snapshot_f = os.path.join(self.parameters['experiment_path'], self.timestamp+'.json')
-        with open(snapshot_f, 'wb') as config_snap:
+        self.snapshot_f = os.path.join(self.parameters['experiment_path'], self.timestamp+'.json')
+        with open(self.snapshot_f, 'wb') as config_snap:
             json.dump(self.parameters, config_snap, sort_keys=True, indent=4)
 
     def log_config(self):
@@ -103,6 +103,12 @@ class BaseExp(object):
         self.panel.reset()
         self.save()
         self.init_summary()
+        
+        self.log.info('%s: running %s with parameters in %s' % (self.name,
+                                                                self.__class__.__name__,
+                                                                self.snapshot_f,
+                                                                )
+                      )
 
         machine = {'idle': self._idle,
                    'sleep': self._sleep_flow,
@@ -192,7 +198,7 @@ class BaseExp(object):
 
     def write_summary(self):
         """ takes in a summary dictionary and options and writes to the bird's summaryDAT"""
-        summary_file = os.path.join(self.parameters['experiment_path'],self.parameters['subject_id'][1:]+'.summaryDAT')
+        summary_file = os.path.join(self.parameters['experiment_path'],self.parameters['subject'][1:]+'.summaryDAT')
         with open(summary_file,'wb') as f:
             f.write("Trials this session: %s\n" % self.summary['trials'])
             f.write("Last trial run @: %s\n" % self.summary['last_trial_time'])
