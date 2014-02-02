@@ -117,13 +117,9 @@ class BaseExp(object):
                                                                 )
                       )
 
-        machine = {'idle': self._idle,
-                   'sleep': self._sleep_flow,
-                   'session': self._session_flow,
-                   }
-        state = 'idle'
-        while state is not None:
-            state = machine[state]()
+        utils.do_flow(pre=self._idle,
+                    sleep=self._sleep_flow,
+                    session=self._session_flow)
 
     def _idle(self):
         if not self.check_light_schedule():
@@ -160,13 +156,9 @@ class BaseExp(object):
         return None
 
     def _sleep_flow(self):
-        machine = {'pre': self.sleep_pre,
-                   'main': self.sleep_main,
-                   'post': self.sleep_post,
-                   }
-        state = 'pre'
-        while state is not None:
-            state = machine[state]()
+        utils.do_flow(pre=self.sleep_pre,
+                    main=self.sleep_main,
+                    post=self.sleep_post)
         return 'idle'
 
     # session flow
