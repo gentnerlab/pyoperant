@@ -6,7 +6,7 @@ from pyoperant
 
 class TwoAltChoiceExp(base.BaseExp):
     """docstring for Experiment"""
-    def __init__(self,summaryDAT, *args, **kwargs):
+    def _run__init__(self,summaryDAT, *args, **kwargs):
         super(Experiment,  self).__init__(self, *args, **kwargs)
 
         # assign stim files full names
@@ -78,7 +78,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def session_main(self):
         try:
-            self._trial_flow()
+            self._run_trial()
             return 'main'
         except utils.GoodNite:
             return 'post'
@@ -169,9 +169,9 @@ class TwoAltChoiceExp(base.BaseExp):
         return 'main'
 
     def trial_main(self):
-        self._stimulus_flow()
-        self._response_flow()
-        self._consequence_flow()
+        self._run_stimulus()
+        self._run_response()
+        self._run_consequence()
         return 'post'
 
     def trial_post(self):
@@ -183,11 +183,12 @@ class TwoAltChoiceExp(base.BaseExp):
         utils.wait(self.intertrial_min)
         return None
 
-    def _trial_flow(self):
+    def _run_trial(self):
         try: 
-            utils.do_flow(pre=self.trial_pre,
-                         main=self.trial_main,
-                         post=self.trial_post)
+            utils.run_state_machine(start_in='pre',
+                                    pre=self.trial_pre,
+                                    main=self.trial_main,
+                                    post=self.trial_post)
 
         except hwio.CriticalError as err:
             self.log.critical(str(err))
@@ -223,10 +224,11 @@ class TwoAltChoiceExp(base.BaseExp):
         utils.wait(self.this_trial.annotations['min_wait'])
         return None
 
-    def _stimulus_flow(self):
-        utils.do_flow(pre=self.stimulus_pre,
-                      main=self.stimulus_main,
-                      post=self.stimulus_post)
+    def _run_stimulus(self):
+        utils.run_state_machine(start_in='pre',
+                                pre=self.stimulus_pre,
+                                main=self.stimulus_main,
+                                post=self.stimulus_post)
 
     #response flow
     def response_pre(self):
@@ -256,10 +258,11 @@ class TwoAltChoiceExp(base.BaseExp):
         self.panel.right.off()
         return None
 
-    def response_flow(self):
-        utils.do_flow(pre=self.response_pre,
-                      main=self.response_main,
-                      post=self.response_post)
+    def response(self):
+        utils.run_state_machine(start_in='pre',
+                                pre=self.response_pre,
+                                main=self.response_main,
+                                post=self.response_post)
 
     ## consequence flow
     def consequence_pre(self):
@@ -277,7 +280,7 @@ class TwoAltChoiceExp(base.BaseExp):
             if self.trial.type == 'correction':
                 pass
             elif self.reinf_sched.consequate(trial=self.this_trial):
-                self._reward_flow() # provide a reward
+                self._run_reward() # provide a reward
         # no response
         elif self.trial.response is 'none':
             pass
@@ -286,17 +289,18 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             self.this_trial.correct = False
             if self.reinf_sched.consequate(trial=self.this_trial):
-                self._punish_flow()
+                self._run_punish()
         return 'post'
 
     def consequence_post(self):
         self.this_trial.duration = (dt.datetime.now() - self.this_trial.time).total_seconds()
         return None
 
-    def _consequence_flow(self):
-        utils.do_flow(pre=self.consequence_pre,
-                      main=self.consequence_main,
-                      post=self.consequence_post)
+    def _run_consequence(self):
+        utils.run_state_machine(start_in='pre',
+                                pre=self.consequence_pre,
+                                main=self.consequence_main,
+                                post=self.consequence_post)
 
 
     def secondary_reinforcement(self,value=1.0):
@@ -354,10 +358,11 @@ class TwoAltChoiceExp(base.BaseExp):
     def reward_post(self):
         return None
 
-    def _reward_flow(self):
-        utils.do_flow(pre=self.reward_pre,
-                      main=self.reward_main,
-                      post=self.reward_post)
+    def _run_reward(self):
+        utils.run_state_machine(start_in='pre',
+                                pre=self.reward_pre,
+                                main=self.reward_main,
+                                post=self.reward_post)
 
     ## punishment flow
     def punish_pre(self):
@@ -372,10 +377,11 @@ class TwoAltChoiceExp(base.BaseExp):
     def punish_post(self):
         return None
 
-    def _punish_flow(self):
-        utils.do_flow(pre=self.punish_pre,
-                      main=self.punish_main,
-                      post=self.punish_post)
+    def _run_punish(self):
+        utils.run_state_machine(start_in='pre',
+                                pre=self.punish_pre,
+                                main=self.punish_main,
+                                post=self.punish_post)
 
 
             

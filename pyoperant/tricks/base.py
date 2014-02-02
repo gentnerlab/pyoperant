@@ -116,12 +116,13 @@ class BaseExp(object):
                                                                 self.snapshot_f,
                                                                 )
                       )
+        while True:
+            utils.run_state_machine(start_in='idle',
+                                    idle=self._run_idle,
+                                    sleep=self._run_sleep,
+                                    session=self._run_session)
 
-        utils.do_flow(pre=self._idle,
-                    sleep=self._sleep_flow,
-                    session=self._session_flow)
-
-    def _idle(self):
+    def _run_idle(self):
         if not self.check_light_schedule():
             return 'sleep'
         elif self.check_session_schedule():
@@ -134,7 +135,7 @@ class BaseExp(object):
 
 
 
-    # defining functions for sleep flow
+    # defining functions for sleep
     def sleep_pre(self):
         self.log.debug('lights off. going to sleep...')
         return 'main'
@@ -155,13 +156,14 @@ class BaseExp(object):
         self.init_summary()
         return None
 
-    def _sleep_flow(self):
-        utils.do_flow(pre=self.sleep_pre,
-                    main=self.sleep_main,
-                    post=self.sleep_post)
+    def _run_sleep(self):
+        utils.run_state_machine(start_in='pre',
+                                pre=self.sleep_pre,
+                                main=self.sleep_main,
+                                post=self.sleep_post)
         return 'idle'
 
-    # session flow
+    # session
 
     def check_session_schedule(self):
         return not self.check_light_schedule()
@@ -175,10 +177,11 @@ class BaseExp(object):
     def session_post(self):
         return None
 
-    def _session_flow(self):
-        utils.do_flow(pre=self.session_pre,
-                      main=self.session_main,
-                      post=self.session_post)
+    def _run_session(self):
+        utils.run_state_machine(start_in='pre',
+                                pre=self.session_pre,
+                                main=self.session_main,
+                                post=self.session_post)
         return 'idle'
 
 

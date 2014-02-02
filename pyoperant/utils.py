@@ -45,14 +45,31 @@ class AuditoryStimulus(Stimulus):
         self.label = 'auditory_stimulus'
 
 
-def do_flow(pre,main,post):
-    machine = {'pre': pre,
-               'main': main,
-               'post': post,
-               }
-    state = 'pre'
+def run_state_machine(start_in='pre',**state_functions):
+    """runs a state machine defined by the keyword arguments
+
+    >>> def run_start():
+    >>>    print "in 'run_start'"
+    >>>    return 'next'
+    >>> def run_next():
+    >>>    print "in 'run_next'"
+    >>>    return None
+    >>> run_state_machine(start_in='start',
+    >>>                   start=run_start,
+    >>>                   next=run_next)
+    in 'run_start'
+    in 'run_next'
+    None
+    """
+    # make sure the start state has a function to run
+    assert (start_in in state_functions.keys())
+    # make sure all of the arguments passed in are callable
+    for func in state_functions.values():
+        assert hasattr(func, '__call__')
+
+    state = start_in
     while state is not None:
-        state = machine[state]()
+        state = state_functions[state]()
 
 
 class Trial(Event):
