@@ -70,7 +70,7 @@ class TwoAltChoiceExp(base.BaseExp):
         self.class_assoc = {}
         for class_, class_params in self.parameters['classes'].items():
             try:
-                resp_port[class_] = getattr(self.panel,class_params['component'])
+                self.class_assoc[class_] = getattr(self.panel,class_params['component'])
             except KeyError:
                 pass
 
@@ -314,6 +314,8 @@ class TwoAltChoiceExp(base.BaseExp):
 
         # but catch the reward errors
 
+        ## note: this is quite specific to the Gentner Lab. consider
+        ## ways to abstract this
         except components.HopperAlreadyUpError as err:
             self.this_trial.reward = True
             self.summary['hopper_already_up'] += 1

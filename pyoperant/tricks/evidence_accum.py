@@ -50,18 +50,18 @@ class EvidenceAccumExperiment(experiment.Experiment):
 
         # use transition CDF to get iteratively get next motif id
         mid = 0
-        for pos in range(self.strlen_max):
+        for pos in range(self.parameters['strlen_max']):
             mid = (self.parameters[trial_class]['transition_cdf'][mid] < random.random()).sum()
             motif_ids.append(mid)
         assert len(motif_ids) == self.strlen_max
 
-        motifs = [self.stim_map[mid] for mid in motif_ids]
+        motifs = [self.parameters['stim_map'][mid] for mid in motif_ids]
 
         motif_isi = [max(random.gauss(self.parameters['isi_mean'], self.parameters['isi_stdev']),0.0) for mot in motifs]
         motif_isi[-1] = 0.0
 
-        input_files = [(self.stims[motif_name], isi) for motif_name, isi in zip(motifs,motif_isi)]
-        filename =  os.path.join(self.stim_path, ''.join(motifs) + '.wav')
+        input_files = [(self.parameters['stims'][motif_name], isi) for motif_name, isi in zip(motifs,motif_isi)]
+        filename =  os.path.join(self.parameters['stim_path'], ''.join(motifs) + '.wav')
         stim, epochs = utils.concat_wav(input_files,filename)
 
         return stim, epochs
@@ -86,18 +86,27 @@ class EvidenceAccumExperiment(experiment.Experiment):
 
         trial['stim_string'] = ''
         for motif in trial['stim_motifs']:
-            trial['stim_string'] += next((name for name, wav in self.stims.iteritems() if wav == motif.name), '')
+            trial['stim_string'] += next((name for name, wav in self.parameters['stims'].iteritems() if wav == motif.name), '')
 
 if __name__ == "__main__":
 
-    cmd_line = utils.parse_commandline()
-    parameters = cmd_line['config']
+    try: import simplejson as json
+    except ImportError: import json
 
     from pyoperant.local import PANELS
-    panel = PANELS[parameters['panel']]()
+
+    cmd_line = utils.parse_commandline()
+    with open(cmd_line['config_file'], 'rb') as config:
+            parameters = json.load(config)
+
+
+    if parameters['debug']:
+        print parameters
+        print PANELS
+
+    panel = PANELS[parameters['panel_name']]()
 
     exp = EvidenceAccumExperiment(panel=panel,**parameters)
     exp.run()
-
 
 

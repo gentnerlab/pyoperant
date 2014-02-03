@@ -5,14 +5,7 @@ import time
 import datetime as dt
 from argparse import ArgumentParser
 
-## defining Error classes for operant HW control
-class Error(Exception):
-    '''base class for exceptions in this module'''
-    pass
 
-class GoodNite(Exception):
-    """ exception for when the lights should be off """
-    pass
 
 # consider importing this from python-neo
 class Event(object):

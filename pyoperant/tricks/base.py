@@ -4,13 +4,14 @@ import datetime as dt
 from pyoperant import utils, components, local, hwio
 
 
-try: import simplejson as json
-except ImportError: import json
+try: 
+    import simplejson as json
+except ImportError: 
+    import json
 
 def _log_except_hook(*exc_info):
     text = "".join(traceback.format_exception(*exc_info))
     logging.error("Unhandled exception: %s", text)
-
 
 class BaseExp(object):
     """Base class for an experiment.
@@ -147,7 +148,7 @@ class BaseExp(object):
         self.log.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['idle_poll_interval'])
-        if self.check_light_schedule():
+        if not self.check_light_schedule():
             return 'main'
         else:
             return 'post'
@@ -222,5 +223,7 @@ class BaseExp(object):
             self.log.critical(str(err))
         elif err.__class__ is hwio.Error:
             self.log.error(str(err))
+        elif err.__class__ is InterfaceError or err.__class__ is ComponentError:
+            self.log.critical(str(err))
         else:
-            self.log.error(str(err))
+            self.log.critical(str(err))
