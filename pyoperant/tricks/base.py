@@ -145,7 +145,7 @@ class BaseExp(object):
         self.log.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['idle_poll_interval'])
-        if self.check_light_schedule():
+        if not self.check_light_schedule():
             return 'main'
         else:
             return 'post'
