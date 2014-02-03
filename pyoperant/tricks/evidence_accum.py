@@ -4,6 +4,7 @@ import os, sys, random, csv, time
 import numpy as np
 import datetime as dt
 from pyoperant import utils, components, local, hwio, experiment
+from pyoperant.tricks import two_alt_choice
 
 try:
     import simplejson as json
@@ -11,14 +12,15 @@ except ImportError:
     import json
 
 
-class EvidenceAccumExperiment(experiment.Experiment):
+class EvidenceAccumExperiment(two_alt_choice.TwoAltChoice):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
         super(EvidenceAccumExperiment, self).__init__(*args, **kwargs)
+        self.build_transition_matrices()
 
-    def build_transition_matrices(self): 
-        # run through the transitions for each stimulus and generate transition matrixes
-        n = len(self.stim_map)
+    def build_transition_matrices(self):
+        """run through the transitions for each stimulus and generate transition matrixes"""
+        n = len(self.parameters['stim_map'])
         self.evidence_arrays = {}
         for stim_class, class_params in self.parameters['classes'].items():
             arr = np.zeros((n,n),np.float_)
@@ -27,11 +29,11 @@ class EvidenceAccumExperiment(experiment.Experiment):
 
             self.parameters[this_class]['evidence_arrays'] = arr
 
-        self.stim_classes = self.parameters['classes'].keys()
-        assert len(self.stim_classes) == 2
+        stim_classes = self.parameters['classes'].keys()
+        assert len(stim_classes) == 2
 
-        for this_class in self.parameters['classes'].keys():
-            other_class = [cl for cl in self.stim_classes if cl is not this_class][0]
+        for this_class in stim_classes:
+            other_class = [cl for cl in stim_classes if cl is not this_class][0]
             trans = self.odds \
                   * self.parameters[stim_class]['evidence_arrays'][stim_class] \
                   + self.parameters[other_class]['evidence_arrays']
@@ -39,6 +41,7 @@ class EvidenceAccumExperiment(experiment.Experiment):
             trans = np.cumsum(trans,axis=1)
             trans = trans / trans[:,-1][:,None] # I don't get why it suddenly works to append '[:,None]'
             self.parameters[this_class]['transition_cdf'] = trans
+            self.log.debug('added class %s transition cdf %s' % (this_class, trans))
 
     def get_stimuli(self,trial_class):
         """ take trial class and return a tuple containing the stimulus event to play and a list of additional events
@@ -74,15 +77,9 @@ class EvidenceAccumExperiment(experiment.Experiment):
 
     def analyze_trial(self):
         '''after the trial is complete, perform additional analyses that will be saved'''
-        
-        for event in self.this_trial.events
-            event.time += self.stimulus_event.time
 
-        # calculate the number of motifs the bird heard
-        trial_motifs = [ev for ev in self.this_trial.events if (ev.label=='motif')]
-        if self.this_trial.response == 'none':
-            num_mots = len(trial_motifs)
-        else:
+        for event in self.this_trial.events:
+            event.time += self.stimulus_event.time
 
         # determine the string of motifs the bird heard
         stim_string = ''
