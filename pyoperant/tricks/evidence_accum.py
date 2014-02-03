@@ -50,54 +50,72 @@ class EvidenceAccumExperiment(experiment.Experiment):
 
         # use transition CDF to get iteratively get next motif id
         mid = 0
-        for pos in range(self.strlen_max):
+        for pos in range(self.parameters['strlen_max']):
             mid = (self.parameters[trial_class]['transition_cdf'][mid] < random.random()).sum()
             motif_ids.append(mid)
         assert len(motif_ids) == self.strlen_max
 
-        motifs = [self.stim_map[mid] for mid in motif_ids]
+        motifs = [self.parameters['stim_map'][mid] for mid in motif_ids]
 
         motif_isi = [max(random.gauss(self.parameters['isi_mean'], self.parameters['isi_stdev']),0.0) for mot in motifs]
         motif_isi[-1] = 0.0
 
-        input_files = [(self.stims[motif_name], isi) for motif_name, isi in zip(motifs,motif_isi)]
-        filename =  os.path.join(self.stim_path, ''.join(motifs) + '.wav')
+        input_files = [(self.parameters['stims'][motif_name], isi) for motif_name, isi in zip(motifs,motif_isi)]
+        filename =  os.path.join(self.parameters['stim_path'], ''.join(motifs) + '.wav')
         stim, epochs = utils.concat_wav(input_files,filename)
+
+        for ep in epochs:
+            for stim_name,f_name in self.parameters['stims'].items():
+                if ep.name in f_name:
+                    ep.name = stim_name
 
         return stim, epochs
 
 
-    def analyze_trial(self,trial):
+    def analyze_trial(self):
         '''after the trial is complete, perform additional analyses that will be saved'''
-        trial_stim.time = trial_stim.time + trial['stim_start']
-        for motif in trial_motifs:
-            motif.time = motif.time + trial['stim_start']
+        
+        for event in self.this_trial.events
+            event.time += self.stimulus_event.time
 
         # calculate the number of motifs the bird heard
-        if trial['response'] == 'none':
+        trial_motifs = [ev for ev in self.this_trial.events if (ev.label=='motif')]
+        if self.this_trial.response == 'none':
             num_mots = len(trial_motifs)
         else:
-            num_mots = 0
-            for motif in trial_motifs:
-                if trial['response_time'] > motif.time:
-                    num_mots += 1
-        # determine the string of motifs the bird heard
-        trial['stim_motifs'] = trial_motifs[:num_mots]
 
-        trial['stim_string'] = ''
-        for motif in trial['stim_motifs']:
-            trial['stim_string'] += next((name for name, wav in self.stims.iteritems() if wav == motif.name), '')
+        # determine the string of motifs the bird heard
+        stim_string = ''
+        for ev in list(self.this_trial.events):
+            if (ev.label=='motif'):
+                if (self.this_trial.response == 'none') or (self.this_trial.rt > motif.time):
+                    stim_string += ev.name
+                else:
+                    self.this_trial.events.remove(ev) # get rid of motif events the bird didn't hear
+
+        self.this_trial.stimulus = stim_string
+
+
 
 if __name__ == "__main__":
 
-    cmd_line = utils.parse_commandline()
-    parameters = cmd_line['config']
+    try: import simplejson as json
+    except ImportError: import json
 
     from pyoperant.local import PANELS
-    panel = PANELS[parameters['panel']]()
+
+    cmd_line = utils.parse_commandline()
+    with open(cmd_line['config_file'], 'rb') as config:
+            parameters = json.load(config)
+
+
+    if parameters['debug']:
+        print parameters
+        print PANELS
+
+    panel = PANELS[parameters['panel_name']]()
 
     exp = EvidenceAccumExperiment(panel=panel,**parameters)
     exp.run()
-
 
 

@@ -4,13 +4,14 @@ import datetime as dt
 from pyoperant import utils, components, local, hwio
 
 
-try: import simplejson as json
-except ImportError: import json
+try: 
+    import simplejson as json
+except ImportError: 
+    import json
 
 def _log_except_hook(*exc_info):
     text = "".join(traceback.format_exception(*exc_info))
     logging.error("Unhandled exception: %s", text)
-
 
 class BaseExp(object):
     """Base class for an experiment.
@@ -118,6 +119,8 @@ class BaseExp(object):
                       )
         while True:
             utils.run_state_machine(start_in='idle',
+                                    error_state='idle',
+                                    error_callback=log_error_callback,
                                     idle=self._run_idle,
                                     sleep=self._run_sleep,
                                     session=self._run_session)
@@ -158,6 +161,8 @@ class BaseExp(object):
 
     def _run_sleep(self):
         utils.run_state_machine(start_in='pre',
+                                error_state='post',
+                                error_callback=log_error_callback,
                                 pre=self.sleep_pre,
                                 main=self.sleep_main,
                                 post=self.sleep_post)
@@ -179,6 +184,8 @@ class BaseExp(object):
 
     def _run_session(self):
         utils.run_state_machine(start_in='pre',
+                                error_state='post',
+                                error_callback=log_error_callback,
                                 pre=self.session_pre,
                                 main=self.session_main,
                                 post=self.session_post)
@@ -210,3 +217,13 @@ class BaseExp(object):
             f.write("Hopper already up failures today: %i\n" % self.summary['hopper_already_up'])
             f.write("Responses during feed: %i\n" % self.summary['responses_during_feed'])
             f.write("Rf'd responses: %i\n" % self.summary['responses'])
+
+    def log_error_callback(self, err):
+        if err.__class__ is hwio.CriticalError:
+            self.log.critical(str(err))
+        elif err.__class__ is hwio.Error:
+            self.log.error(str(err))
+        elif err.__class__ is InterfaceError or err.__class__ is ComponentError:
+            self.log.critical(str(err))
+        else:
+            self.log.critical(str(err))

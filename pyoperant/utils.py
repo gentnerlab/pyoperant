@@ -5,14 +5,7 @@ import time
 import datetime as dt
 from argparse import ArgumentParser
 
-## defining Error classes for operant HW control
-class Error(Exception):
-    '''base class for exceptions in this module'''
-    pass
 
-class GoodNite(Exception):
-    """ exception for when the lights should be off """
-    pass
 
 # consider importing this from python-neo
 class Event(object):
@@ -45,7 +38,7 @@ class AuditoryStimulus(Stimulus):
         self.label = 'auditory_stimulus'
 
 
-def run_state_machine(start_in='pre',**state_functions):
+def run_state_machine(start_in='pre', error_state=None, error_callback=None, **state_functions):
     """runs a state machine defined by the keyword arguments
 
     >>> def run_start():
@@ -69,7 +62,14 @@ def run_state_machine(start_in='pre',**state_functions):
 
     state = start_in
     while state is not None:
-        state = state_functions[state]()
+        try:
+            state = state_functions[state]()
+        except Exception, e:
+            if error_callback:
+                error_callback(e)
+            else:
+                raise
+            state = error_state
 
 
 class Trial(Event):
@@ -211,7 +211,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
     """
 
     cursor = 0
-    epochs = [] # list of tuples defining file epochs
+    epochs = [] # list of file epochs
     audio_data = ''
     output = wave.open(output_filename, 'wb')
 
@@ -259,7 +259,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
     finally:
         output.close()
 
-    description = ''
+    description = 'concatenated on-the-fly'
     concat_wav = AuditoryStimulus(time=0.0,
                                   duration=epochs[-1].time+epochs[-1].duration,
                                   name=output_filename,

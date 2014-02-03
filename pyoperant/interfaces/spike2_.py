@@ -1,28 +1,27 @@
+from pyoperant.interfaces import base_
 
-
-class Spike2Interface(object):
+class Spike2Interface(base_.BaseInterface):
     """docstring for Spike2Interface"""
-    def __init__(self, arg):
+    def __init__(self):
         super(Spike2Interface, self).__init__()
-        self.arg = arg
 
     def open(self):
-        pass
+        raise NotImplementedError
 
     def close(self):
-        pass
+        raise NotImplementedError
         
     def _read_bool(self):
-        pass
+        raise NotImplementedError
 
     def _write_bool(self):
-        pass
+        raise NotImplementedError
 
     def _queue_wav(self):
-        pass
+        raise NotImplementedError
 
     def _play_wav(self):
-        pass
+        raise NotImplementedError
 
     def _stop_wav(self):
-        pass
+        raise NotImplementedError

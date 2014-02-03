@@ -1,5 +1,3 @@
-from pyoperant.utils import Error
-
 ## Panel classes
 
 class BasePanel(object):
