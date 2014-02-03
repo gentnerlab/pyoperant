@@ -64,29 +64,38 @@ class EvidenceAccumExperiment(experiment.Experiment):
         filename =  os.path.join(self.parameters['stim_path'], ''.join(motifs) + '.wav')
         stim, epochs = utils.concat_wav(input_files,filename)
 
+        for ep in epochs:
+            for stim_name,f_name in self.parameters['stims'].items():
+                if ep.name in f_name:
+                    ep.name = stim_name
+                    
         return stim, epochs
 
 
-    def analyze_trial(self,trial):
+    def analyze_trial(self):
         '''after the trial is complete, perform additional analyses that will be saved'''
-        trial_stim.time = trial_stim.time + trial['stim_start']
-        for motif in trial_motifs:
-            motif.time = motif.time + trial['stim_start']
+        
+        for event in self.this_trial.events
+            event.time += self.this_trial.time
 
         # calculate the number of motifs the bird heard
-        if trial['response'] == 'none':
+        trial_motifs = [ev for ev in self.this_trial.events if (ev.label=='motif')]
+        if self.this_trial.response == 'none':
             num_mots = len(trial_motifs)
         else:
-            num_mots = 0
-            for motif in trial_motifs:
-                if trial['response_time'] > motif.time:
-                    num_mots += 1
-        # determine the string of motifs the bird heard
-        trial['stim_motifs'] = trial_motifs[:num_mots]
 
-        trial['stim_string'] = ''
-        for motif in trial['stim_motifs']:
-            trial['stim_string'] += next((name for name, wav in self.parameters['stims'].iteritems() if wav == motif.name), '')
+        # determine the string of motifs the bird heard
+        stim_string = ''
+        for ev in list(self.this_trial.events):
+            if (ev.label=='motif'):
+                if (self.this_trial.response == 'none') or (self.this_trial.rt > motif.time):
+                    stim_string += ev.name
+                else:
+                    self.this_trial.events.remove(ev) # get rid of motif events the bird didn't hear
+
+        self.this_trial.stimulus = stim_string
+
+
 
 if __name__ == "__main__":
 

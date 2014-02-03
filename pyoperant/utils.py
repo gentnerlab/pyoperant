@@ -211,7 +211,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
     """
 
     cursor = 0
-    epochs = [] # list of tuples defining file epochs
+    epochs = [] # list of file epochs
     audio_data = ''
     output = wave.open(output_filename, 'wb')
 
@@ -259,7 +259,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
     finally:
         output.close()
 
-    description = ''
+    description = 'concatenated on-the-fly'
     concat_wav = AuditoryStimulus(time=0.0,
                                   duration=epochs[-1].time+epochs[-1].duration,
                                   name=output_filename,
