@@ -31,7 +31,8 @@ class PyAudioInterface(base_.BaseInterface):
                 self.device_index = index
                 break
             else:
-                self.device_index = None
+                raise InterfaceError('could not find pyaudio device %s' % (self.device_name))
+                
         self.device_info = self.pa.get_device_info_by_index(self.device_index)
 
     def close(self):

@@ -1,7 +1,3 @@
-import datetime
-import subprocess
-from pyoperant.utils import is_day, time_in_range, Error
-
 
 # Classes of operant components
 class BaseIO(object):

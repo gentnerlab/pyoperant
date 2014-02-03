@@ -20,12 +20,12 @@ class ComediInterface(base_.BaseInterface):
     def open(self):
         self.device = comedi.comedi_open(self.device_name)
         if self.device < 0:
-            raise ComediError('could not open device %s' % self.device_name)
+            raise ComediError('could not open comedi device %s' % self.device_name)
 
     def close(self):
         s = comedi.comedi_close(self.device)
         if s < 0:
-            raise ComediError('could not close device %s(%s)' % (self.device_name, self.device))
+            raise InterfaceError('could not close comedi device %s(%s)' % (self.device_name, self.device))
 
     def _read_bool(self,subdevice,channel):
         """ read from comedi port
@@ -34,7 +34,7 @@ class ComediInterface(base_.BaseInterface):
         if s:
             return (not v)
         else:
-            raise ComediError('could not read from device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
+            raise InterfaceError('could not read from comedi device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
 
     def _poll(self,subdevice,channel):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
@@ -50,7 +50,7 @@ class ComediInterface(base_.BaseInterface):
         if s:
             return True
         else:
-            raise ComediError('could not write to device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
+            raise InterfaceError('could not write to comedi device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
 
 
 

@@ -11,15 +11,11 @@ class BaseComponent(object):
 
 ## Hopper ##
 
-class HopperError(Error):
-    """raised when there is a detected error with the hopper (1: already up, 2: didn't come up, 3: didn't go down)"""
-    pass
-
-class HopperActiveError(HopperError):
+class HopperActiveError(HardwareError):
     """raised when the hopper is up when it shouldn't be"""
     pass
 
-class HopperInactiveError(HopperError):
+class HopperInactiveError(HardwareError):
     """raised when the hopper is down when it shouldn't be"""
     pass
 
@@ -61,11 +57,11 @@ class Hopper(BaseComponent):
         if isinstance(IR,hwio.BooleanInput):
             self.IR = IR
         else:
-            raise Error('%s is not an input channel' % IR)
+            raise ValueError('%s is not an input channel' % IR)
         if isinstance(solenoid,hwio.BooleanOutput):
             self.solenoid = solenoid
         else:
-            raise Error('%s is not an output channel' % solenoid)
+            raise ValueError('%s is not an output channel' % solenoid)
 
     def check(self):
         """get status of solenoid & IR beam, throw hopper error if mismatch"""
@@ -77,7 +73,7 @@ class Hopper(BaseComponent):
             elif solenoid_status:
                 raise HopperInactiveError
             else:
-                raise HopperError('IR:%s,solenoid:%s' % (IR_status,solenoid_status))
+                raise HardwareError('IR:%s,solenoid:%s' % (IR_status,solenoid_status))
         else:
             return IR_status
 
@@ -148,11 +144,11 @@ class PeckPort(BaseComponent):
         if isinstance(IR,hwio.BooleanInput):
             self.IR = IR
         else:
-            raise Error('%s is not an input channel' % IR)
+            raise ValueError('%s is not an input channel' % IR)
         if isinstance(LED,hwio.BooleanOutput):
             self.LED = LED
         else:
-            raise Error('%s is not an output channel' % LED)
+            raise ValueError('%s is not an output channel' % LED)
 
     def status(self):
         """get the status of the IR beam """
@@ -203,7 +199,7 @@ class HouseLight(BaseComponent):
         if isinstance(light,hwio.BooleanOutput):
             self.light = light
         else:
-            raise Error('%s is not an output channel' % light)
+            raise ValueError('%s is not an output channel' % light)
 
     def off(self):
         """ drop  """
@@ -251,15 +247,15 @@ class RGBLight(BaseComponent):
         if isinstance(red,hwio.BooleanOutput):
             self._red = red
         else:
-            raise Error('%s is not an output channel' % red)
+            raise ValueError('%s is not an output channel' % red)
         if isinstance(green,hwio.BooleanOutput):
             self._green = green
         else:
-            raise Error('%s is not an output channel' % green)
+            raise ValueError('%s is not an output channel' % green)
         if isinstance(blue,hwio.BooleanOutput):
             self._blue = blue
         else:
-            raise Error('%s is not an output channel' % blue)
+            raise ValueError('%s is not an output channel' % blue)
 
     def red(self):
         self._green.write(False)
