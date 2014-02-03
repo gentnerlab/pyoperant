@@ -86,17 +86,15 @@ class TwoAltChoiceExp(base.BaseExp):
     ## trial flow
     def new_trial(self):
         '''create a new trial and append it to the trial list'''
-        try:
+        do_correction = False
+        if self.trials:
             last_trial = self.trials[-1]
             index = last_trial.index+1
-        except IndexError:
-            last_trial = None
-            index = 0
-
-        do_correction = False
-        if last_trial is not None:
             if self.parameters['correction_trials'] and last_trial.response and (last_trial.correct==False):
                 do_correction = True
+        else:
+            last_trial = None
+            index = 0
                     
         if do_correction:
             trial = Trial(tr_type='correction',
@@ -184,15 +182,12 @@ class TwoAltChoiceExp(base.BaseExp):
         return None
 
     def _run_trial(self):
-        try: 
-            utils.run_state_machine(start_in='pre',
-                                    pre=self.trial_pre,
-                                    main=self.trial_main,
-                                    post=self.trial_post)
-
-        except InterfaceError, ComponentError as err:
-            self.log.critical(str(err))
-            self.trial_post()
+        utils.run_state_machine(start_in='pre',
+                                error_state='post',
+                                error_callback=log_error_callback,
+                                pre=self.trial_pre,
+                                main=self.trial_main,
+                                post=self.trial_post)
 
     ## stimulus flow
     def stimulus_pre(self):
@@ -221,6 +216,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_stimulus(self):
         utils.run_state_machine(start_in='pre',
+                                error_callback=log_error_callback,
                                 pre=self.stimulus_pre,
                                 main=self.stimulus_main,
                                 post=self.stimulus_post)
@@ -255,6 +251,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def response(self):
         utils.run_state_machine(start_in='pre',
+                                error_callback=log_error_callback,
                                 pre=self.response_pre,
                                 main=self.response_main,
                                 post=self.response_post)
@@ -293,6 +290,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_consequence(self):
         utils.run_state_machine(start_in='pre',
+                                error_callback=log_error_callback,
                                 pre=self.consequence_pre,
                                 main=self.consequence_main,
                                 post=self.consequence_post)
@@ -357,6 +355,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_reward(self):
         utils.run_state_machine(start_in='pre',
+                                error_callback=log_error_callback,
                                 pre=self.reward_pre,
                                 main=self.reward_main,
                                 post=self.reward_post)
@@ -376,12 +375,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_punish(self):
         utils.run_state_machine(start_in='pre',
+                                error_callback=log_error_callback,
                                 pre=self.punish_pre,
                                 main=self.punish_main,
                                 post=self.punish_post)
-
-
-            
-
-
-
