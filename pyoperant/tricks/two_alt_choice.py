@@ -223,8 +223,8 @@ class TwoAltChoiceExp(base.BaseExp):
 
     #response flow
     def response_pre(self):
-        self.panel.left.on()
-        self.panel.right.on()
+        for class_, port in self.class_assoc.items():
+            port.on()
         return 'main'
 
     def response_main(self):
@@ -245,8 +245,8 @@ class TwoAltChoiceExp(base.BaseExp):
         return 'post'
 
     def response_post(self):
-        self.panel.left.off()
-        self.panel.right.off()
+        for class_, port in self.class_assoc.items():
+            port.off()
         return None
 
     def response(self):
