@@ -1,7 +1,6 @@
 import datetime
 from pyoperant import hwio
-from pyoperant.utils import Error, wait, check_time
-
+from pyoperant import utils
 
 class BaseComponent(object):
     """Base class for physcal component"""
@@ -79,7 +78,7 @@ class Hopper(BaseComponent):
 
     def up(self):
         self.solenoid.write(True)
-        wait(self.lag)
+        utils.wait(self.lag)
         try:
             self.check()
         except HopperInactiveError as e:
@@ -89,7 +88,7 @@ class Hopper(BaseComponent):
     def down(self):
         """ drop hopper """
         self.solenoid.write(False)
-        wait(self.lag)
+        utils.wait(self.lag)
         try:
             self.check()
         except HopperActiveError as e:
@@ -111,7 +110,7 @@ class Hopper(BaseComponent):
         self.up()
         feed_duration = datetime.datetime.now() - feed_time
         while feed_duration < datetime.timedelta(seconds=dur):
-            wait(self.lag)
+            utils.wait(self.lag)
             self.check()
             feed_duration = datetime.datetime.now() - feed_time
         self.down()
@@ -171,7 +170,7 @@ class PeckPort(BaseComponent):
         flash_duration = datetime.datetime.now() - flash_time
         while flash_duration < datetime.timedelta(seconds=dur):
             self.LED.toggle()
-            wait(isi)
+            utils.wait(isi)
             flash_duration = datetime.datetime.now() - flash_time
         self.LED.write(LED_state)
         return (flash_time,flash_duration)
