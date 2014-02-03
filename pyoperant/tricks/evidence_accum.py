@@ -68,7 +68,7 @@ class EvidenceAccumExperiment(experiment.Experiment):
             for stim_name,f_name in self.parameters['stims'].items():
                 if ep.name in f_name:
                     ep.name = stim_name
-                    
+
         return stim, epochs
 
 
@@ -76,7 +76,7 @@ class EvidenceAccumExperiment(experiment.Experiment):
         '''after the trial is complete, perform additional analyses that will be saved'''
         
         for event in self.this_trial.events
-            event.time += self.this_trial.time
+            event.time += self.stimulus_event.time
 
         # calculate the number of motifs the bird heard
         trial_motifs = [ev for ev in self.this_trial.events if (ev.label=='motif')]

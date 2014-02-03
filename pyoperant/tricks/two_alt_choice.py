@@ -196,6 +196,11 @@ class TwoAltChoiceExp(base.BaseExp):
         self.panel.center.on()
         self.this_trial.time = panel.center.poll()
         self.panel.center.off()
+        self.this_trial.events.append(Event(name='center',
+                                            label='peck',
+                                            time=0.0,
+                                            )
+                                      )
 
         # record trial initiation
         self.summary['trials'] += 1
@@ -230,16 +235,21 @@ class TwoAltChoiceExp(base.BaseExp):
     def response_main(self):
 
         while True:
-            elapsed_time = (dt.datetime.now() - stim_start).total_seconds()
+            elapsed_time = (dt.datetime.now() - self.this_trial.stimulus_event.time).total_seconds()
             if elapsed_time > self.max_wait:
                 self.this_trial.response = 'none'
                 break
             for class_, port in self.class_assoc.items():
                 if port.status():
-                    trial.rt = trial.time + elapsed_time
+                    self.this_trial.rt = self.this_trial.time + elapsed_time
                     wave_stream.close()
-                    trial.response = class_
+                    self.this_trial.response = class_
                     self.summary['responses'] += 1
+                    response_event = Event(name=self.parameters[class_]['component'],
+                                           label='peck',
+                                           time=self.this_trial.rt,
+                                           )
+                    self.this_trial.events.append(response_event)
                     break
 
         return 'post'
