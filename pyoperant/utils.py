@@ -45,7 +45,7 @@ class AuditoryStimulus(Stimulus):
         self.label = 'auditory_stimulus'
 
 
-def run_state_machine(start_in='pre',**state_functions):
+def run_state_machine(start_in='pre', error_state=None, error_callback=None, **state_functions):
     """runs a state machine defined by the keyword arguments
 
     >>> def run_start():
@@ -69,7 +69,14 @@ def run_state_machine(start_in='pre',**state_functions):
 
     state = start_in
     while state is not None:
-        state = state_functions[state]()
+        try:
+            state = state_functions[state]()
+        except Exception, e:
+            if error_callback:
+                error_callback(e)
+            else:
+                raise
+            state = error_state
 
 
 class Trial(Event):
