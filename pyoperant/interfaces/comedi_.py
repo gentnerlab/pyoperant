@@ -1,10 +1,7 @@
 import comedi
+import subprocess, datetime
 from pyoperant.interfaces import base_
-from pyoperant import utils
-
-class ComediError(utils.Error):
-    '''raised for problems communicating with the comedi driver'''
-    pass
+from pyoperant import utils, InterfaceError
 
 
 class ComediInterface(base_.BaseInterface):
@@ -20,7 +17,7 @@ class ComediInterface(base_.BaseInterface):
     def open(self):
         self.device = comedi.comedi_open(self.device_name)
         if self.device < 0:
-            raise ComediError('could not open comedi device %s' % self.device_name)
+            raise InterfaceError('could not open comedi device %s' % self.device_name)
 
     def close(self):
         s = comedi.comedi_close(self.device)
