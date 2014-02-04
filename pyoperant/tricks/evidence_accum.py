@@ -3,7 +3,7 @@
 import os, sys, random, csv, time
 import numpy as np
 import datetime as dt
-from pyoperant import utils, components, local, hwio, experiment
+from pyoperant import utils, components, local, hwio
 from pyoperant.tricks import two_alt_choice
 
 try:
@@ -11,36 +11,51 @@ try:
 except ImportError:
     import json
 
+class NumpyAwareJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
-class EvidenceAccumExperiment(two_alt_choice.TwoAltChoice):
+
+class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
         super(EvidenceAccumExperiment, self).__init__(*args, **kwargs)
         self.build_transition_matrices()
 
+    def save(self):
+        self.snapshot_f = os.path.join(self.parameters['experiment_path'], self.timestamp+'.json')
+        with open(self.snapshot_f, 'wb') as config_snap:
+            json.dump(self.parameters,
+                      config_snap,
+                      sort_keys=True,
+                      indent=4,
+                      cls=NumpyAwareJSONEncoder)
+
     def build_transition_matrices(self):
         """run through the transitions for each stimulus and generate transition matrixes"""
         n = len(self.parameters['stim_map'])
-        self.evidence_arrays = {}
+
         for stim_class, class_params in self.parameters['classes'].items():
             arr = np.zeros((n,n),np.float_)
             for a,b in class_params['transitions']:
                 arr[a,b] = 1.0
 
-            self.parameters[this_class]['evidence_arrays'] = arr
+            self.parameters['classes'][stim_class]['evidence_arrays'] = arr
 
         stim_classes = self.parameters['classes'].keys()
         assert len(stim_classes) == 2
 
         for this_class in stim_classes:
             other_class = [cl for cl in stim_classes if cl is not this_class][0]
-            trans = self.odds \
-                  * self.parameters[stim_class]['evidence_arrays'][stim_class] \
-                  + self.parameters[other_class]['evidence_arrays']
+            trans = self.parameters['odds'] \
+                  * self.parameters['classes'][stim_class]['evidence_arrays'] \
+                  + self.parameters['classes'][other_class]['evidence_arrays']
             trans[0,1:] = 1.0
             trans = np.cumsum(trans,axis=1)
             trans = trans / trans[:,-1][:,None] # I don't get why it suddenly works to append '[:,None]'
-            self.parameters[this_class]['transition_cdf'] = trans
+            self.parameters['classes'][this_class]['transition_cdf'] = trans
             self.log.debug('added class %s transition cdf %s' % (this_class, trans))
 
     def get_stimuli(self,trial_class):
@@ -54,9 +69,9 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoice):
         # use transition CDF to get iteratively get next motif id
         mid = 0
         for pos in range(self.parameters['strlen_max']):
-            mid = (self.parameters[trial_class]['transition_cdf'][mid] < random.random()).sum()
+            mid = (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
             motif_ids.append(mid)
-        assert len(motif_ids) == self.strlen_max
+        assert len(motif_ids) == self.parameters['strlen_max']
 
         motifs = [self.parameters['stim_map'][mid] for mid in motif_ids]
 
@@ -74,18 +89,33 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoice):
 
         return stim, epochs
 
+    def trial_pre(self):
+        ''' this is where we initialize a trial'''
+        # make sure lights are on at the beginning of each trial, prep for trial
+
+        self.new_trial()
+
+        self.this_trial = self.trials[-1]
+        motifs = [m for m in self.this_trial.events if (m.label=='motif')]
+        self.log.debug("%s motifs to present" % len(motifs))
+        min_motif = motifs[self.parameters['strlen_min']-1]
+        self.this_trial.annotate(min_wait=min_motif.time+min_motif.duration)
+        max_wait = self.this_trial.stimulus_event.duration + self.parameters['response_win']
+        self.this_trial.annotate(max_wait=max_wait)
+        self.log.debug('created new trial')
+        return 'main'
 
     def analyze_trial(self):
         '''after the trial is complete, perform additional analyses that will be saved'''
 
         for event in self.this_trial.events:
-            event.time += self.stimulus_event.time
+            event.time += self.this_trial.stimulus_event.time
 
         # determine the string of motifs the bird heard
         stim_string = ''
         for ev in list(self.this_trial.events):
             if (ev.label=='motif'):
-                if (self.this_trial.response == 'none') or (self.this_trial.rt > motif.time):
+                if (self.this_trial.response == 'none') or (self.this_trial.rt > ev.time):
                     stim_string += ev.name
                 else:
                     self.this_trial.events.remove(ev) # get rid of motif events the bird didn't hear

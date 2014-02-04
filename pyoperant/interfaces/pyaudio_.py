@@ -1,6 +1,7 @@
 import pyaudio
 import wave
 from pyoperant.interfaces import base_
+from pyoperant import InterfaceError
 
 class _StreamContainer(object):
     def __init__(self,wf,stream):
@@ -31,8 +32,10 @@ class PyAudioInterface(base_.BaseInterface):
                 self.device_index = index
                 break
             else:
-                raise InterfaceError('could not find pyaudio device %s' % (self.device_name))
-                
+                self.device_index = None
+        if self.device_index == None:
+            raise InterfaceError('could not find pyaudio device %s' % (self.device_name))
+
         self.device_info = self.pa.get_device_info_by_index(self.device_index)
 
     def close(self):
@@ -40,16 +43,16 @@ class PyAudioInterface(base_.BaseInterface):
             self.stream.close()
         self.pa.terminate()
 
-    def _get_stream(self,wf,start=False):
+    def _get_stream(self,start=False):
         """
         """
         def _callback(in_data, frame_count, time_info, status):
-            data = wf.readframes(frame_count)
+            data = self.wf.readframes(frame_count)
             return (data, pyaudio.paContinue)
 
-        self.stream = self.pa.open(format=self.pa.get_format_from_width(wf.getsampwidth()),
-                                   channels=wf.getnchannels(),
-                                   rate=wf.getframerate(),
+        self.stream = self.pa.open(format=self.pa.get_format_from_width(self.wf.getsampwidth()),
+                                   channels=self.wf.getnchannels(),
+                                   rate=self.wf.getframerate(),
                                    output=True,
                                    output_device_index=self.device_index,
                                    start=start,
@@ -57,8 +60,8 @@ class PyAudioInterface(base_.BaseInterface):
 
     def _queue_wav(self,wav_file,start=False):
         self.wf = wave.open(wav_file)
-        stream = self._get_stream(wf,start=start)
-        self.stream = _StreamContainer(stream=stream,wf=wf)
+        stream = self._get_stream(start=start)
+        self.stream = _StreamContainer(stream=stream,wf=self.wf)
 
     def _play_wav(self):
         self.stream.play()

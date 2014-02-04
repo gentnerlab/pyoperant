@@ -1,7 +1,7 @@
 import sys
-from pyoperant.interfaces import base
+from pyoperant.interfaces import base_
 
-class ConsoleInterface(base.BaseInterface):
+class ConsoleInterface(base_.BaseInterface):
     """docstring for ComediInterface"""
     def __init__(self,*args,**kwargs):
         super(ConsoleInterface, self).__init__(*args,**kwargs)

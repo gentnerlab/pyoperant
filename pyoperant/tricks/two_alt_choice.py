@@ -1,26 +1,29 @@
 #!/usr/bin/python
 
-# from psychopy import core, data, logging, sound
+import os
+import csv
+import datetime as dt
+from numpy import random
 from pyoperant.tricks import base
-from pyoperant
+from pyoperant import components, utils,reinf
 
 class TwoAltChoiceExp(base.BaseExp):
     """docstring for Experiment"""
-    def _run__init__(self,summaryDAT, *args, **kwargs):
-        super(Experiment,  self).__init__(self, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super(TwoAltChoiceExp,  self).__init__(*args, **kwargs)
 
         # assign stim files full names
         for name, filename in self.parameters['stims'].items():
             filename_full = os.path.join(self.parameters['stim_path'], filename)
             self.parameters['stims'][name] = filename_full
 
-        self.req_panel_attr.append(['speaker',
-                                    'left',
-                                    'center',
-                                    'right',
-                                    'reward',
-                                    'punish',
-                                    ])
+        self.req_panel_attr += ['speaker',
+                                'left',
+                                'center',
+                                'right',
+                                'reward',
+                                'punish',
+                                ]
 
         # configure csv file for data
         self.fields_to_save = ['session',
@@ -39,15 +42,15 @@ class TwoAltChoiceExp(base.BaseExp):
         self.trials = []
         self.session_id = 0
 
-        self.data_csv = os.path.join(self.parameters['subject_path'], 
-                                     self.parameters['subject_id']+'_trialdata_'+self.exp_timestamp+'.csv')
+        self.data_csv = os.path.join(self.parameters['experiment_path'],
+                                     self.parameters['subject']+'_trialdata_'+self.timestamp+'.csv')
 
         if 'reinforcement' in self.parameters.keys():
-            reinf = self.parameters['reinforcement']
-            if reinf['schedule'] == 'variable_ratio':
-                self.reinf_sched = reinf.VariableRatioSchedule(ratio=reinf['ratio'])
+            reinforcement = self.parameters['reinforcement']
+            if reinforcement['schedule'] == 'variable_ratio':
+                self.reinf_sched = reinf.VariableRatioSchedule(ratio=reinforcement['ratio'])
             elif reinf['schedule'] == 'fixed_ratio':
-                self.reinf_sched = reinf.FixedRatioSchedule(ratio=reinf['ratio'])
+                self.reinf_sched = reinf.FixedRatioSchedule(ratio=reinforcement['ratio'])
             else:
                 self.reinf_sched = reinf.ContinuousReinforcement()
 
@@ -61,9 +64,10 @@ class TwoAltChoiceExp(base.BaseExp):
 
     ## session flow
     def check_session_schedule(self):
-        return not self.check_light_schedule()
+        return self.check_light_schedule()
 
     def session_pre(self):
+        self.log.info('starting session')
         self.trials = []
         self.session_id += 1
 
@@ -77,11 +81,14 @@ class TwoAltChoiceExp(base.BaseExp):
         return 'main'
 
     def session_main(self):
-        try:
-            self._run_trial()
+        self._run_trial()
+        if self.check_session_schedule:
             return 'main'
-        except utils.GoodNite:
+        else:
             return 'post'
+    def session_post(self):
+        self.log.info('ending session')
+        return None
 
     ## trial flow
     def new_trial(self):
@@ -95,33 +102,33 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             last_trial = None
             index = 0
-                    
+
         if do_correction:
-            trial = Trial(tr_type='correction',
-                          index=index,
-                          tr_class=last_trial.tr_class)
+            trial = utils.Trial(tr_type='correction',
+                                index=index,
+                                tr_class=last_trial.tr_class)
             for ev in last_trial.events:
                 if ev.label is 'wav':
                     trial.events.append(ev[:])
-                    trial.stimulus_event = correction.events[-1]
+                    trial.stimulus_event = trial.events[-1]
                     trial.stimulus = trial.stimulus_event.name
                 elif ev.label is 'motif':
-                    correction.events.append(ev[:])
+                    trial.events.append(ev[:])
             self.log.debug("correction trial: class is %s" % trial.tr_class)
         else:
-            trial = Trial(index=index)
-            trial.tr_class = random.choice(self.models.keys())
-            trial_stim, trial_motifs = self.get_stimuli(trial['class'])
+            trial = utils.Trial(index=index)
+            trial.tr_class = random.choice(self.class_assoc.keys())
+            trial_stim, trial_motifs = self.get_stimuli(trial.tr_class)
             trial.events.append(trial_stim)
-            trial.stim_event = trial.events[-1]
-            trial.stimulus = trial.stim_event.name
+            trial.stimulus_event = trial.events[-1]
+            trial.stimulus = trial.stimulus_event.name
             for mot in trial_motifs:
                 trial.events.append(mot)
 
         self.trials.append(trial)
         self.this_trial = self.trials[-1]
-        self.this_trial_index = selfz.trials.index(self.this_trial)
-        self.log.debug("trial %i: %s, %s" % (trial['index'],trial['type'],trial['class']))
+        self.this_trial_index = self.trials.index(self.this_trial)
+        self.log.debug("trial %i: %s, %s" % (self.this_trial.index,self.this_trial.type_,self.this_trial.class_))
 
         return True
 
@@ -129,7 +136,7 @@ class TwoAltChoiceExp(base.BaseExp):
         # TODO: default stimulus selection
         pass
 
-    def analyze_trial(self,trial_class):
+    def analyze_trial(self):
         # TODO: calculate reaction times
         pass
 
@@ -158,12 +165,11 @@ class TwoAltChoiceExp(base.BaseExp):
         self.new_trial()
 
         self.this_trial = self.trials[-1]
-        min_epoch = self.this_trial.events[self.strlen_min-1]
-        self.this_trial.annotate(min_epoch=min_epoch)
-        self.this_trial.annotate(min_wait=min_epoch.time+min_epoch.duration)
-        stim = trial.events[]
-        max_wait = trial_stim.duration + self.parameters['response_win']
+        min_wait = self.this_trial.stimulus_event.duration
+        max_wait = self.this_trial.stimulus_event.duration + self.parameters['response_win']
+        self.this_trial.annotate(min_wait=min_wait)
         self.this_trial.annotate(max_wait=max_wait)
+        self.log.debug('created new trial')
         return 'main'
 
     def trial_main(self):
@@ -178,13 +184,14 @@ class TwoAltChoiceExp(base.BaseExp):
         self.analyze_trial()
         self.save_trial(self.this_trial)
         self.write_summary()
-        utils.wait(self.intertrial_min)
+        utils.wait(self.parameters['intertrial_min'])
         return None
 
     def _run_trial(self):
+        self.log.debug('running trial')
         utils.run_state_machine(start_in='pre',
                                 error_state='post',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.trial_pre,
                                 main=self.trial_main,
                                 post=self.trial_post)
@@ -192,15 +199,16 @@ class TwoAltChoiceExp(base.BaseExp):
     ## stimulus flow
     def stimulus_pre(self):
         # wait for bird to peck
+        self.panel.speaker.queue(self.this_trial.stimulus_event.file_origin)
         self.log.debug('waiting for peck...')
         self.panel.center.on()
-        self.this_trial.time = panel.center.poll()
+        self.this_trial.time = self.panel.center.poll() ## need to add a 1 minute timeout to check the sched
         self.panel.center.off()
-        self.this_trial.events.append(Event(name='center',
-                                            label='peck',
-                                            time=0.0,
+        self.this_trial.events.append(utils.Event(name='center',
+                                                  label='peck',
+                                                  time=0.0,
+                                                  )
                                             )
-                                      )
 
         # record trial initiation
         self.summary['trials'] += 1
@@ -212,7 +220,7 @@ class TwoAltChoiceExp(base.BaseExp):
         ## 1. play stimulus
         stim_start = dt.datetime.now()
         self.this_trial.stimulus_event.time = (stim_start - self.this_trial.time).total_seconds()
-        self.wave_stream = panel.speaker.play_wav(trial.stimulus_event.file_origin)
+        self.panel.speaker.play() # already queued in stimulus_pre()
         return 'post'
 
     def stimulus_post(self):
@@ -221,7 +229,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_stimulus(self):
         utils.run_state_machine(start_in='pre',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.stimulus_pre,
                                 main=self.stimulus_main,
                                 post=self.stimulus_post)
@@ -236,19 +244,19 @@ class TwoAltChoiceExp(base.BaseExp):
 
         while True:
             elapsed_time = (dt.datetime.now() - self.this_trial.stimulus_event.time).total_seconds()
-            if elapsed_time > self.max_wait:
+            if elapsed_time > self.this_trial.annotations['max_wait']:
                 self.this_trial.response = 'none'
                 break
             for class_, port in self.class_assoc.items():
                 if port.status():
                     self.this_trial.rt = self.this_trial.time + elapsed_time
-                    wave_stream.close()
+                    self.panel.speaker.stop()
                     self.this_trial.response = class_
                     self.summary['responses'] += 1
-                    response_event = Event(name=self.parameters[class_]['component'],
-                                           label='peck',
-                                           time=self.this_trial.rt,
-                                           )
+                    response_event = utils.Event(name=self.parameters[class_]['component'],
+                                                 label='peck',
+                                                 time=self.this_trial.rt,
+                                                 )
                     self.this_trial.events.append(response_event)
                     break
 
@@ -259,9 +267,9 @@ class TwoAltChoiceExp(base.BaseExp):
             port.off()
         return None
 
-    def response(self):
+    def _run_response(self):
         utils.run_state_machine(start_in='pre',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.response_pre,
                                 main=self.response_main,
                                 post=self.response_post)
@@ -274,17 +282,17 @@ class TwoAltChoiceExp(base.BaseExp):
         # correct trial
         if self.this_trial.response is self.this_trial.tr_class:
             self.this_trial.correct = True
-            
+
             if self.parameters['reinforcement']['secondary']:
                 secondary_reinf_event = self.secondary_reinforcement()
                 self.this_trial.events.append(secondary_reinf_event)
 
-            if self.trial.type == 'correction':
+            if self.this_trial.type_ == 'correction':
                 pass
             elif self.reinf_sched.consequate(trial=self.this_trial):
                 self._run_reward() # provide a reward
         # no response
-        elif self.trial.response is 'none':
+        elif self.this_trial.response is 'none':
             pass
 
         # incorrect trial
@@ -300,7 +308,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_consequence(self):
         utils.run_state_machine(start_in='pre',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.consequence_pre,
                                 main=self.consequence_main,
                                 post=self.consequence_post)
@@ -316,7 +324,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def reward_main(self):
         try:
-            value = self.parameters[self.this_trial.class_]['reward_value']
+            value = self.parameters['classes'][self.this_trial.class_]['reward_value']
             reward_event = self.panel.reward(value=value)
             self.this_trial.reward = True
             ## TODO: make rewards into events
@@ -330,14 +338,14 @@ class TwoAltChoiceExp(base.BaseExp):
             self.this_trial.reward = True
             self.summary['hopper_already_up'] += 1
             self.log.warning("hopper already up on panel %s" % str(err))
-            utils.wait(self.parameters[self.this_trial.class_]['reward_value'])
+            utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
             self.panel.reset()
 
         except components.HopperWontComeUpError as err:
             self.this_trial.reward = 'error'
             self.summary['hopper_failures'] += 1
             self.log.error("hopper didn't come up on panel %s" % str(err))
-            utils.wait(self.parameters[self.this_trial.class_]['reward_value'])
+            utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
             self.panel.reset()
 
         # except components.ResponseDuringFeedError as err:
@@ -365,7 +373,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_reward(self):
         utils.run_state_machine(start_in='pre',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.reward_pre,
                                 main=self.reward_main,
                                 post=self.reward_post)
@@ -375,7 +383,8 @@ class TwoAltChoiceExp(base.BaseExp):
         return 'main'
 
     def punish_main(self):
-        punish_event = self.panel.punish(value=self.timeout_dur[trial['class']])
+        value = self.parameters['classes'][self.this_trial.class_]['punish_value']
+        punish_event = self.panel.punish(value=value)
         self.this_trial.events.append(punish_event)
         self.this_trial.punish = True
         return 'post'
@@ -385,7 +394,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_punish(self):
         utils.run_state_machine(start_in='pre',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.punish_pre,
                                 main=self.punish_main,
                                 post=self.punish_post)

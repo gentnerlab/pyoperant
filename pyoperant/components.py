@@ -1,6 +1,5 @@
 import datetime
-from pyoperant import hwio
-from pyoperant import utils
+from pyoperant import hwio, utils, ComponentError
 
 class BaseComponent(object):
     """Base class for physcal component"""
@@ -10,11 +9,11 @@ class BaseComponent(object):
 
 ## Hopper ##
 
-class HopperActiveError(HardwareError):
+class HopperActiveError(ComponentError):
     """raised when the hopper is up when it shouldn't be"""
     pass
 
-class HopperInactiveError(HardwareError):
+class HopperInactiveError(ComponentError):
     """raised when the hopper is down when it shouldn't be"""
     pass
 
@@ -72,7 +71,7 @@ class Hopper(BaseComponent):
             elif solenoid_status:
                 raise HopperInactiveError
             else:
-                raise HardwareError('IR:%s,solenoid:%s' % (IR_status,solenoid_status))
+                raise ComponentError("the IR & solenoid don't match: IR:%s,solenoid:%s" % (IR_status,solenoid_status))
         else:
             return IR_status
 
@@ -175,7 +174,7 @@ class PeckPort(BaseComponent):
         self.LED.write(LED_state)
         return (flash_time,flash_duration)
 
-    def wait_for_peck(self):
+    def poll(self):
         """ poll peck port until there is a peck"""
         return self.IR.poll()
 
@@ -242,7 +241,7 @@ class RGBLight(BaseComponent):
 
     """
     def __init__(self,red,green,blue,*args,**kwargs):
-        super(CueLight, self).__init__(*args,**kwargs)
+        super(RGBLight, self).__init__(*args,**kwargs)
         if isinstance(red,hwio.BooleanOutput):
             self._red = red
         else:

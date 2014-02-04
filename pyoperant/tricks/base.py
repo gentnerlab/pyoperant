@@ -1,12 +1,13 @@
-import logging
+import logging, traceback
 import os, sys
 import datetime as dt
 from pyoperant import utils, components, local, hwio
+from pyoperant import ComponentError, InterfaceError
 
 
-try: 
+try:
     import simplejson as json
-except ImportError: 
+except ImportError:
     import json
 
 def _log_except_hook(*exc_info):
@@ -84,7 +85,7 @@ class BaseExp(object):
             self.log_level = logging.INFO
 
         sys.excepthook = _log_except_hook # send uncaught exceptions to log file
-        
+
         logging.basicConfig(filename=self.log_file,
                             level=self.log_level,
                             format='"%(asctime)s","%(levelname)s","%(message)s"')
@@ -98,9 +99,11 @@ class BaseExp(object):
         #log.addHandler(email_handler)
 
     def check_light_schedule(self):
+        """returns true if the lights should be on"""
         return utils.check_time(self.parameters['light_schedule'])
 
     def check_session_schedule(self):
+        """returns True if the subject should be running sessions"""
         return False
 
 
@@ -111,7 +114,7 @@ class BaseExp(object):
         self.panel.reset()
         self.save()
         self.init_summary()
-        
+
         self.log.info('%s: running %s with parameters in %s' % (self.name,
                                                                 self.__class__.__name__,
                                                                 self.snapshot_f,
@@ -120,7 +123,7 @@ class BaseExp(object):
         while True:
             utils.run_state_machine(start_in='idle',
                                     error_state='idle',
-                                    error_callback=log_error_callback,
+                                    error_callback=self.log_error_callback,
                                     idle=self._run_idle,
                                     sleep=self._run_sleep,
                                     session=self._run_session)
@@ -162,16 +165,13 @@ class BaseExp(object):
     def _run_sleep(self):
         utils.run_state_machine(start_in='pre',
                                 error_state='post',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.sleep_pre,
                                 main=self.sleep_main,
                                 post=self.sleep_post)
         return 'idle'
 
     # session
-
-    def check_session_schedule(self):
-        return not self.check_light_schedule()
 
     def session_pre(self):
         return 'main'
@@ -185,7 +185,7 @@ class BaseExp(object):
     def _run_session(self):
         utils.run_state_machine(start_in='pre',
                                 error_state='post',
-                                error_callback=log_error_callback,
+                                error_callback=self.log_error_callback,
                                 pre=self.session_pre,
                                 main=self.session_main,
                                 post=self.session_post)
@@ -219,11 +219,5 @@ class BaseExp(object):
             f.write("Rf'd responses: %i\n" % self.summary['responses'])
 
     def log_error_callback(self, err):
-        if err.__class__ is hwio.CriticalError:
-            self.log.critical(str(err))
-        elif err.__class__ is hwio.Error:
-            self.log.error(str(err))
-        elif err.__class__ is InterfaceError or err.__class__ is ComponentError:
-            self.log.critical(str(err))
-        else:
+        if err.__class__ is InterfaceError or err.__class__ is ComponentError:
             self.log.critical(str(err))

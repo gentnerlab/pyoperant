@@ -4,7 +4,7 @@ import struct
 import time
 import datetime as dt
 from argparse import ArgumentParser
-
+from pyoperant import Error
 
 
 # consider importing this from python-neo
@@ -29,13 +29,15 @@ class Stimulus(Event):
     """docstring for Stimulus"""
     def __init__(self, *args, **kwargs):
         super(Stimulus, self).__init__(*args, **kwargs)
-        self.label = 'stimulus'
+        if self.label=='':
+            self.label = 'stimulus'
 
 class AuditoryStimulus(Stimulus):
     """docstring for AuditoryStimulus"""
     def __init__(self, *args, **kwargs):
         super(AuditoryStimulus, self).__init__(*args, **kwargs)
-        self.label = 'auditory_stimulus'
+        if self.label=='':
+            self.label = 'auditory_stimulus'
 
 
 def run_state_machine(start_in='pre', error_state=None, error_callback=None, **state_functions):
@@ -67,6 +69,7 @@ def run_state_machine(start_in='pre', error_state=None, error_callback=None, **s
         except Exception, e:
             if error_callback:
                 error_callback(e)
+                raise
             else:
                 raise
             state = error_state
@@ -158,9 +161,9 @@ def check_time(schedule,fmt="%H:%M"):
     else:
         for epoch in schedule:
             assert len(epoch) is 2
-            now = datetime.datetime.time(datetime.datetime.now())
-            start = datetime.datetime.time(datetime.datetime.strptime(epoch[0],fmt))
-            end = datetime.datetime.time(datetime.datetime.strptime(epoch[1],fmt))
+            now = dt.datetime.time(dt.datetime.now())
+            start = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
+            end = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
             if time_in_range(start,end,now):
                 return True
         else:

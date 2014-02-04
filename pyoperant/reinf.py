@@ -43,7 +43,7 @@ class ContinuousReinforcement(BaseSchedule):
 class FixedRatioSchedule(BaseSchedule):
     """Maintains logic for deciding whether to consequate trials.
 
-    This class implements a fixed ratio schedule, where a reward reinforcement 
+    This class implements a fixed ratio schedule, where a reward reinforcement
     is provided after every nth correct response, where 'n' is the 'ratio'.
 
     Incorrect trials are always reinforced.
@@ -82,12 +82,12 @@ class FixedRatioSchedule(BaseSchedule):
 class VariableRatioSchedule(FixedRatioSchedule):
     """Maintains logic for deciding whether to consequate trials.
 
-    This class implements a variable ratio schedule, where a reward 
-    reinforcement is provided after every a number of consecutive correct 
+    This class implements a variable ratio schedule, where a reward
+    reinforcement is provided after every a number of consecutive correct
     responses. On average, the number of consecutive responses necessary is the
-    'ratio'. After a reinforcement is provided, the number of consecutive 
-    correct trials needed for the next reinforcement is selected by sampling 
-    randomly from the interval [1,2*ratio-1]. e.g. a ratio of '3' will require 
+    'ratio'. After a reinforcement is provided, the number of consecutive
+    correct trials needed for the next reinforcement is selected by sampling
+    randomly from the interval [1,2*ratio-1]. e.g. a ratio of '3' will require
     consecutive correct trials of 1, 2, 3, 4, & 5, randomly.
 
     Incorrect trials are always reinforced.
@@ -102,10 +102,10 @@ class VariableRatioSchedule(FixedRatioSchedule):
         super(VariableRatioSchedule, self).__init__(ratio=ratio)
 
     def _update(self):
-        ''' update min correct by randomly sampling from interval [1:2*ratio-1)'''
+        ''' update min correct by randomly sampling from interval [1:2*ratio)'''
         self.cumulative_correct = 0
-        self.threshold = random.randint(1, 2*self.ratio-1)
+        self.threshold = random.randint(1, 2*self.ratio)
 
     def __unicode__(self):
         return "VR%i" % self.ratio
-        
+
