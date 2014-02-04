@@ -104,9 +104,9 @@ class TwoAltChoiceExp(base.BaseExp):
             index = 0
 
         if do_correction:
-            trial = utils.Trial(tr_type='correction',
+            trial = utils.Trial(type_='correction',
                                 index=index,
-                                tr_class=last_trial.tr_class)
+                                class_=last_trial.class_)
             for ev in last_trial.events:
                 if ev.label is 'wav':
                     trial.events.append(ev[:])
@@ -114,11 +114,11 @@ class TwoAltChoiceExp(base.BaseExp):
                     trial.stimulus = trial.stimulus_event.name
                 elif ev.label is 'motif':
                     trial.events.append(ev[:])
-            self.log.debug("correction trial: class is %s" % trial.tr_class)
+            self.log.debug("correction trial: class is %s" % trial.class_)
         else:
             trial = utils.Trial(index=index)
-            trial.tr_class = random.choice(self.class_assoc.keys())
-            trial_stim, trial_motifs = self.get_stimuli(trial.tr_class)
+            trial.class_ = random.choice(self.class_assoc.keys())
+            trial_stim, trial_motifs = self.get_stimuli(trial.class_)
             trial.events.append(trial_stim)
             trial.stimulus_event = trial.events[-1]
             trial.stimulus = trial.stimulus_event.name
@@ -199,6 +199,7 @@ class TwoAltChoiceExp(base.BaseExp):
     ## stimulus flow
     def stimulus_pre(self):
         # wait for bird to peck
+        self.log.debug("presenting stimulus %s" % self.this_trial.stimulus)
         self.panel.speaker.queue(self.this_trial.stimulus_event.file_origin)
         self.log.debug('waiting for peck...')
         self.panel.center.on()
@@ -238,29 +239,30 @@ class TwoAltChoiceExp(base.BaseExp):
     def response_pre(self):
         for class_, port in self.class_assoc.items():
             port.on()
+        self.log.debug('waiting for response')
         return 'main'
 
     def response_main(self):
-
-        while True:
-            elapsed_time = (dt.datetime.now() - self.this_trial.stimulus_event.time).total_seconds()
-            if elapsed_time > self.this_trial.annotations['max_wait']:
-                self.this_trial.response = 'none'
-                break
-            for class_, port in self.class_assoc.items():
-                if port.status():
-                    self.this_trial.rt = self.this_trial.time + elapsed_time
-                    self.panel.speaker.stop()
-                    self.this_trial.response = class_
-                    self.summary['responses'] += 1
-                    response_event = utils.Event(name=self.parameters[class_]['component'],
-                                                 label='peck',
-                                                 time=self.this_trial.rt,
-                                                 )
-                    self.this_trial.events.append(response_event)
-                    break
-
-        return 'post'
+        elapsed_time = (dt.datetime.now() - self.this_trial.time).total_seconds()
+        rt = elapsed_time - self.this_trial.stimulus_event.time
+        if rt > self.this_trial.annotations['max_wait']:
+            self.this_trial.response = 'none'
+            self.log.info('no response')
+            return 'post'
+        for class_, port in self.class_assoc.items():
+            if port.status():
+                self.this_trial.rt = rt
+                self.panel.speaker.stop()
+                self.this_trial.response = class_
+                self.summary['responses'] += 1
+                response_event = utils.Event(name=self.parameters['classes'][class_]['component'],
+                                             label='peck',
+                                             time=elapsed_time,
+                                             )
+                self.this_trial.events.append(response_event)
+                self.log.info('response: %s' % (self.this_trial.response))
+                return 'post'
+        return 'main'
 
     def response_post(self):
         for class_, port in self.class_assoc.items():
@@ -280,12 +282,12 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def consequence_main(self):
         # correct trial
-        if self.this_trial.response is self.this_trial.tr_class:
+        if self.this_trial.response==self.this_trial.class_:
             self.this_trial.correct = True
 
             if self.parameters['reinforcement']['secondary']:
                 secondary_reinf_event = self.secondary_reinforcement()
-                self.this_trial.events.append(secondary_reinf_event)
+                # self.this_trial.events.append(secondary_reinf_event)
 
             if self.this_trial.type_ == 'correction':
                 pass
@@ -385,7 +387,7 @@ class TwoAltChoiceExp(base.BaseExp):
     def punish_main(self):
         value = self.parameters['classes'][self.this_trial.class_]['punish_value']
         punish_event = self.panel.punish(value=value)
-        self.this_trial.events.append(punish_event)
+        # self.this_trial.events.append(punish_event)
         self.this_trial.punish = True
         return 'post'
 

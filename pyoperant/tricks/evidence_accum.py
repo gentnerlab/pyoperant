@@ -43,14 +43,15 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
                 arr[a,b] = 1.0
 
             self.parameters['classes'][stim_class]['evidence_arrays'] = arr
+            self.log.debug('added class %s evidence array %s' % (stim_class,arr))
 
         stim_classes = self.parameters['classes'].keys()
         assert len(stim_classes) == 2
 
         for this_class in stim_classes:
-            other_class = [cl for cl in stim_classes if cl is not this_class][0]
+            other_class = [cl for cl in stim_classes if (cl != this_class)][0]
             trans = self.parameters['odds'] \
-                  * self.parameters['classes'][stim_class]['evidence_arrays'] \
+                  * self.parameters['classes'][this_class]['evidence_arrays'] \
                   + self.parameters['classes'][other_class]['evidence_arrays']
             trans[0,1:] = 1.0
             trans = np.cumsum(trans,axis=1)
@@ -97,7 +98,6 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
 
         self.this_trial = self.trials[-1]
         motifs = [m for m in self.this_trial.events if (m.label=='motif')]
-        self.log.debug("%s motifs to present" % len(motifs))
         min_motif = motifs[self.parameters['strlen_min']-1]
         self.this_trial.annotate(min_wait=min_motif.time+min_motif.duration)
         max_wait = self.this_trial.stimulus_event.duration + self.parameters['response_win']
