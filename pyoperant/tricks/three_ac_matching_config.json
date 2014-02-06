@@ -1,17 +1,16 @@
 {
 	"comments": "json doesn't support comments",
 	"experimenter": {
-		"name": "Justin T Kiggins",
-		"email": "justin.kiggins@gmail.com"
+		"name": "Marvin Thielk",
+		"email": "marvin.thield@gmail.com"
 	},
-	"subject": "B957",
-	"panel": "Vogel1",
-	"experiment_path": "/home/bird/opdat/B957",
-	"data_path": "/home/bird/opdat/B957/data",
-    "stim_path": "/home/bird/opdat/B957/stimuli",
-	"name": "evidence accumulation 2ac, version 2.0",
-	"description": "2AC task, using 400ms long motifs. 5 motifs. each model has 2 transitions in and out, no repetitions.",
-	"debug": false,
+	"subject": "B999",
+	"panel_name": "Vogel4",
+	"experiment_path": "/home/bird/opdat/B999",
+    	"stim_path": "/home/bird/opdat/B999/stimuli",
+	"name": "matching task - 3ac, version 1.0",
+	"description": "first version of 3ac matching task",
+	"debug": true,
 	"stims": {
 		"a": "A8 165_s_25 @2_trim800-1200_68dbmean_5mstaper.wav",
 		"b": "M1 211_s_48 @1_trim300-700_68dbmean_5mstaper.wav",
@@ -23,48 +22,25 @@
 		"h": "F2 165_s_48 @2_trim0-400_68dbmean_5mstaper.wav",
 		"i": "K1 211_s_19 @1_trim515-915_68dbmean_5mstaper.wav"
 	},
-	"stim_map": [null, "a","b","c","d","e"],
-	"odds": 100.0,
 	"classes": {
 		"L": {
-			"transitions": [
-				[1,2],
-				[1,4],
-				[2,3],
-				[2,5],
-				[3,1],
-				[3,4],
-				[4,3],
-				[4,5],
-				[5,1],
-				[5,3]
-				],
 			"reward_value": 2.0,
 			"punish_value": 10.0,
 			"component": "left"
 			},
 		"R": {
-			"transitions": [
-				[2,1],
-				[4,1],
-				[3,2],
-				[5,2],
-				[1,3],
-				[4,3],
-				[3,4],
-				[5,4],
-				[1,5],
-				[3,5]
-				],
 			"reward_value": 2.0,
 			"punish_value": 10.0,
 			"component": "right"
-		},
+			},
+		"C": {
+			"reward_value": 2.0,
+			"punish_value": 10.0,
+			"component": "center"
+			}
 	},
-	"strlen_max": 10,
-	"strlen_min": 10,
-	"isi_mean": 0.100,
-	"isi_stdev": 0.015,
+	"isi_mean": 0.1,
+	"isi_stdev": 0.0,
 	"reinforcement": {"schedule": "variable_ratio",
 		              "ratio": 1,
 					  "secondary": true

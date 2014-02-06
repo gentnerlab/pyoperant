@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import random, os
 from pyoperant import utils
 from pyoperant.tricks import two_alt_choice
@@ -5,7 +7,7 @@ from pyoperant.tricks import two_alt_choice
 class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
     """docstring for ThreeACMatchingExp"""
     def __init__(self, *args, **kwargs):
-        super(two_alt_choice.TwoAltChoiceExp, self).__init__(*args, **kwargs)
+        super(ThreeACMatchingExp, self).__init__(*args, **kwargs)
         self.num_stims = len(self.parameters['stims'].items())
 
     def get_stimuli(self, trial_class):
@@ -36,3 +38,27 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
 
     def analyze_trial(self, trial):
         super(self, trial)
+
+if __name__ == "__main__":
+
+    try: import simplejson as json
+    except ImportError: import json
+
+
+    from pyoperant.local import PANELS
+
+    cmd_line = utils.parse_commandline()
+    with open(cmd_line['config_file'], 'rb') as config:
+            parameters = json.load(config)
+
+
+    if parameters['debug']:
+        print parameters
+        print PANELS
+
+    panel = PANELS[parameters['panel_name']]()
+
+    exp = ThreeACMatchingExp(panel=panel,**parameters)
+    exp.run()
+
+
