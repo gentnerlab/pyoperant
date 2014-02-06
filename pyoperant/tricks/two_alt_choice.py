@@ -2,6 +2,7 @@
 
 import os
 import csv
+import copy
 import datetime as dt
 from numpy import random
 from pyoperant.tricks import base
@@ -35,7 +36,7 @@ class TwoAltChoiceExp(base.BaseExp):
                                'correct',
                                'rt',
                                'reward',
-                               'timeout',
+                               'punish',
                                'time',
                                ]
 
@@ -109,11 +110,11 @@ class TwoAltChoiceExp(base.BaseExp):
                                 class_=last_trial.class_)
             for ev in last_trial.events:
                 if ev.label is 'wav':
-                    trial.events.append(ev[:])
+                    trial.events.append(copy.copy(ev))
                     trial.stimulus_event = trial.events[-1]
                     trial.stimulus = trial.stimulus_event.name
                 elif ev.label is 'motif':
-                    trial.events.append(ev[:])
+                    trial.events.append(copy.copy(ev))
             self.log.debug("correction trial: class is %s" % trial.class_)
         else:
             trial = utils.Trial(index=index)
@@ -124,6 +125,8 @@ class TwoAltChoiceExp(base.BaseExp):
             trial.stimulus = trial.stimulus_event.name
             for mot in trial_motifs:
                 trial.events.append(mot)
+
+        trial.annotate(session=self.session_id)
 
         self.trials.append(trial)
         self.this_trial = self.trials[-1]
