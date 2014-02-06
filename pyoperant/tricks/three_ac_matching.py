@@ -15,12 +15,12 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
 
         """
         mids = random.sample(xrange(self.num_stims), 3)
-        if trial_class is "L":
+        if trial_class == "L":
             mids[2] = mids[0]
-        elif trial_class is "R":
+        elif trial_class == "R":
             mids[2] = mids[1]
 
-        motif_names, motif_files = zip([self.parameters['stims'].items()[mid] for mid in mids])
+        motif_names, motif_files = zip(*[self.parameters['stims'].items()[mid] for mid in mids])
 
         motif_isi = [max(random.gauss(self.parameters['isi_mean'], self.parameters['isi_stdev']), 0.0) for mot in motif_names]
         motif_isi[-1] = 0.0
@@ -36,8 +36,8 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
 
         return stim, epochs
 
-    def analyze_trial(self, trial):
-        super(self, trial)
+    def analyze_trial(self):
+        super(ThreeACMatchingExp)
 
 if __name__ == "__main__":
 

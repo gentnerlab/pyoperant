@@ -39,7 +39,7 @@
 			"component": "center"
 			}
 	},
-	"isi_mean": 0.1,
+	"isi_mean": 0.5,
 	"isi_stdev": 0.0,
 	"reinforcement": {"schedule": "variable_ratio",
 		              "ratio": 1,
