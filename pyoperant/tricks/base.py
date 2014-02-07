@@ -129,7 +129,7 @@ class BaseExp(object):
                                     session=self._run_session)
 
     def _run_idle(self):
-        if not self.check_light_schedule():
+        if self.check_light_schedule() == False:
             return 'sleep'
         elif self.check_session_schedule():
             return 'session'
@@ -151,7 +151,7 @@ class BaseExp(object):
         self.log.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['idle_poll_interval'])
-        if not self.check_light_schedule():
+        if self.check_light_schedule() == False:
             return 'main'
         else:
             return 'post'
