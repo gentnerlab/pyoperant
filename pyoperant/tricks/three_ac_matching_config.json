@@ -1,0 +1,53 @@
+{
+	"comments": "json doesn't support comments",
+	"experimenter": {
+		"name": "Marvin Thielk",
+		"email": "marvin.thield@gmail.com"
+	},
+	"subject": "B999",
+	"panel_name": "Vogel4",
+	"experiment_path": "/home/bird/opdat/B999",
+    	"stim_path": "/home/bird/opdat/B999/stimuli",
+	"name": "matching task - 3ac, version 1.0",
+	"description": "first version of 3ac matching task",
+	"debug": true,
+	"stims": {
+		"a": "A8 165_s_25 @2_trim800-1200_68dbmean_5mstaper.wav",
+		"b": "M1 211_s_48 @1_trim300-700_68dbmean_5mstaper.wav",
+		"c": "F3 165_s_13 @3_trim127_68dbmean_5mstaper.wav",
+		"d": "E1 211_s_53 @1_trim0-400_68dbmean_5mstaper.wav",
+		"e": "L#2 165_s_11 @4_trim10-410_68dbmean_5mstaper.wav",
+		"f": "G3 165_s_09 @3_trim0-400_68dbmean_5mstaper.wav",
+		"g": "B1-2 211_s_37 @1_trim820-1220_68dbmean_5mstaper.wav",
+		"h": "F2 165_s_48 @2_trim0-400_68dbmean_5mstaper.wav",
+		"i": "K1 211_s_19 @1_trim515-915_68dbmean_5mstaper.wav"
+	},
+	"classes": {
+		"L": {
+			"reward_value": 2.0,
+			"punish_value": 10.0,
+			"component": "left"
+			},
+		"R": {
+			"reward_value": 2.0,
+			"punish_value": 10.0,
+			"component": "right"
+			},
+		"C": {
+			"reward_value": 2.0,
+			"punish_value": 10.0,
+			"component": "center"
+			}
+	},
+	"isi_mean": 0.5,
+	"isi_stdev": 0.0,
+	"reinforcement": {"schedule": "variable_ratio",
+		              "ratio": 1,
+					  "secondary": true
+					  },
+	"correction_trials": false,
+	"response_win": 2.0,
+	"intertrial_min": 5.0,
+	"forced_choice": false,
+	"light_schedule": "sun"
+}
