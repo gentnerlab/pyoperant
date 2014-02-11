@@ -26,7 +26,7 @@ class Shaper(object):
 			utils.run_state_machine(	start_in='init',
 										error_state='wait',
 										error_callback=self.error_callback,
-										init=self._block_init,
+										init=self._block_init('wait'),
 										wait=self._wait_block(10, 40,'check'),
 										check=self._check_block('flash_mid', 1, float('inf')),
 										flash_mid=self._flash_poll(self.panel.center, 5, 'reward', 'pre_reward'),
@@ -43,10 +43,10 @@ class Shaper(object):
 			utils.run_state_machine(	start_in='init',
 										error_state='wait',
 										error_callback=self.error_callback,
-										init=self._block_init,
+										init=self._block_init('wait'),
 										wait=self._wait_block(10, 40, 'check'),
 										check=self._check_block('poll_mid', reps, revert_timeout),
-										poll_mid=self._flash_poll(self.panel.mid, 10, 'wait', 'pre_reward'),
+										poll_mid=self._flash_poll(self.panel.center, 10, 'wait', 'pre_reward'),
 										pre_reward=self._pre_reward('reward'),
 										reward=self.reward(4, 'wait'))
 			if self.responded_block:
@@ -59,15 +59,20 @@ class Shaper(object):
 # 			key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
 
 	def _response_block(self):
-		pass
+		def temp():
+			pass
+		return temp
 
 # Block 4:	Wait for peck to non-flashing center key, then right or left key flashes
 # 			until pecked, then food for 2.5 sec.   Run 100 trials.
 
-	def _block_init(self):
-		self.block_start = dt.datetime.now()
-		self.responded_block = False
-		self.response_counter = 0
+	def _block_init(self, next_state):
+		def temp():
+			self.block_start = dt.datetime.now()
+			self.responded_block = False
+			self.response_counter = 0
+			return next_state
+		return temp
 
 	def _check_block(self, next_state, reps, revert_timeout):
 		def temp():
@@ -76,7 +81,7 @@ class Shaper(object):
 				if elapsed_time > revert_timeout:
 					return None
 			else:
-				if self.response_counter > reps:
+				if self.response_counter >= reps:
 					return None
 			return next_state
 		return temp
