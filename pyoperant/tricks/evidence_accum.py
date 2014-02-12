@@ -125,7 +125,6 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
                 else:
                     self.this_trial.events.remove(ev) # get rid of motif events the bird didn't hear
 
-        self.this_trial.stimulus = stim_string
         os.remove(self.this_trial.stimulus_event.file_origin)
         self.this_trial.stimulus = self.this_trial.stimulus[:num_mots]
 
