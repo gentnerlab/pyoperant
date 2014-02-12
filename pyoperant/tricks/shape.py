@@ -52,13 +52,11 @@ class Shaper(object):
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
-                                        init=self._block_init('wait'),
-                                        wait=self._wait_block(10, 40, 'check'),
+                                        init=self._block_init('check'),
                                         check=self._check_block('poll_mid', reps, revert_timeout),
-                                        poll_mid=self._flash_poll(self.panel.center, 10, 'check2', 'pre_reward'),
+                                        poll_mid=self._flash_poll(self.panel.center, 10, 'check', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
-                                        reward=self.reward(4, 'check2'),
-                                        check2=self._check_block('wait', reps, revert_timeout))
+                                        reward=self.reward(4, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
