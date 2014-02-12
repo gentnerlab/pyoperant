@@ -1,12 +1,17 @@
 #!/usr/bin/python
-from pyoperant import utils
+from pyoperant import utils, components
 from pyoperant.tricks import base
 
 class Lights(base.BaseExp):
     """docstring for Lights"""
     def __init__(self,  *args, **kwargs):
         super(Lights, self).__init__(*args, **kwargs)
-        pass
+
+    def panel_reset(self):
+        try:
+            self.panel.reset()
+        except components.HopperWontDropError:
+            pass
 
 if __name__ == "__main__":
 
@@ -29,6 +34,3 @@ if __name__ == "__main__":
 
     exp = Lights(panel=panel,**parameters)
     exp.run()
-
-
-

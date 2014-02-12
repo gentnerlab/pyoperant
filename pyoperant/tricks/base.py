@@ -106,12 +106,14 @@ class BaseExp(object):
         """returns True if the subject should be running sessions"""
         return False
 
+    def panel_reset(self):
+        self.panel.reset()
 
     def run(self):
 
         for attr in self.req_panel_attr:
             assert hasattr(self.panel,attr)
-        self.panel.reset()
+        self.panel_reset()
         self.save()
         self.init_summary()
 
@@ -134,7 +136,7 @@ class BaseExp(object):
         elif self.check_session_schedule():
             return 'session'
         else:
-            self.panel.reset()
+            self.panel_reset()
             self.log.debug('idling...')
             utils.wait(self.parameters['idle_poll_interval'])
             return 'idle'
