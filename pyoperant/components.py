@@ -65,7 +65,7 @@ class Hopper(BaseComponent):
         """get status of solenoid & IR beam, throw hopper error if mismatch"""
         IR_status = self.IR.read()
         solenoid_status = self.solenoid.read()
-        if IR_status is not solenoid_status:
+        if IR_status != solenoid_status:
             if IR_status:
                 raise HopperActiveError
             elif solenoid_status:
@@ -106,13 +106,10 @@ class Hopper(BaseComponent):
         except HopperInactiveError as e:
             raise HopperAlreadyUpError(e)
         feed_time = datetime.datetime.now()
-        self.up()
+        self.up() # includes a lag
+        utils.wait(dur - self.lag)
         feed_duration = datetime.datetime.now() - feed_time
-        while feed_duration < datetime.timedelta(seconds=dur):
-            utils.wait(self.lag)
-            self.check()
-            feed_duration = datetime.datetime.now() - feed_time
-        self.down()
+        self.down() # includes a lag
         return (feed_time,feed_duration)
 
     def reward(self,value=2.0):
@@ -213,9 +210,8 @@ class HouseLight(BaseComponent):
         """ turn off light for a few seconds """
         timeout_time = datetime.datetime.now()
         self.light.write(False)
+        utils.wait(dur)
         timeout_duration = datetime.datetime.now() - timeout_time
-        while timeout_duration < datetime.timedelta(seconds=dur):
-            timeout_duration = datetime.datetime.now() - timeout_time
         self.light.write(True)
         return (timeout_time,timeout_duration)
 
