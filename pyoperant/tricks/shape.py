@@ -7,6 +7,7 @@ class Shaper(object):
     def __init__(self, panel, log, parameters, error_callback=None):
         self.panel = panel
         self.log = log
+        self.parameters = parameters
         self.error_callback = error_callback
         self.recent_state = 'hopper_block'
 
