@@ -59,14 +59,16 @@ class VogelPanel(panels.BasePanel):
 
     def test(self):
         self.reset()
+        dur = 2.0
         for output in self.outputs:
             output.write(True)
-            utils.wait(2.0)
+            utils.wait(dur)
             output.write(False)
         self.reset()
-        self.reward(value=1.0)
-        self.punish(value=1.0)
-
+        self.reward(value=dur)
+        self.punish(value=dur)
+        self.speaker.queue('/usr/local/stimuli/A1.wav')
+        self.speaker.play()
         return True
 
 
@@ -90,6 +92,11 @@ class Vogel4(VogelPanel):
     def __init__(self):
         super(Vogel4, self).__init__(id=4)
 
+class Vogel6(VogelPanel):
+    """Vogel6 panel"""
+    def __init__(self):
+        super(Vogel6, self).__init__(id=6)
+
 class Vogel7(VogelPanel):
     """Vogel7 panel"""
     def __init__(self):
@@ -107,6 +114,7 @@ PANELS = {"Vogel1": Vogel1,
           "Vogel2": Vogel2,
           "Vogel3": Vogel3,
           "Vogel4": Vogel4,
+          "Vogel6": Vogel6,
           "Vogel7": Vogel7,
           "Vogel8": Vogel8,
           }
