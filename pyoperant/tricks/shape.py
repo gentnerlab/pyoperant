@@ -24,7 +24,8 @@ class Shaper(object):
         self.parameters = parameters
         assert 'light_schedule' in self.parameters
         self.error_callback = error_callback
-        self.recent_state = 'block1'
+        self.recent_state = 0
+        self.last_response = None
 
     def run_shape(self, start_state='hopper_block'):
         self.log.info('Starting shaping procedure')
@@ -45,8 +46,8 @@ class Shaper(object):
 
     def _hopper_block(self, block_num):
         def temp():
-            self.recent_state = self.block_name(block_num)
-            self.log.info('Starting %s'%(self.recent_state))
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
@@ -67,8 +68,8 @@ class Shaper(object):
 #           reverts to revert_state if no response before timeout (60*60*3=10800)
     def _peck_block(self, block_num, reps=100, revert_timeout=10800):
         def temp():
-            self.recent_state = self.block_name(block_num)
-            self.log.info('Starting %s'%(self.recent_state))
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -90,8 +91,8 @@ class Shaper(object):
 
     def _response_block(self, block_num, reps=100, revert_timeout=10800):
         def temp():
-            self.recent_state = self.block_name(block_num)
-            self.log.info('Starting %s'%(self.recent_state))
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -118,8 +119,8 @@ class Shaper(object):
 
     def _response_block2(self, block_num, reps=100, revert_timeout=10800):
         def temp():
-            self.recent_state = self.block_name(block_num)
-            self.log.info('Starting %s'%(self.recent_state))
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -145,6 +146,7 @@ class Shaper(object):
         def temp():
             self.block_start = dt.datetime.now()
             self.log.info('Block start time: %s'%(self.block_start.isoformat(' ')))
+            self.log.info("Blk #\tTrl #\tResp Key\tResp Time")
             self.responded_block = False
             self.response_counter = 0
             return next_state
@@ -155,6 +157,7 @@ class Shaper(object):
             if not self.responded_block:
                 elapsed_time = (dt.datetime.now() - self.block_start).total_seconds()
                 if elapsed_time > revert_timeout:
+                    self.log.info("No response in block %d, reverting to block %d.  Time: %s"%(self.recent_state, self.recent_state - 1, dt.datetime.now().isoformat(' ')))
                     return None
             else:
                 if self.response_counter >= reps:
@@ -204,6 +207,7 @@ class Shaper(object):
         def temp():
             self.polling_start = dt.datetime.now()
             self.responded_poll = False
+            self.last_response = None
             return next_state
         return temp
 
@@ -214,6 +218,7 @@ class Shaper(object):
             if elapsed_time <= duration:
                 if component.status():
                     self.responded_poll = True
+                    self.last_response = component.name
                     return None
                 return 'main'
             else:
@@ -231,6 +236,7 @@ class Shaper(object):
                 if component.status():
                     component.off()
                     self.responded_poll = True
+                    self.last_response = component.name
                     return None
                 return 'main'
             else:
@@ -248,6 +254,7 @@ class Shaper(object):
                 if component.status():
                     component.off()
                     self.responded_poll = True
+                    self.last_response = component.name
                     return None
                 return 'main'
             else:
@@ -258,6 +265,7 @@ class Shaper(object):
 #TODO: catch errors here
     def reward(self, value, next_state):
         def temp():
+            self.log.info('%d\t%d\t%s\t%s'%(self.recent_state, self.response_counter, self.last_response, dt.datetime.now().isoformat(' ')))
             self.panel.reward(value=value)
             return next_state
         return temp
@@ -291,7 +299,7 @@ class Shaper(object):
                                 pre=self.sleep_pre,
                                 main=self.sleep_main,
                                 post=self.sleep_post)
-        return self.recent_state
+        return self.block_name(self.recent_state)
 
     def block_name(block_num):
         if block_num >= 1 and block_num <= 4:
