@@ -3,7 +3,8 @@ from pyoperant import hwio, utils, ComponentError
 
 class BaseComponent(object):
     """Base class for physcal component"""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name=None, *args, **kwargs):
+        self.name = name
         pass
 
 
