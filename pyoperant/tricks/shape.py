@@ -24,17 +24,17 @@ class Shaper(object):
         self.parameters = parameters
         assert 'light_schedule' in self.parameters
         self.error_callback = error_callback
-        self.recent_state = 'hopper_block'
+        self.recent_state = 'block1'
 
     def run_shape(self, start_state='hopper_block'):
         self.log.info('Starting shaping procedure')
         utils.run_state_machine(    start_in=start_state,
-                                    error_state='hopper_block',
+                                    error_state='block1',
                                     error_callback=self.error_callback,
-                                    hopper_block=self._hopper_block('peck_block'),
-                                    peck_block=self._peck_block('response_block','hopper_block'),
-                                    response_block=self._response_block('response_block2', 'peck_block'),
-                                    response_block2=self._response_block2(None, 'response_block'),
+                                    block1=self._hopper_block('block2'),
+                                    block2=self._peck_block('block3','block1'),
+                                    block3=self._response_block('block4', 'block2'),
+                                    block4=self._response_block2(None, 'block3'),
                                     sleep_block=self._run_sleep)
         self.log.info('Shaping procedure complete')
 
@@ -43,10 +43,10 @@ class Shaper(object):
 # to the hopper access. If the center key is pressed while flashing, then
 # the hopper comes up and then the session jumps to block 2 immediately
 
-    def _hopper_block(self, next_state):
+    def _hopper_block(self, block_num):
         def temp():
-            self.recent_state = 'hopper_block'
-            self.log.info('Starting hopper_block')
+            self.recent_state = self.block_name(block_num)
+            self.log.info('Starting %s'%(self.recent_state))
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
@@ -59,16 +59,16 @@ class Shaper(object):
                                         check2=self._check_block('wait', 1, float('inf')))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            return next_state
+            return self.block_name(block_num + 1)
         return temp
 
 # Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
 #           4 sec. Run 100 trials.
 #           reverts to revert_state if no response before timeout (60*60*3=10800)
-    def _peck_block(self, next_state, revert_state, reps=100, revert_timeout=10800):
+    def _peck_block(self, block_num, reps=100, revert_timeout=10800):
         def temp():
-            self.recent_state = 'peck_block'
-            self.log.info('Starting peck_block')
+            self.recent_state = self.block_name(block_num)
+            self.log.info('Starting %s'%(self.recent_state))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -80,18 +80,18 @@ class Shaper(object):
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
-                return next_state
+                return self.block_name(block_num + 1)
             else:
-                return revert_state
+                return self.block_name(block_num - 1)
         return temp
 
 # Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
 #           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
 
-    def _response_block(self, next_state, revert_state, reps=100, revert_timeout=10800):
+    def _response_block(self, block_num, reps=100, revert_timeout=10800):
         def temp():
-            self.recent_state = 'response_block'
-            self.log.info('Starting response_block')
+            self.recent_state = self.block_name(block_num)
+            self.log.info('Starting %s'%(self.recent_state))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -108,18 +108,18 @@ class Shaper(object):
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
-                return next_state
+                return self.block_name(block_num + 1)
             else:
-                return revert_state
+                return self.block_name(block_num - 1)
         return temp
 
 # Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
 #           until pecked, then food for 2.5 sec.   Run 100 trials.
 
-    def _response_block2(self, next_state, revert_state, reps=100, revert_timeout=10800):
+    def _response_block2(self, block_num, reps=100, revert_timeout=10800):
         def temp():
-            self.recent_state = 'response_block2'
-            self.log.info('Starting response_block2')
+            self.recent_state = self.block_name(block_num)
+            self.log.info('Starting %s'%(self.recent_state))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -136,9 +136,9 @@ class Shaper(object):
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
-                return next_state
+                return self.block_name(block_num + 1)
             else:
-                return revert_state
+                return self.block_name(block_num - 1)
         return temp
 
     def _block_init(self, next_state):
@@ -293,3 +293,75 @@ class Shaper(object):
                                 post=self.sleep_post)
         return self.recent_state
 
+    def block_name(block_num):
+        if block_num >= 1 and block_num <= 4:
+            return "block%d"&block_num
+        else:
+            return None
+
+class Shaper2AC(Shaper):
+# Run a shaping routine in the operant chamber that will teach an 
+# to peck the center key to hear a stimulus, then peck one of the side keys for reward.
+# training sequence:
+# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day 
+#           that the animal is in the apparatus. Center key flashes for 5 sec, prior 
+#           to the hopper access. If the center key is pressed while flashing, then 
+#           the hopper comes up and then the session jumps to block 2 immediately.
+# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for 
+#           4 sec. Run 100 trials.
+# Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
+#           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials. 
+# Block 4:  Wait for peck to non-flashing center key, then right or left key flashes 
+#           until pecked, then food for 2.5 sec.   Run 100 trials.
+    def __init__(self, panel, log, parameters, error_callback=None):
+        super(Shaper2AC, self).__init__(self, panel, log, parameters, error_callback)
+
+class ShaperGoNogo(Shaper):
+# accomodate go/nogo terminal procedure along with one or two hopper 2choice procedures
+# Go/Nogo shaping works like this:
+# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day 
+#           that the animal is in the apparatus. Center key flashes for 5 sec, prior 
+#           to the hopper access. If the center key is pressed while flashing, then 
+#           the hopper comes up and then the session jumps to block 2 immediately.
+# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for 
+#           4 sec. Run 100 trials.
+# Block 3:  Wait for a peck to non-flashing center key, when you get it, the hopper 
+#           comes up for 2.5 sec. Run 100 trials. 
+# NOTE:     when you run the go/nog procedure in a 2 hopper apparatus, it uses only the 
+#           right hand key and hopper.  If you do this often, you may want to add the
+#           facility for use of the left hand key and hopper.   
+    def __init__(self, panel, log, parameters, error_callback=None):
+        super(ShaperGoNogo, self).__init__(self, panel, log, parameters, error_callback)
+
+class ShaperFemalePref(Shaper):
+# run a shaping routine for female pecking preferencein the operant chamber
+# termial proc: peck one of the side keys for stimulus presentation followed by reward.
+# Training sequence invoked as:
+# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day 
+#           that the animal is in the apparatus. 
+#           Left and right keylights flash for 5 sec, prior 
+#           to the hopper access. If either L or R key is pressed while flashing, then 
+#           the hopper comes up and the session jumps to block 2 immediately.
+# Block 2:  randomly choose either L or R key to flash until pecked.  When pecked the hopper 
+#           comes up for 4 sec. 
+# Block 3:  Wait for peck to non-flashing L or R key (chosen at random). When pecked,
+#           give food for 2.5 sec.
+    def __init__(self, panel, log, parameters, error_callback=None):
+        super(ShaperFemalePref, self).__init__(self, panel, log, parameters, error_callback)
+
+class Shaper3AC(Shaper):
+# run a shaping routine for 3AC the operant chamber
+# termial proc: peck center key for stimulus presentation then peck one of three keys L-C-R, or give no response.
+# Training sequence invoked as:
+# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day 
+#           that the animal is in the apparatus. Center key flashes for 5 sec, prior 
+#           to the hopper access. If the center key is pressed while flashing, then 
+#           the hopper comes up and then the session jumps to block 2 immediately.
+# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for 
+#           4 sec. Run 100 trials.
+# Block 3:  The center key flashes until pecked, then either the right, left, or center
+#           key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials. 
+# Block 4:  Wait for peck to non-flashing center key, then right, center,or left key flashes 
+#           until pecked, then food for 2.5 sec.   Run 150 trials.
+    def __init__(self, panel, log, parameters, error_callback=None):
+        super(Shaper3AC, self).__init__(self, panel, log, parameters, error_callback)
