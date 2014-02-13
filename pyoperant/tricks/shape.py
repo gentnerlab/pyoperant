@@ -1,5 +1,6 @@
 import random
 import datetime as dt
+from pyoperant import panels
 from pyoperant import utils
 
 class Shaper(object):
@@ -20,7 +21,9 @@ class Shaper(object):
 
     def __init__(self, panel, log, parameters, error_callback=None):
         self.panel = panel
+        assert isinstance(panel, panels.BasePanel)
         self.log = log
+        assert log is not None
         self.parameters = parameters
         assert 'light_schedule' in self.parameters
         self.error_callback = error_callback
