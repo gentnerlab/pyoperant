@@ -125,6 +125,8 @@ class TwoAltChoiceExp(base.BaseExp):
                     trial.events.append(copy.copy(ev))
             self.log.debug("correction trial: class is %s" % trial.class_)
         else:
+            if last_trial is not None:
+                os.remove(last_trial.stimulus_event.file_origin)
             trial = utils.Trial(index=index)
             trial.class_ = random.choice(self.class_assoc.keys())
             trial_stim, trial_motifs = self.get_stimuli(trial.class_)

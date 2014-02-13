@@ -170,7 +170,7 @@ def check_time(schedule,fmt="%H:%M"):
             raise Error('unknown epoch: %s' % epoch)
     return False
 
-def wait(secs=1.0, final_countdown=0.2,waitfunc=None):
+def wait(secs=1.0, final_countdown=0.0,waitfunc=None):
     """Smartly wait for a given time period.
 
     secs -- total time to wait in seconds
