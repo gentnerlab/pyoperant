@@ -4,22 +4,39 @@ from pyoperant import utils
 
 class Shaper(object):
 
+# Run a shaping routine in the operant chamber that will teach an 
+# to peck the center key to hear a stimulus, then peck one of the side keys for reward.
+# training sequence:
+# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day 
+#           that the animal is in the apparatus. Center key flashes for 5 sec, prior 
+#           to the hopper access. If the center key is pressed while flashing, then 
+#           the hopper comes up and then the session jumps to block 2 immediately.
+# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for 
+#           4 sec. Run 100 trials.
+# Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
+#           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials. 
+# Block 4:  Wait for peck to non-flashing center key, then right or left key flashes 
+#           until pecked, then food for 2.5 sec.   Run 100 trials.
+
     def __init__(self, panel, log, parameters, error_callback=None):
         self.panel = panel
         self.log = log
         self.parameters = parameters
+        assert 'light_schedule' in self.parameters
         self.error_callback = error_callback
         self.recent_state = 'hopper_block'
 
     def run_shape(self, start_state='hopper_block'):
+        self.log.info('Starting shaping procedure')
         utils.run_state_machine(    start_in=start_state,
                                     error_state='hopper_block',
                                     error_callback=self.error_callback,
                                     hopper_block=self._hopper_block('peck_block'),
                                     peck_block=self._peck_block('response_block','hopper_block'),
                                     response_block=self._response_block('response_block2', 'peck_block'),
-                                    response_block2=self._response_block2(None, 'response_block')
+                                    response_block2=self._response_block2(None, 'response_block'),
                                     sleep_block=self._run_sleep)
+        self.log.info('Shaping procedure complete')
 
 # Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
 # that the animal is in the apparatus. Center key flashes for 5 sec, prior
@@ -29,6 +46,7 @@ class Shaper(object):
     def _hopper_block(self, next_state):
         def temp():
             self.recent_state = 'hopper_block'
+            self.log.info('Starting hopper_block')
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
@@ -50,6 +68,7 @@ class Shaper(object):
     def _peck_block(self, next_state, revert_state, reps=100, revert_timeout=10800):
         def temp():
             self.recent_state = 'peck_block'
+            self.log.info('Starting peck_block')
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -72,6 +91,7 @@ class Shaper(object):
     def _response_block(self, next_state, revert_state, reps=100, revert_timeout=10800):
         def temp():
             self.recent_state = 'response_block'
+            self.log.info('Starting response_block')
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -98,7 +118,8 @@ class Shaper(object):
 
     def _response_block2(self, next_state, revert_state, reps=100, revert_timeout=10800):
         def temp():
-            self.recent_state = 'response_block'
+            self.recent_state = 'response_block2'
+            self.log.info('Starting response_block2')
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -123,6 +144,7 @@ class Shaper(object):
     def _block_init(self, next_state):
         def temp():
             self.block_start = dt.datetime.now()
+            self.log.info('Block start time: %s'%(self.block_start.isoformat(' ')))
             self.responded_block = False
             self.response_counter = 0
             return next_state
@@ -159,22 +181,43 @@ class Shaper(object):
             return next_state
         return temp
 
-    def _flash_poll(self, component, duration, next_state, reward_state=None):
+    def _poll(self, component, duration, next_state, reward_state=None, poll_state=None):
+        if poll_state == None:
+            poll_state = self._poll_main
         def temp():
             utils.run_state_machine(    start_in='init',
                                         init=self._polling_init('main'),
-                                        main=self._flashing_main(component, duration, 1))
+                                        main=poll_state(component, duration))
             if self.responded_poll:
                 return reward_state
             else:
                 return next_state
-        return temp
+
+    def _flash_poll(self, component, duration, next_state, reward_state=None):
+        return self._poll(self, component, duration, next_state, reward_state, poll_state=self._flashing_main)
+
+    def _light_poll(self, component, duration, next_state, reward_state=None):
+        return self._poll(self, component, duration, next_state, reward_state, poll_state=self._light_main)
+
 
     def _polling_init(self, next_state):
         def temp():
             self.polling_start = dt.datetime.now()
             self.responded_poll = False
             return next_state
+        return temp
+
+    # TODO: remake to not hog CPU
+    def _poll_main(self, component, duration):
+        def temp():
+            elapsed_time = (dt.datetime.now() - self.polling_start).total_seconds()
+            if elapsed_time <= duration:
+                if component.status():
+                    self.responded_poll = True
+                    return None
+                return 'main'
+            else:
+                return None
         return temp
 
     def _flashing_main(self, component, duration, period):
@@ -195,16 +238,7 @@ class Shaper(object):
                 return None
         return temp
 
-    def _light_poll(self, component, duration, next_state, reward_state=None):
-        def temp():
-            utils.run_state_machine(    start_in='init',
-                                        init=self._polling_init('main'),
-                                        main=self._light_main(component, duration))
-            if self.responded_poll:
-                return reward_state
-            else:
-                return next_state
-        return temp
+
 
     def _light_main(self, component, duration):
         def temp():
@@ -218,28 +252,6 @@ class Shaper(object):
                 return 'main'
             else:
                 component.off()
-                return None
-        return temp
-
-    def _poll(self, component, duration, next_state, reward_state=None):
-        def temp():
-            utils.run_state_machine(    start_in='init',
-                                        init=self._polling_init('main'),
-                                        main=self._light_main(component, duration))
-            if self.responded_poll:
-                return reward_state
-            else:
-                return next_state
-
-    def _poll_main(self, component, duration):
-        def temp():
-            elapsed_time = (dt.datetime.now() - self.polling_start).total_seconds()
-            if elapsed_time <= duration:
-                if component.status():
-                    self.responded_poll = True
-                    return None
-                return 'main'
-            else:
                 return None
         return temp
 
@@ -280,3 +292,4 @@ class Shaper(object):
                                 main=self.sleep_main,
                                 post=self.sleep_post)
         return self.recent_state
+
