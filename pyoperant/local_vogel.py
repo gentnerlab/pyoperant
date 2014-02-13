@@ -41,9 +41,9 @@ class VogelPanel(panels.BasePanel):
         self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
 
         # assemble inputs into components
-        self.left = components.PeckPort(IR=self.inputs[0],LED=self.outputs[0])
-        self.center = components.PeckPort(IR=self.inputs[1],LED=self.outputs[1])
-        self.right = components.PeckPort(IR=self.inputs[2],LED=self.outputs[2])
+        self.left = components.PeckPort(IR=self.inputs[0],LED=self.outputs[0],name='l')
+        self.center = components.PeckPort(IR=self.inputs[1],LED=self.outputs[1],name='c')
+        self.right = components.PeckPort(IR=self.inputs[2],LED=self.outputs[2],name='r')
         self.house_light = components.HouseLight(light=self.outputs[3])
         self.hopper = components.Hopper(IR=self.inputs[3],solenoid=self.outputs[4])
 
