@@ -6,7 +6,7 @@ from pyoperant.tricks import three_ac_matching, shape
 class ThreeACMatchingExpShape(three_ac_matching.ThreeACMatchingExp):
     def __init__(self, *args, **kwargs):
         super(ThreeACMatchingExpShape, self).__init__(*args, **kwargs)
-        self.shaper = shape.Shaper(self.panel, self.log, self.parameters, self.log_error_callback)
+        self.shaper = shape.Shaper2AC(self.panel, self.log, self.parameters, self.log_error_callback)
 
     def run(self):
 
