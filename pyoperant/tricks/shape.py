@@ -284,7 +284,7 @@ class Shaper2AC(Shaper):
 # Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
 #           until pecked, then food for 2.5 sec.   Run 100 trials.
     def __init__(self, panel, log, parameters, error_callback=None):
-        super(Shaper2AC, self).__init__(self, panel, log, parameters, error_callback)
+        super(Shaper2AC, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
         self.block2 = self._center_peck_block(2)
         self.block3 = self._response_2ac_block(3)
@@ -361,7 +361,7 @@ class ShaperGoNogo(Shaper):
 #           right hand key and hopper.  If you do this often, you may want to add the
 #           facility for use of the left hand key and hopper.
     def __init__(self, panel, log, parameters, error_callback=None):
-        super(ShaperGoNogo, self).__init__(self, panel, log, parameters, error_callback)
+        super(ShaperGoNogo, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
         self.block2 = self._center_peck_block(2)
         self.block3 = self._center_peck_no_flash_block(3)
@@ -383,7 +383,7 @@ class ShaperFemalePref(Shaper):
 # Block 3:  Wait for peck to non-flashing L or R key (chosen at random). When pecked,
 #           give food for 2.5 sec.
     def __init__(self, panel, log, parameters, error_callback=None):
-        super(ShaperFemalePref, self).__init__(self, panel, log, parameters, error_callback)
+        super(ShaperFemalePref, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
         self.block2 = self._female_choice_block(2)
         self.block3 = self._female_choice_no_flash_block(3)
@@ -409,7 +409,7 @@ class Shaper3AC(Shaper):
 # Block 4:  Wait for peck to non-flashing center key, then right, center,or left key flashes
 #           until pecked, then food for 2.5 sec.   Run 150 trials.
     def __init__(self, panel, log, parameters, error_callback=None):
-        super(Shaper3AC, self).__init__(self, panel, log, parameters, error_callback)
+        super(Shaper3AC, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
         self.block2 = self._center_peck_block(2)
         self.block3 = self._response_3ac_block(3)
