@@ -29,18 +29,27 @@ class Shaper(object):
         self.error_callback = error_callback
         self.recent_state = 0
         self.last_response = None
+        self.block1 = self._null_block(1)
+        self.block2 = self._null_block(2)
+        self.block3 = self._null_block(3)
+        self.block4 = self._null_block(4)
 
     def run_shape(self, start_state='block1'):
         self.log.info('Starting shaping procedure')
         utils.run_state_machine(    start_in=start_state,
                                     error_state='block1',
                                     error_callback=self.error_callback,
-                                    block1=self._hopper_block(1),
-                                    block2=self._peck_block(2),
-                                    block3=self._response_block(3),
-                                    block4=self._response_block2(4),
+                                    block1=self.block1,
+                                    block2=self.block2,
+                                    block3=self.block3,
+                                    block4=self.block4,
                                     sleep_block=self._run_sleep)
         self.log.info('Shaping procedure complete')
+
+    def _null_block(self, block_num):
+        def temp():
+            return self.block_name(block_num + 1)
+        return temp
 
 # Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
 # that the animal is in the apparatus. Center key flashes for 5 sec, prior
@@ -69,7 +78,7 @@ class Shaper(object):
 # Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
 #           4 sec. Run 100 trials.
 #           reverts to revert_state if no response before timeout (60*60*3=10800)
-    def _peck_block(self, block_num, reps=100, revert_timeout=10800):
+    def _center_peck_block(self, block_num, reps=100, revert_timeout=10800):
         def temp():
             self.recent_state = block_num
             self.log.info('Starting %s'%(self.block_name(block_num)))
@@ -81,62 +90,6 @@ class Shaper(object):
                                         poll_mid=self._flash_poll(self.panel.center, 10, 'check', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
                                         reward=self.reward(4, 'check'))
-            if not utils.check_time(self.parameters['light_schedule']):
-                return 'sleep_block'
-            if self.responded_block:
-                return self.block_name(block_num + 1)
-            else:
-                return self.block_name(block_num - 1)
-        return temp
-
-# Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
-#           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
-
-    def _response_block(self, block_num, reps=100, revert_timeout=10800):
-        def temp():
-            self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
-            utils.run_state_machine(    start_in='init',
-                                        error_state='check',
-                                        error_callback=self.error_callback,
-                                        init=self._block_init('check'),
-                                        check=self._check_block('poll_mid', reps, revert_timeout),
-                                        poll_mid=self._flash_poll(self.panel.center, 10, 'check', 'coin_flip'),
-                                        coin_flip=self._coin_flip('check_right', 'check_left', p=.5),
-                                        check_right=self._check_block('poll_right', reps, revert_timeout),
-                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
-                                        check_left=self._check_block('poll_left', reps, revert_timeout),
-                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
-                                        pre_reward=self._pre_reward('reward'),
-                                        reward=self.reward(3))
-            if not utils.check_time(self.parameters['light_schedule']):
-                return 'sleep_block'
-            if self.responded_block:
-                return self.block_name(block_num + 1)
-            else:
-                return self.block_name(block_num - 1)
-        return temp
-
-# Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
-#           until pecked, then food for 2.5 sec.   Run 100 trials.
-
-    def _response_block2(self, block_num, reps=100, revert_timeout=10800):
-        def temp():
-            self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
-            utils.run_state_machine(    start_in='init',
-                                        error_state='check',
-                                        error_callback=self.error_callback,
-                                        init=self._block_init('check'),
-                                        check=self._check_block('poll_mid', reps, revert_timeout),
-                                        poll_mid=self._poll(self.panel.center, 10, 'check', 'coin_flip'),
-                                        coin_flip=self._coin_flip('check_right', 'check_left', p=.5),
-                                        check_right=self._check_block('poll_right', reps, revert_timeout),
-                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
-                                        check_left=self._check_block('poll_left', reps, revert_timeout),
-                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
-                                        pre_reward=self._pre_reward('reward'),
-                                        reward=self.reward(2.5))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
@@ -274,6 +227,11 @@ class Shaper(object):
             return next_state
         return temp
 
+    def _rand_state(self, states):
+        def temp():
+            return random.choice(states)
+        return temp
+
     # defining functions for sleep
     #TODO: there should really be a separate sleeper or some better solution
     def sleep_pre(self):
@@ -299,7 +257,7 @@ class Shaper(object):
     def _run_sleep(self):
         utils.run_state_machine(start_in='pre',
                                 error_state='post',
-                                error_callback=self.log_error_callback,
+                                error_callback=self.error_callback,
                                 pre=self.sleep_pre,
                                 main=self.sleep_main,
                                 post=self.sleep_post)
@@ -327,6 +285,66 @@ class Shaper2AC(Shaper):
 #           until pecked, then food for 2.5 sec.   Run 100 trials.
     def __init__(self, panel, log, parameters, error_callback=None):
         super(Shaper2AC, self).__init__(self, panel, log, parameters, error_callback)
+        self.block1 = self._hopper_block(1)
+        self.block2 = self._center_peck_block(2)
+        self.block3 = self._response_2ac_block(3)
+        self.block4 = self._response_2ac_no_flash_block(4)
+
+# Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
+#           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
+
+    def _response_2ac_block(self, block_num, reps=100, revert_timeout=10800):
+        def temp():
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
+            utils.run_state_machine(    start_in='init',
+                                        error_state='check',
+                                        error_callback=self.error_callback,
+                                        init=self._block_init('check'),
+                                        check=self._check_block('poll_mid', reps, revert_timeout),
+                                        poll_mid=self._flash_poll(self.panel.center, 10, 'check', 'coin_flip'),
+                                        coin_flip=self._rand_state(('check_right', 'check_left')),
+                                        check_right=self._check_block('poll_right', reps, revert_timeout),
+                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
+                                        check_left=self._check_block('poll_left', reps, revert_timeout),
+                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        pre_reward=self._pre_reward('reward'),
+                                        reward=self.reward(3))
+            if not utils.check_time(self.parameters['light_schedule']):
+                return 'sleep_block'
+            if self.responded_block:
+                return self.block_name(block_num + 1)
+            else:
+                return self.block_name(block_num - 1)
+        return temp
+
+# Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
+#           until pecked, then food for 2.5 sec.   Run 100 trials.
+
+    def _response_2ac_no_flash_block(self, block_num, reps=100, revert_timeout=10800):
+        def temp():
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
+            utils.run_state_machine(    start_in='init',
+                                        error_state='check',
+                                        error_callback=self.error_callback,
+                                        init=self._block_init('check'),
+                                        check=self._check_block('poll_mid', reps, revert_timeout),
+                                        poll_mid=self._poll(self.panel.center, 10, 'check', 'coin_flip'),
+                                        coin_flip=self._rand_state(('check_right', 'check_left')),
+                                        check_right=self._check_block('poll_right', reps, revert_timeout),
+                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
+                                        check_left=self._check_block('poll_left', reps, revert_timeout),
+                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        pre_reward=self._pre_reward('reward'),
+                                        reward=self.reward(2.5))
+            if not utils.check_time(self.parameters['light_schedule']):
+                return 'sleep_block'
+            if self.responded_block:
+                return self.block_name(block_num + 1)
+            else:
+                return self.block_name(block_num - 1)
+        return temp
 
 class ShaperGoNogo(Shaper):
 # accomodate go/nogo terminal procedure along with one or two hopper 2choice procedures
@@ -344,6 +362,12 @@ class ShaperGoNogo(Shaper):
 #           facility for use of the left hand key and hopper.
     def __init__(self, panel, log, parameters, error_callback=None):
         super(ShaperGoNogo, self).__init__(self, panel, log, parameters, error_callback)
+        self.block1 = self._hopper_block(1)
+        self.block2 = self._center_peck_block(2)
+        self.block3 = self._center_peck_no_flash_block(3)
+
+    def _center_peck_no_flash_block(self, block_num):
+        raise NotImplementedError
 
 class ShaperFemalePref(Shaper):
 # run a shaping routine for female pecking preferencein the operant chamber
@@ -360,6 +384,15 @@ class ShaperFemalePref(Shaper):
 #           give food for 2.5 sec.
     def __init__(self, panel, log, parameters, error_callback=None):
         super(ShaperFemalePref, self).__init__(self, panel, log, parameters, error_callback)
+        self.block1 = self._hopper_block(1)
+        self.block2 = self._female_choice_block(2)
+        self.block3 = self._female_choice_no_flash_block(3)
+
+    def _female_choice_block(self, block_num):
+        raise NotImplementedError
+
+    def _female_choice_no_flash_block(self, block_num):
+        raise NotImplementedError
 
 class Shaper3AC(Shaper):
 # run a shaping routine for 3AC the operant chamber
@@ -377,3 +410,65 @@ class Shaper3AC(Shaper):
 #           until pecked, then food for 2.5 sec.   Run 150 trials.
     def __init__(self, panel, log, parameters, error_callback=None):
         super(Shaper3AC, self).__init__(self, panel, log, parameters, error_callback)
+        self.block1 = self._hopper_block(1)
+        self.block2 = self._center_peck_block(2)
+        self.block3 = self._response_3ac_block(3)
+        self.block4 = self._response_3ac_no_flash_block(4)
+
+# Block 3:  The center key flashes until pecked, then either the right, left, or center
+#           key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials.
+    def _response_3ac_block(self, block_num, reps=100, revert_timeout=10800):
+        def temp():
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
+            utils.run_state_machine(    start_in='init',
+                                        error_state='check',
+                                        error_callback=self.error_callback,
+                                        init=self._block_init('check'),
+                                        check=self._check_block('poll_mid', reps, revert_timeout),
+                                        poll_mid=self._flash_poll(self.panel.center, 10, 'check', 'coin_flip'),
+                                        coin_flip=self._rand_state(('check_right', 'check_center' 'check_left')),
+                                        check_right=self._check_block('poll_right', reps, revert_timeout),
+                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
+                                        check_center=self._check_block('poll_center', reps, revert_timeout),
+                                        poll_center=self._flash_poll(self.panel.center, 10, 'check_center', 'pre_reward'),
+                                        check_left=self._check_block('poll_left', reps, revert_timeout),
+                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        pre_reward=self._pre_reward('reward'),
+                                        reward=self.reward(3))
+            if not utils.check_time(self.parameters['light_schedule']):
+                return 'sleep_block'
+            if self.responded_block:
+                return self.block_name(block_num + 1)
+            else:
+                return self.block_name(block_num - 1)
+        return temp
+
+# Block 4:  Wait for peck to non-flashing center key, then right, center,or left key flashes
+#           until pecked, then food for 2.5 sec.   Run 150 trials.
+    def _response_3ac_no_flash_block(self, block_num, reps=150, revert_timeout=10800):
+        def temp():
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
+            utils.run_state_machine(    start_in='init',
+                                        error_state='check',
+                                        error_callback=self.error_callback,
+                                        init=self._block_init('check'),
+                                        check=self._check_block('poll_mid', reps, revert_timeout),
+                                        poll_mid=self._poll(self.panel.center, 10, 'check', 'coin_flip'),
+                                        coin_flip=self._rand_state(('check_right', 'check_center' 'check_left')),
+                                        check_right=self._check_block('poll_right', reps, revert_timeout),
+                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
+                                        check_left=self._check_block('poll_left', reps, revert_timeout),
+                                        check_center=self._check_block('poll_center', reps, revert_timeout),
+                                        poll_center=self._flash_poll(self.panel.center, 10, 'check_center', 'pre_reward'),
+                                        poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        pre_reward=self._pre_reward('reward'),
+                                        reward=self.reward(2.5))
+            if not utils.check_time(self.parameters['light_schedule']):
+                return 'sleep_block'
+            if self.responded_block:
+                return self.block_name(block_num + 1)
+            else:
+                return self.block_name(block_num - 1)
+        return temp
