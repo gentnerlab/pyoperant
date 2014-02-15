@@ -257,7 +257,7 @@ class Shaper(object):
     def _run_sleep(self):
         utils.run_state_machine(start_in='pre',
                                 error_state='post',
-                                error_callback=self.log_error_callback,
+                                error_callback=self.error_callback,
                                 pre=self.sleep_pre,
                                 main=self.sleep_main,
                                 post=self.sleep_post)
