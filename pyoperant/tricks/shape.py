@@ -243,7 +243,7 @@ class Shaper(object):
         self.log.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['idle_poll_interval'])
-        if not self.check_light_schedule():
+        if not utils.check_time(self.parameters['light_schedule']):
             return 'main'
         else:
             return 'post'
