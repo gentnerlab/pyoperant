@@ -456,7 +456,7 @@ class Shaper3AC(Shaper):
                                         init=self._block_init('check'),
                                         check=self._check_block('poll_mid', reps, revert_timeout),
                                         poll_mid=self._poll(self.panel.center, 10, 'check', 'coin_flip'),
-                                        coin_flip=self._rand_state(('check_right', 'check_center' 'check_left')),
+                                        coin_flip=self._rand_state(('check_right', 'check_center', 'check_left')),
                                         check_right=self._check_block('poll_right', reps, revert_timeout),
                                         poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
                                         check_left=self._check_block('poll_left', reps, revert_timeout),
