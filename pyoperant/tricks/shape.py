@@ -309,7 +309,7 @@ class Shaper2AC(Shaper):
                                         check_left=self._check_block('poll_left', reps, revert_timeout),
                                         poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
-                                        reward=self.reward(3))
+                                        reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
@@ -337,7 +337,7 @@ class Shaper2AC(Shaper):
                                         check_left=self._check_block('poll_left', reps, revert_timeout),
                                         poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
-                                        reward=self.reward(2.5))
+                                        reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
@@ -435,7 +435,7 @@ class Shaper3AC(Shaper):
                                         check_left=self._check_block('poll_left', reps, revert_timeout),
                                         poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
-                                        reward=self.reward(3))
+                                        reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
@@ -464,7 +464,7 @@ class Shaper3AC(Shaper):
                                         poll_center=self._flash_poll(self.panel.center, 10, 'check_center', 'pre_reward'),
                                         poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
-                                        reward=self.reward(2.5))
+                                        reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             if self.responded_block:
