@@ -307,7 +307,7 @@ class Shaper2AC(Shaper):
                                         check_right=self._check_block('poll_right', reps, revert_timeout),
                                         poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
                                         check_left=self._check_block('poll_left', reps, revert_timeout),
-                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
                                         reward=self.reward(3))
             if not utils.check_time(self.parameters['light_schedule']):
@@ -335,7 +335,7 @@ class Shaper2AC(Shaper):
                                         check_right=self._check_block('poll_right', reps, revert_timeout),
                                         poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
                                         check_left=self._check_block('poll_left', reps, revert_timeout),
-                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
                                         reward=self.reward(2.5))
             if not utils.check_time(self.parameters['light_schedule']):
@@ -433,7 +433,7 @@ class Shaper3AC(Shaper):
                                         check_center=self._check_block('poll_center', reps, revert_timeout),
                                         poll_center=self._flash_poll(self.panel.center, 10, 'check_center', 'pre_reward'),
                                         check_left=self._check_block('poll_left', reps, revert_timeout),
-                                        poll_left=self.flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
                                         reward=self.reward(3))
             if not utils.check_time(self.parameters['light_schedule']):
