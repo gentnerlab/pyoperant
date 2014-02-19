@@ -8,7 +8,7 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
     """docstring for ThreeACMatchingExp"""
     def __init__(self, *args, **kwargs):
         super(ThreeACMatchingExp, self).__init__(*args, **kwargs)
-        self.shaper = shape.Shaper3AC(self.panel, self.log, self.parameters, self.log_error_callback)
+        self.shaper = shape.Shaper3ACMatching(self.panel, self.log, self.parameters, self.get_stimuli, self.log_error_callback)
         self.num_stims = len(self.parameters['stims'].items())
 
     def get_stimuli(self, trial_class):

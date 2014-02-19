@@ -475,3 +475,46 @@ class Shaper3AC(Shaper):
             else:
                 return self.block_name(block_num - 1)
         return temp
+
+class Shaper3ACMatching(Shaper3AC):
+    def __init__(self, panel, log, parameters, get_stimuli, error_callback=None):
+        super(Shaper3AC, self).__init__(panel, log, parameters, error_callback)
+        assert hasattr(get_stimuli, '__call__')
+        self.get_stimuli = get_stimuli
+        self.block5 = self._response_3ac_matching_audio_block(5)
+
+    def _response_3ac_matching_audio_block(self, block_num, reps=150, revert_timeout=10800):
+        def temp():
+            self.recent_state = block_num
+            self.log.info('Starting %s'%(self.block_name(block_num)))
+            utils.run_state_machine(    start_in='init',
+                                        error_state='check',
+                                        error_callback=self.error_callback,
+                                        init=self._block_init('check'),
+                                        check=self._check_block('poll_mid', reps, revert_timeout),
+                                        poll_mid=self._poll(self.panel.center, 10, 'check', 'coin_flip'),
+                                        coin_flip=self._rand_state(('check_right', 'check_center', 'check_left')),
+                                        check_right=self._check_block('poll_right', reps, revert_timeout),
+                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
+                                        check_left=self._check_block('poll_left', reps, revert_timeout),
+                                        check_center=self._check_block('poll_center', reps, revert_timeout),
+                                        poll_center=self._flash_poll(self.panel.center, 10, 'check_center', 'pre_reward'),
+                                        poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        pre_reward=self._pre_reward('reward'),
+                                        reward=self.reward(2.5, 'check'))
+            if not utils.check_time(self.parameters['light_schedule']):
+                return 'sleep_block'
+            if self.responded_block:
+                return self.block_name(block_num + 1)
+            else:
+                return self.block_name(block_num - 1)
+        return temp
+
+    def _play_audio(self, next_state, trial_class):
+        def temp():
+            trial_stim, trial_motifs = self.get_stimuli(trial_class)
+            self.log.debug("presenting stimulus %s" % trial_stim.stimulus)
+            self.panel.speaker.queue(trial_stim.file_origin)
+            self.panel.speaker.play()
+            return next_state
+        return temp
