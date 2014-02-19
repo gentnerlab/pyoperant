@@ -44,6 +44,7 @@ class Shaper(object):
                                     block2=self.block2,
                                     block3=self.block3,
                                     block4=self.block4,
+                                    block5=self.block5,
                                     sleep_block=self._run_sleep)
         self.log.info('Shaping procedure complete')
 
