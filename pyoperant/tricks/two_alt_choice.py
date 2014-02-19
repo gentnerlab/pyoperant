@@ -12,6 +12,7 @@ class TwoAltChoiceExp(base.BaseExp):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
         super(TwoAltChoiceExp,  self).__init__(*args, **kwargs)
+        self.shaper = shape.Shaper2AC(self.panel, self.log, self.parameters, self.log_error_callback)
 
         # assign stim files full names
         for name, filename in self.parameters['stims'].items():

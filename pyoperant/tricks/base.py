@@ -73,6 +73,11 @@ class BaseExp(object):
         self.panel = panel
         self.log.debug('panel %s initialized' % self.parameters['panel_name'])
 
+        if 'shape' not in self.parameters or self.parameters['shape'] not in ['block1', 'block2', 'block3', 'block4', 'block5']:
+            self.parameters['shape'] = None
+
+        self.shaper = shape.Shaper(self.panel, self.log, self.parameters, self.log_error_callback)
+
     def save(self):
         self.snapshot_f = os.path.join(self.parameters['experiment_path'], self.timestamp+'.json')
         with open(self.snapshot_f, 'wb') as config_snap:
@@ -122,7 +127,9 @@ class BaseExp(object):
                                                                 self.snapshot_f,
                                                                 )
                       )
-        while True:
+        if self.parameters['shape']:
+                self.shaper.run_shape(self.parameters['shape'])
+        while True: #is this while necessary
             utils.run_state_machine(start_in='idle',
                                     error_state='idle',
                                     error_callback=self.log_error_callback,
