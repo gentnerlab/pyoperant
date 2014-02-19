@@ -5,7 +5,7 @@ import csv
 import copy
 import datetime as dt
 from numpy import random
-from pyoperant.tricks import base
+from pyoperant.tricks import base, shape
 from pyoperant import components, utils,reinf
 
 class TwoAltChoiceExp(base.BaseExp):

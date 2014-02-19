@@ -2,7 +2,7 @@
 
 import random, os
 from pyoperant import utils
-from pyoperant.tricks import two_alt_choice
+from pyoperant.tricks import two_alt_choice, shape
 
 class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
     """docstring for ThreeACMatchingExp"""

@@ -3,6 +3,7 @@ import os, sys
 import datetime as dt
 from pyoperant import utils, components, local, hwio
 from pyoperant import ComponentError, InterfaceError
+from pyoperant.tricks import shape
 
 
 try:
