@@ -269,7 +269,7 @@ class Shaper(object):
         return self.block_name(self.recent_state)
 
     def block_name(self, block_num):
-        if block_num >= 1 and block_num <= 4:
+        if block_num >= 1 and block_num <= 5:
             return "block%d"%block_num
         else:
             return None
