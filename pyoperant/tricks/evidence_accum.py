@@ -83,6 +83,7 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
         filename =  os.path.join(self.parameters['stim_path'], ''.join(motifs) + '.wav')
         stim, epochs = utils.concat_wav(input_files,filename)
         stim.name = ''.join(motifs)
+        self.log.debug('stim %s created at %s' % (stim.name,stim.file_origin))
 
         for ep in epochs:
             self.log.debug('old epoch.name: %s' % ep.name)
@@ -90,8 +91,6 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
                 if ep.name == f_name:
                     ep.name = stim_name
             self.log.debug('new epoch.name: %s' % ep.name)
-
-        stim.name = ''.join(motifs)
 
         return stim, epochs
 
@@ -125,7 +124,6 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
                 else:
                     self.this_trial.events.remove(ev) # get rid of motif events the bird didn't hear
 
-        os.remove(self.this_trial.stimulus_event.file_origin)
         self.this_trial.stimulus = self.this_trial.stimulus[:num_mots]
 
 if __name__ == "__main__":
