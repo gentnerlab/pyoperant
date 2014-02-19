@@ -177,6 +177,7 @@ class Shaper(object):
                     self.responded_poll = True
                     self.last_response = component.name
                     return None
+                utils.wait(.015)
                 return 'main'
             else:
                 return None
@@ -195,6 +196,7 @@ class Shaper(object):
                     self.responded_poll = True
                     self.last_response = component.name
                     return None
+                utils.wait(.015)
                 return 'main'
             else:
                 component.off()
@@ -213,6 +215,7 @@ class Shaper(object):
                     self.responded_poll = True
                     self.last_response = component.name
                     return None
+                utils.wait(.015)
                 return 'main'
             else:
                 component.off()

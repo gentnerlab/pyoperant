@@ -273,6 +273,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.this_trial.events.append(response_event)
                 self.log.info('response: %s' % (self.this_trial.response))
                 return 'post'
+        utils.wait(.015)
         return 'main'
 
     def response_post(self):
