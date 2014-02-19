@@ -33,6 +33,7 @@ class Shaper(object):
         self.block2 = self._null_block(2)
         self.block3 = self._null_block(3)
         self.block4 = self._null_block(4)
+        self.block5 = self._null_block(5)
 
     def run_shape(self, start_state='block1'):
         self.log.info('Starting shaping procedure')
