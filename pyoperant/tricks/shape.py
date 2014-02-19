@@ -518,7 +518,7 @@ class Shaper3ACMatching(Shaper3AC):
     def _play_audio(self, next_state, trial_class):
         def temp():
             trial_stim, trial_motifs = self.get_stimuli(trial_class)
-            self.log.debug("presenting stimulus %s" % trial_stim.stimulus)
+            self.log.debug("presenting stimulus %s" % trial_stim.name)
             self.panel.speaker.queue(trial_stim.file_origin)
             self.panel.speaker.play()
             return next_state
