@@ -5,13 +5,14 @@ import csv
 import copy
 import datetime as dt
 from numpy import random
-from pyoperant.tricks import base
+from pyoperant.tricks import base, shape
 from pyoperant import components, utils,reinf
 
 class TwoAltChoiceExp(base.BaseExp):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
         super(TwoAltChoiceExp,  self).__init__(*args, **kwargs)
+        self.shaper = shape.Shaper2AC(self.panel, self.log, self.parameters, self.log_error_callback)
 
         # assign stim files full names
         for name, filename in self.parameters['stims'].items():
@@ -45,6 +46,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
         self.data_csv = os.path.join(self.parameters['experiment_path'],
                                      self.parameters['subject']+'_trialdata_'+self.timestamp+'.csv')
+        self.make_data_csv()
 
         if 'reinforcement' in self.parameters.keys():
             reinforcement = self.parameters['reinforcement']
@@ -68,9 +70,9 @@ class TwoAltChoiceExp(base.BaseExp):
         return self.check_light_schedule()
 
     def session_pre(self):
-        self.log.info('starting session')
         self.trials = []
         self.session_id += 1
+        self.log.info('starting session %s' % self.session_id)
 
         self.class_assoc = {}
         for class_, class_params in self.parameters['classes'].items():
@@ -83,7 +85,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def session_main(self):
         self._run_trial()
-        if self.check_session_schedule:
+        if self.check_session_schedule():
             return 'main'
         else:
             return 'post'
@@ -94,15 +96,22 @@ class TwoAltChoiceExp(base.BaseExp):
     ## trial flow
     def new_trial(self):
         '''create a new trial and append it to the trial list'''
-        do_correction = False
-        if self.trials:
+        do_correction = True
+        if len(self.trials) > 0:
             last_trial = self.trials[-1]
             index = last_trial.index+1
-            if self.parameters['correction_trials'] and last_trial.response and (last_trial.correct==False):
-                do_correction = True
+            if self.parameters['correction_trials']:
+                if last_trial.correct == True:
+                    do_correction = False
+                elif last_trial.response == 'none':
+                    if last_trial.type_ == 'normal':
+                        do_correction = False
+            else:
+                do_correction = False
         else:
             last_trial = None
             index = 0
+            do_correction = False
 
         if do_correction:
             trial = utils.Trial(type_='correction',
@@ -117,6 +126,8 @@ class TwoAltChoiceExp(base.BaseExp):
                     trial.events.append(copy.copy(ev))
             self.log.debug("correction trial: class is %s" % trial.class_)
         else:
+            if last_trial is not None:
+                os.remove(last_trial.stimulus_event.file_origin)
             trial = utils.Trial(index=index)
             trial.class_ = random.choice(self.class_assoc.keys())
             trial_stim, trial_motifs = self.get_stimuli(trial.class_)
@@ -126,7 +137,7 @@ class TwoAltChoiceExp(base.BaseExp):
             for mot in trial_motifs:
                 trial.events.append(mot)
 
-        trial.annotate(session=self.session_id)
+        trial.session=self.session_id
 
         self.trials.append(trial)
         self.this_trial = self.trials[-1]
@@ -151,10 +162,7 @@ class TwoAltChoiceExp(base.BaseExp):
             try:
                 trial_dict[field] = getattr(trial,field)
             except AttributeError:
-                try:
-                    trial_dict[field] = trial.annotations[field]
-                except KeyError:
-                    trial_dict[field] = None
+                trial_dict[field] = trial.annotations[field]
 
 
         with open(self.data_csv,'ab') as data_fh:
@@ -265,6 +273,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.this_trial.events.append(response_event)
                 self.log.info('response: %s' % (self.this_trial.response))
                 return 'post'
+        utils.wait(.015)
         return 'main'
 
     def response_post(self):

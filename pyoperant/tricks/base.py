@@ -3,6 +3,7 @@ import os, sys
 import datetime as dt
 from pyoperant import utils, components, local, hwio
 from pyoperant import ComponentError, InterfaceError
+from pyoperant.tricks import shape
 
 
 try:
@@ -73,6 +74,11 @@ class BaseExp(object):
         self.panel = panel
         self.log.debug('panel %s initialized' % self.parameters['panel_name'])
 
+        if 'shape' not in self.parameters or self.parameters['shape'] not in ['block1', 'block2', 'block3', 'block4', 'block5']:
+            self.parameters['shape'] = None
+
+        self.shaper = shape.Shaper(self.panel, self.log, self.parameters, self.log_error_callback)
+
     def save(self):
         self.snapshot_f = os.path.join(self.parameters['experiment_path'], self.timestamp+'.json')
         with open(self.snapshot_f, 'wb') as config_snap:
@@ -106,12 +112,14 @@ class BaseExp(object):
         """returns True if the subject should be running sessions"""
         return False
 
+    def panel_reset(self):
+        self.panel.reset()
 
     def run(self):
 
         for attr in self.req_panel_attr:
             assert hasattr(self.panel,attr)
-        self.panel.reset()
+        self.panel_reset()
         self.save()
         self.init_summary()
 
@@ -120,7 +128,9 @@ class BaseExp(object):
                                                                 self.snapshot_f,
                                                                 )
                       )
-        while True:
+        if self.parameters['shape']:
+                self.shaper.run_shape(self.parameters['shape'])
+        while True: #is this while necessary
             utils.run_state_machine(start_in='idle',
                                     error_state='idle',
                                     error_callback=self.log_error_callback,
@@ -129,12 +139,12 @@ class BaseExp(object):
                                     session=self._run_session)
 
     def _run_idle(self):
-        if not self.check_light_schedule():
+        if self.check_light_schedule() == False:
             return 'sleep'
         elif self.check_session_schedule():
             return 'session'
         else:
-            self.panel.reset()
+            self.panel_reset()
             self.log.debug('idling...')
             utils.wait(self.parameters['idle_poll_interval'])
             return 'idle'
@@ -151,7 +161,7 @@ class BaseExp(object):
         self.log.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['idle_poll_interval'])
-        if not self.check_light_schedule():
+        if self.check_light_schedule() == False:
             return 'main'
         else:
             return 'post'

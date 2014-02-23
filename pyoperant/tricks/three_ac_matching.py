@@ -2,12 +2,13 @@
 
 import random, os
 from pyoperant import utils
-from pyoperant.tricks import two_alt_choice
+from pyoperant.tricks import two_alt_choice, shape
 
 class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
     """docstring for ThreeACMatchingExp"""
     def __init__(self, *args, **kwargs):
         super(ThreeACMatchingExp, self).__init__(*args, **kwargs)
+        self.shaper = shape.Shaper3ACMatching(self.panel, self.log, self.parameters, self.get_stimuli, self.log_error_callback)
         self.num_stims = len(self.parameters['stims'].items())
 
     def get_stimuli(self, trial_class):

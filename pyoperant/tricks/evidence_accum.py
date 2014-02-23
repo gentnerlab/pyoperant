@@ -83,11 +83,14 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
         filename =  os.path.join(self.parameters['stim_path'], ''.join(motifs) + '.wav')
         stim, epochs = utils.concat_wav(input_files,filename)
         stim.name = ''.join(motifs)
+        self.log.debug('stim %s created at %s' % (stim.name,stim.file_origin))
 
         for ep in epochs:
+            self.log.debug('old epoch.name: %s' % ep.name)
             for stim_name,f_name in self.parameters['stims'].items():
-                if ep.name in f_name:
+                if ep.name == f_name:
                     ep.name = stim_name
+            self.log.debug('new epoch.name: %s' % ep.name)
 
         return stim, epochs
 
@@ -113,16 +116,15 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
             event.time += self.this_trial.stimulus_event.time
 
         # determine the string of motifs the bird heard
-        stim_string = ''
+        num_mots = 0
         for ev in list(self.this_trial.events):
             if (ev.label=='motif'):
-                if (self.this_trial.response == 'none') or (self.this_trial.rt > ev.time):
-                    stim_string += ev.name
+                if (self.this_trial.rt > ev.time) or (self.this_trial.response == 'none'):
+                    num_mots += 1
                 else:
                     self.this_trial.events.remove(ev) # get rid of motif events the bird didn't hear
 
-        self.this_trial.stimulus = stim_string
-        os.remove(self.this_trial.stimulus_event.file_origin)
+        self.this_trial.stimulus = self.this_trial.stimulus[:num_mots]
 
 if __name__ == "__main__":
 
