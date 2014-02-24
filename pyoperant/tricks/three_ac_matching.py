@@ -40,6 +40,66 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
     def analyze_trial(self):
         super(ThreeACMatchingExp)
 
+    def correction_reward_pre(self):
+        self.summary['feeds'] += .5
+        return 'main'
+
+    def correction_reward_main(self):
+        try:
+            value = self.parameters['classes'][self.this_trial.class_]['reward_value'] * .5
+            reward_event = self.panel.reward(value=value)
+            self.this_trial.reward = True
+            ## TODO: make rewards into events
+            # self.this_trial.events.append(reward_event)
+
+        # but catch the reward errors
+
+        ## note: this is quite specific to the Gentner Lab. consider
+        ## ways to abstract this
+        except components.HopperAlreadyUpError as err:
+            self.this_trial.reward = True
+            self.summary['hopper_already_up'] += 1
+            self.log.warning("hopper already up on panel %s" % str(err))
+            utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
+            self.panel.reset()
+
+        except components.HopperWontComeUpError as err:
+            self.this_trial.reward = 'error'
+            self.summary['hopper_failures'] += 1
+            self.log.error("hopper didn't come up on panel %s" % str(err))
+            utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
+            self.panel.reset()
+
+        # except components.ResponseDuringFeedError as err:
+        #     trial['reward'] = 'Error'
+        #     self.summary['responses_during_reward'] += 1
+        #     self.log.error("response during reward on panel %s" % str(err))
+        #     utils.wait(self.reward_dur[trial['class']])
+        #     self.panel.reset()
+
+        except components.HopperWontDropError as err:
+            self.this_trial.reward = 'error'
+            self.summary['hopper_wont_go_down'] += 1
+            self.log.warning("hopper didn't go down on panel %s" % str(err))
+            self.panel.reset()
+
+        finally:
+            self.panel.house_light.on()
+
+            # TODO: add errors as trial events
+
+        return 'post'
+
+    def correction_reward_post(self):
+        return None
+
+    def _run_correction_reward():
+        utils.run_state_machine(start_in='pre',
+                                error_callback=self.log_error_callback,
+                                pre=self.correction_reward_pre,
+                                main=self.correction_reward_main,
+                                post=self.correction_reward_post)
+
 if __name__ == "__main__":
 
     try: import simplejson as json

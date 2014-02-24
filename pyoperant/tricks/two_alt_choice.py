@@ -302,7 +302,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 # self.this_trial.events.append(secondary_reinf_event)
 
             if self.this_trial.type_ == 'correction':
-                pass
+                self._run_correction_reward()
             elif self.reinf_sched.consequate(trial=self.this_trial):
                 self._run_reward() # provide a reward
         # no response
@@ -391,6 +391,9 @@ class TwoAltChoiceExp(base.BaseExp):
                                 pre=self.reward_pre,
                                 main=self.reward_main,
                                 post=self.reward_post)
+
+    def _run_correction_reward():
+        pass
 
     ## punishment flow
     def punish_pre(self):
