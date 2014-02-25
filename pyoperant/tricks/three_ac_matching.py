@@ -93,7 +93,7 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
     def correction_reward_post(self):
         return None
 
-    def _run_correction_reward():
+    def _run_correction_reward(self):
         utils.run_state_machine(start_in='pre',
                                 error_callback=self.log_error_callback,
                                 pre=self.correction_reward_pre,

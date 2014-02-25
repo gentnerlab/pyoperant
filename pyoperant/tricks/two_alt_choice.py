@@ -392,7 +392,7 @@ class TwoAltChoiceExp(base.BaseExp):
                                 main=self.reward_main,
                                 post=self.reward_post)
 
-    def _run_correction_reward():
+    def _run_correction_reward(self):
         pass
 
     ## punishment flow
