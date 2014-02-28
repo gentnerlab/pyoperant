@@ -233,7 +233,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
                 pass
 
             audio_frames = wav_part.readframes(wav_part.getnframes())
-            wav_part.close
+            wav_part.close()
 
             # append the audio data
             audio_data += audio_frames
