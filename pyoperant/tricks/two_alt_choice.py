@@ -258,6 +258,7 @@ class TwoAltChoiceExp(base.BaseExp):
         elapsed_time = (dt.datetime.now() - self.this_trial.time).total_seconds()
         rt = elapsed_time - self.this_trial.stimulus_event.time
         if rt > self.this_trial.annotations['max_wait']:
+            self.panel.speaker.stop()
             self.this_trial.response = 'none'
             self.log.info('no response')
             return 'post'
