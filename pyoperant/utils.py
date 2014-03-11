@@ -2,6 +2,8 @@ import wave
 import sys
 import struct
 import time
+import subprocess
+import os
 import datetime as dt
 from argparse import ArgumentParser
 from pyoperant import Error
@@ -273,4 +275,22 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
                                   )
 
     return (concat_wav,epochs)
+
+def get_num_open_fds():
+    '''
+    return the number of open file descriptors for current process
+
+    .. warning: will only work on UNIX-like os-es.
+    '''
+
+    pid = os.getpid()
+    procs = subprocess.check_output( 
+        [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
+
+    nprocs = len( 
+        filter( 
+            lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
+            procs.split( '\n' ) )
+        )
+    return nprocs
 

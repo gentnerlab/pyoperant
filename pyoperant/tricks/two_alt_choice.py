@@ -200,6 +200,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def _run_trial(self):
         self.log.debug('running trial')
+        self.log.debug("number of open file descriptors: %d" %(utils.get_num_open_fds()))
         utils.run_state_machine(start_in='pre',
                                 error_state='post',
                                 error_callback=self.log_error_callback,
@@ -257,6 +258,7 @@ class TwoAltChoiceExp(base.BaseExp):
         elapsed_time = (dt.datetime.now() - self.this_trial.time).total_seconds()
         rt = elapsed_time - self.this_trial.stimulus_event.time
         if rt > self.this_trial.annotations['max_wait']:
+            self.panel.speaker.stop()
             self.this_trial.response = 'none'
             self.log.info('no response')
             return 'post'
