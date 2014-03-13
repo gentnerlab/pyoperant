@@ -11,6 +11,7 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
 
         if 'reduced_stims' not in self.parameters or self.parameters['reduced_stims'] not in [True, False]:
             self.parameters['reduced_stims'] = False
+            self.log.debug('Using full stimuli set')
         else:
             self.log.debug('Using reduced stimuli set only')
 
