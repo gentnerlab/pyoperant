@@ -11,6 +11,8 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
 
         if 'reduced_stims' not in self.parameters or self.parameters['reduced_stims'] not in [True, False]:
             self.parameters['reduced_stims'] = False
+        else:
+            self.log.debug('Using reduced stimuli set only')
 
         self.shaper = shape.Shaper3ACMatching(self.panel, self.log, self.parameters, self.get_stimuli, self.log_error_callback)
         self.num_stims = len(self.parameters['stims'].items())
