@@ -8,6 +8,19 @@ import datetime as dt
 from argparse import ArgumentParser
 from pyoperant import Error
 
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
+class NumpyAwareJSONEncoder(json.JSONEncoder):
+    """ this json encoder converts numpy arrays to lists so that json can write them.
+
+    """
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 # consider importing this from python-neo
 class Event(object):
@@ -284,11 +297,11 @@ def get_num_open_fds():
     '''
 
     pid = os.getpid()
-    procs = subprocess.check_output( 
+    procs = subprocess.check_output(
         [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
 
-    nprocs = len( 
-        filter( 
+    nprocs = len(
+        filter(
             lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
             procs.split( '\n' ) )
         )
