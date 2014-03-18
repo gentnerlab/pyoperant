@@ -1,5 +1,5 @@
 import logging, traceback
-import os, sys
+import os, sys, socket
 import datetime as dt
 from pyoperant import utils, components, local, hwio
 from pyoperant import ComponentError, InterfaceError
@@ -45,6 +45,7 @@ class BaseExp(object):
                  stim_path='',
                  subject='',
                  panel=None,
+                 log_handlers=[],
                  *args, **kwargs):
         super(BaseExp,  self).__init__()
 
@@ -65,7 +66,7 @@ class BaseExp(object):
         self.parameters['subject'] = subject
 
         # configure logging
-        self.log_file = os.path.join(self.parameters['experiment_path'], self.parameters['subject'] + '.log')
+        self.parameters['log_handlers'] = log_handlers
         self.log_config()
 
         self.req_panel_attr= ['house_light',
@@ -85,6 +86,9 @@ class BaseExp(object):
             json.dump(self.parameters, config_snap, sort_keys=True, indent=4)
 
     def log_config(self):
+
+        self.log_file = os.path.join(self.parameters['experiment_path'], self.parameters['subject'] + '.log')
+
         if self.debug:
             self.log_level = logging.DEBUG
         else:
@@ -96,13 +100,15 @@ class BaseExp(object):
                             level=self.log_level,
                             format='"%(asctime)s","%(levelname)s","%(message)s"')
         self.log = logging.getLogger()
-        #email_handler = logging.handlers.SMTPHandler(mailhost='localhost',
-        #                                             fromaddr='bird@vogel.ucsd.edu',
-        #                                             toaddrs=[options['experimenter']['email'],],
-        #                                             subject='error notice',
-        #                                             )
-        #email_handler.setlevel(logging.ERROR)
-        #log.addHandler(email_handler)
+
+        if 'email' in self.parameters['log_handlers']:
+            from pyoperant.local import SMTP_CONFIG
+            SMTP_CONFIG['toaddrs'] = [self.parameters['experimenter']['email'],]
+
+            email_handler = logging.handlers.SMTPHandler(**SMTP_CONFIG)
+            email_handler.setlevel(logging.ERROR)
+
+            self.log.addHandler(email_handler)
 
     def check_light_schedule(self):
         """returns true if the lights should be on"""
