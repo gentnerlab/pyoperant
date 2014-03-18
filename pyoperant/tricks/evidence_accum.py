@@ -11,13 +11,6 @@ try:
 except ImportError:
     import json
 
-class NumpyAwareJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-                return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
-
-
 class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
     """docstring for Experiment"""
     def __init__(self, *args, **kwargs):
@@ -31,7 +24,7 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
                       config_snap,
                       sort_keys=True,
                       indent=4,
-                      cls=NumpyAwareJSONEncoder)
+                      cls=utils.NumpyAwareJSONEncoder)
 
     def build_transition_matrices(self):
         """run through the transitions for each stimulus and generate transition matrixes"""
@@ -68,11 +61,21 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
         motif_ids = []
 
         # use transition CDF to get iteratively get next motif id
-        mid = 0
-        for pos in range(self.parameters['strlen_max']):
-            mid = (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
-            motif_ids.append(mid)
-        assert len(motif_ids) == self.parameters['strlen_max']
+        append_mot = True
+        while append_mot:
+            if len(motif_ids) < self.parameters['strlen_min']:
+                mid = (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
+                motif_ids.append(mid)
+            elif len(motif_ids) == (self.parameters['strlen_max']+1):
+                if self.parameters['decay'] < 1.0:
+                    motif_ids = []
+                else:
+                    append_mot = False
+            elif random.random() < self.parameters['decay']:
+                mid = (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
+                motif_ids.append(mid)
+            else:
+                append_mot = False
 
         motifs = [self.parameters['stim_map'][mid] for mid in motif_ids]
 
