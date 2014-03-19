@@ -498,13 +498,14 @@ class Shaper3ACMatching(Shaper3AC):
                                         coin_flip=self._rand_state(('check_right', 'check_center', 'check_left')),
                                         check_right=self._check_block('audio_right', reps, revert_timeout),
                                         audio_right=self._play_audio('poll_right', 'R'),
-                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'pre_reward'),
+                                        poll_right=self._flash_poll(self.panel.right, 10, 'check_right', 'close_audio'),
                                         check_center=self._check_block('audio_center', reps, revert_timeout),
                                         audio_center=self._play_audio('poll_center', 'C'),
-                                        poll_center=self._flash_poll(self.panel.center, 10, 'check_center', 'pre_reward'),
+                                        poll_center=self._flash_poll(self.panel.center, 10, 'check_center', 'close_audio'),
                                         check_left=self._check_block('audio_left', reps, revert_timeout),
                                         audio_left=self._play_audio('poll_left', 'L'),
-                                        poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'pre_reward'),
+                                        poll_left=self._flash_poll(self.panel.left, 10, 'check_left', 'close_audio'),
+                                        close_audio=self._close_audio('pre_reward'),
                                         pre_reward=self._pre_reward('reward'),
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
@@ -521,5 +522,11 @@ class Shaper3ACMatching(Shaper3AC):
             self.log.debug("presenting stimulus %s" % trial_stim.name)
             self.panel.speaker.queue(trial_stim.file_origin)
             self.panel.speaker.play()
+            return next_state
+        return temp
+
+    def _close_audio(self, next_state):
+        def temp():
+            self.panel.speaker.stop()
             return next_state
         return temp
