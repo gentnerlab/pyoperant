@@ -62,6 +62,7 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
 
         # use transition CDF to get iteratively get next motif id
         append_mot = True
+        mid = 0
         while append_mot:
             if len(motif_ids) < self.parameters['strlen_min']:
                 mid = (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
@@ -69,6 +70,7 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
             elif len(motif_ids) == (self.parameters['strlen_max']+1):
                 if self.parameters['decay'] < 1.0:
                     motif_ids = []
+                    mid = 0
                 else:
                     append_mot = False
             elif random.random() < self.parameters['decay']:

@@ -119,3 +119,14 @@ PANELS = {"Vogel1": Vogel1,
           "Vogel8": Vogel8,
           }
 
+# SMTP_CONFIG
+
+DEFAULT_EMAIL = 'justin.kiggins@gmail.com'
+
+SMTP_CONFIG = {'mailhost': 'localhost',
+               'toaddrs': [DEFAULT_EMAIL],
+               'fromaddr': 'Vogel <bird@vogel.ucsd.edu>',
+               'subject': '[pyoperant notice] on vogel',
+               'credentials': None, 
+               'secure': None,
+               }

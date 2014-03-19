@@ -103,10 +103,15 @@ class BaseExp(object):
 
         if 'email' in self.parameters['log_handlers']:
             from pyoperant.local import SMTP_CONFIG
+            from logging import handlers
             SMTP_CONFIG['toaddrs'] = [self.parameters['experimenter']['email'],]
 
-            email_handler = logging.handlers.SMTPHandler(**SMTP_CONFIG)
-            email_handler.setlevel(logging.ERROR)
+            email_handler = handlers.SMTPHandler(**SMTP_CONFIG)
+            email_handler.setLevel(logging.ERROR)
+
+            heading = '%s\n' % (self.parameters['subject'])
+            formatter = logging.Formatter(heading+'%(levelname)s at %(asctime)s:\n%(message)s')
+            email_handler.setFormatter(formatter)
 
             self.log.addHandler(email_handler)
 

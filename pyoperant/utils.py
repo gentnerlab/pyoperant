@@ -5,6 +5,7 @@ import time
 import subprocess
 import os
 import datetime as dt
+import numpy as np
 from argparse import ArgumentParser
 from pyoperant import Error
 
