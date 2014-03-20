@@ -17,6 +17,15 @@ except ImportError:
 class NumpyAwareJSONEncoder(json.JSONEncoder):
     """ this json encoder converts numpy arrays to lists so that json can write them.
 
+    example usage:
+
+    >>> import numpy as np
+    >>> dict_to_save = {'array': np.zeros((5,))}
+    >>> json.dumps(dict_to_save,
+                   cls=NumpyAwareJSONEncoder
+                   )
+    '{"array": [0.0, 0.0, 0.0, 0.0, 0.0]}'
+
     """
     def default(self, obj):
         if isinstance(obj, np.ndarray):
