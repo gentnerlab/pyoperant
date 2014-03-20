@@ -52,6 +52,9 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
             self.parameters['classes'][this_class]['transition_cdf'] = trans
             self.log.debug('added class %s transition cdf %s' % (this_class, trans))
 
+    def next_motif(self,mid,trial_class):
+        return (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
+
     def get_stimuli(self,trial_class):
         """ take trial class and return a tuple containing the stimulus event to play and a list of additional events
 
@@ -63,21 +66,29 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
         # use transition CDF to get iteratively get next motif id
         append_mot = True
         mid = 0
-        while append_mot:
-            if len(motif_ids) < self.parameters['strlen_min']:
-                mid = (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
-                motif_ids.append(mid)
-            elif len(motif_ids) == (self.parameters['strlen_max']+1):
-                if self.parameters['decay'] < 1.0:
+        if 'decay' not in self.parameters.keys():
+            self.parameters['decay'] = 1.0
+
+        if self.parameters['decay'] < 1.0:
+            while append_mot:
+                if len(motif_ids) < self.parameters['strlen_min']:
+                    mid = self.next_motif(self,mid,trial_class)
+                    motif_ids.append(mid)
+                elif len(motif_ids) == (self.parameters['strlen_max']+1):
                     motif_ids = []
                     mid = 0
+                elif random.random() < self.parameters['decay']:
+                    mid = self.next_motif(self,mid,trial_class)
+                    motif_ids.append(mid)
                 else:
                     append_mot = False
-            elif random.random() < self.parameters['decay']:
-                mid = (self.parameters['classes'][trial_class]['transition_cdf'][mid] < random.random()).sum()
-                motif_ids.append(mid)
-            else:
-                append_mot = False
+        else:
+            while append_mot:
+                if len(motif_ids) < self.parameters['strlen_min']:
+                    mid = self.next_motif(self,mid,trial_class)
+                    motif_ids.append(mid)
+                else:
+                    append_mot = False
 
         motifs = [self.parameters['stim_map'][mid] for mid in motif_ids]
 
