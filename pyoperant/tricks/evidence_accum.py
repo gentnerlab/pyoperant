@@ -72,20 +72,20 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
         if self.parameters['decay'] < 1.0:
             while append_mot:
                 if len(motif_ids) < self.parameters['strlen_min']:
-                    mid = self.next_motif(self,mid,trial_class)
+                    mid = self.next_motif(mid,trial_class)
                     motif_ids.append(mid)
                 elif len(motif_ids) == (self.parameters['strlen_max']+1):
                     motif_ids = []
                     mid = 0
                 elif random.random() < self.parameters['decay']:
-                    mid = self.next_motif(self,mid,trial_class)
+                    mid = self.next_motif(mid,trial_class)
                     motif_ids.append(mid)
                 else:
                     append_mot = False
         else:
             while append_mot:
                 if len(motif_ids) < self.parameters['strlen_min']:
-                    mid = self.next_motif(self,mid,trial_class)
+                    mid = self.next_motif(mid,trial_class)
                     motif_ids.append(mid)
                 else:
                     append_mot = False
@@ -109,21 +109,6 @@ class EvidenceAccumExperiment(two_alt_choice.TwoAltChoiceExp):
             self.log.debug('new epoch.name: %s' % ep.name)
 
         return stim, epochs
-
-    def trial_pre(self):
-        ''' this is where we initialize a trial'''
-        # make sure lights are on at the beginning of each trial, prep for trial
-
-        self.new_trial()
-
-        self.this_trial = self.trials[-1]
-        motifs = [m for m in self.this_trial.events if (m.label=='motif')]
-        min_motif = motifs[self.parameters['strlen_min']-1]
-        self.this_trial.annotate(min_wait=min_motif.time+min_motif.duration)
-        max_wait = self.this_trial.stimulus_event.duration + self.parameters['response_win']
-        self.this_trial.annotate(max_wait=max_wait)
-        self.log.debug('created new trial')
-        return 'main'
 
     def analyze_trial(self):
         '''after the trial is complete, perform additional analyses that will be saved'''
