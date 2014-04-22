@@ -4,20 +4,20 @@ from pyoperant import panels
 from pyoperant import utils
 
 class Shaper(object):
-
-# Run a shaping routine in the operant chamber that will teach an
-# to peck the center key to hear a stimulus, then peck one of the side keys for reward.
-# training sequence:
-# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
-#           that the animal is in the apparatus. Center key flashes for 5 sec, prior
-#           to the hopper access. If the center key is pressed while flashing, then
-#           the hopper comes up and then the session jumps to block 2 immediately.
-# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
-#           4 sec. Run 100 trials.
-# Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
-#           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
-# Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
-#           until pecked, then food for 2.5 sec.   Run 100 trials.
+    """
+    Run a shaping routine in the operant chamber that will teach an
+    to peck the center key to hear a stimulus, then peck one of the side keys for reward.
+    training sequence:
+    Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
+              that the animal is in the apparatus. Center key flashes for 5 sec, prior
+              to the hopper access. If the center key is pressed while flashing, then
+              the hopper comes up and then the session jumps to block 2 immediately.
+    Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
+              4 sec. Run 100 trials.
+    Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
+              key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
+    Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
+              until pecked, then food for 2.5 sec.   Run 100 trials."""
 
     def __init__(self, panel, log, parameters, error_callback=None):
         self.panel = panel
@@ -53,12 +53,13 @@ class Shaper(object):
             return self.block_name(block_num + 1)
         return temp
 
-# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
-# that the animal is in the apparatus. Center key flashes for 5 sec, prior
-# to the hopper access. If the center key is pressed while flashing, then
-# the hopper comes up and then the session jumps to block 2 immediately
-
     def _hopper_block(self, block_num):
+        """
+        Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
+        that the animal is in the apparatus. Center key flashes for 5 sec, prior
+        to the hopper access. If the center key is pressed while flashing, then
+        the hopper comes up and then the session jumps to block 2 immediately"""
+
         def temp():
             self.recent_state = block_num
             self.log.info('Starting %s'%(self.block_name(block_num)))
@@ -77,10 +78,10 @@ class Shaper(object):
             return self.block_name(block_num + 1)
         return temp
 
-# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
-#           4 sec. Run 100 trials.
-#           reverts to revert_state if no response before timeout (60*60*3=10800)
     def _center_peck_block(self, block_num, reps=100, revert_timeout=10800):
+        """Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
+        4 sec. Run 100 trials.
+        reverts to revert_state if no response before timeout (60*60*3=10800)"""
         def temp():
             self.recent_state = block_num
             self.log.info('Starting %s'%(self.block_name(block_num)))
@@ -275,19 +276,19 @@ class Shaper(object):
             return None
 
 class Shaper2AC(Shaper):
-# Run a shaping routine in the operant chamber that will teach an
-# to peck the center key to hear a stimulus, then peck one of the side keys for reward.
-# training sequence:
-# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
-#           that the animal is in the apparatus. Center key flashes for 5 sec, prior
-#           to the hopper access. If the center key is pressed while flashing, then
-#           the hopper comes up and then the session jumps to block 2 immediately.
-# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
-#           4 sec. Run 100 trials.
-# Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
-#           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
-# Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
-#           until pecked, then food for 2.5 sec.   Run 100 trials.
+    """Run a shaping routine in the operant chamber that will teach an
+    to peck the center key to hear a stimulus, then peck one of the side keys for reward.
+    training sequence:
+    Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
+              that the animal is in the apparatus. Center key flashes for 5 sec, prior
+              to the hopper access. If the center key is pressed while flashing, then
+              the hopper comes up and then the session jumps to block 2 immediately.
+    Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
+              4 sec. Run 100 trials.
+    Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
+              key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
+    Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
+              until pecked, then food for 2.5 sec.   Run 100 trials."""
     def __init__(self, panel, log, parameters, error_callback=None):
         super(Shaper2AC, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
@@ -295,10 +296,10 @@ class Shaper2AC(Shaper):
         self.block3 = self._response_2ac_block(3)
         self.block4 = self._response_2ac_no_flash_block(4)
 
-# Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
-#           key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials.
-
     def _response_2ac_block(self, block_num, reps=100, revert_timeout=10800):
+
+        """Block 3:  The center key flashes until pecked, then either the right or left (p = .5)
+        key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials."""
         def temp():
             self.recent_state = block_num
             self.log.info('Starting %s'%(self.block_name(block_num)))
@@ -323,10 +324,9 @@ class Shaper2AC(Shaper):
                 return self.block_name(block_num - 1)
         return temp
 
-# Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
-#           until pecked, then food for 2.5 sec.   Run 100 trials.
-
     def _response_2ac_no_flash_block(self, block_num, reps=100, revert_timeout=10800):
+        """Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
+        until pecked, then food for 2.5 sec.   Run 100 trials."""
         def temp():
             self.recent_state = block_num
             self.log.info('Starting %s'%(self.block_name(block_num)))
@@ -352,19 +352,19 @@ class Shaper2AC(Shaper):
         return temp
 
 class ShaperGoNogo(Shaper):
-# accomodate go/nogo terminal procedure along with one or two hopper 2choice procedures
-# Go/Nogo shaping works like this:
-# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
-#           that the animal is in the apparatus. Center key flashes for 5 sec, prior
-#           to the hopper access. If the center key is pressed while flashing, then
-#           the hopper comes up and then the session jumps to block 2 immediately.
-# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
-#           4 sec. Run 100 trials.
-# Block 3:  Wait for a peck to non-flashing center key, when you get it, the hopper
-#           comes up for 2.5 sec. Run 100 trials.
-# NOTE:     when you run the go/nog procedure in a 2 hopper apparatus, it uses only the
-#           right hand key and hopper.  If you do this often, you may want to add the
-#           facility for use of the left hand key and hopper.
+    """accomodate go/nogo terminal procedure along with one or two hopper 2choice procedures
+    Go/Nogo shaping works like this:
+    Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
+              that the animal is in the apparatus. Center key flashes for 5 sec, prior
+              to the hopper access. If the center key is pressed while flashing, then
+              the hopper comes up and then the session jumps to block 2 immediately.
+    Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
+              4 sec. Run 100 trials.
+    Block 3:  Wait for a peck to non-flashing center key, when you get it, the hopper
+              comes up for 2.5 sec. Run 100 trials.
+    NOTE:     when you run the go/nog procedure in a 2 hopper apparatus, it uses only the
+              right hand key and hopper.  If you do this often, you may want to add the
+              facility for use of the left hand key and hopper."""
     def __init__(self, panel, log, parameters, error_callback=None):
         super(ShaperGoNogo, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
@@ -375,18 +375,18 @@ class ShaperGoNogo(Shaper):
         raise NotImplementedError
 
 class ShaperFemalePref(Shaper):
-# run a shaping routine for female pecking preferencein the operant chamber
-# termial proc: peck one of the side keys for stimulus presentation followed by reward.
-# Training sequence invoked as:
-# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
-#           that the animal is in the apparatus.
-#           Left and right keylights flash for 5 sec, prior
-#           to the hopper access. If either L or R key is pressed while flashing, then
-#           the hopper comes up and the session jumps to block 2 immediately.
-# Block 2:  randomly choose either L or R key to flash until pecked.  When pecked the hopper
-#           comes up for 4 sec.
-# Block 3:  Wait for peck to non-flashing L or R key (chosen at random). When pecked,
-#           give food for 2.5 sec.
+    """run a shaping routine for female pecking preferencein the operant chamber
+    termial proc: peck one of the side keys for stimulus presentation followed by reward.
+    Training sequence invoked as:
+    Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
+              that the animal is in the apparatus.
+              Left and right keylights flash for 5 sec, prior
+              to the hopper access. If either L or R key is pressed while flashing, then
+              the hopper comes up and the session jumps to block 2 immediately.
+    Block 2:  randomly choose either L or R key to flash until pecked.  When pecked the hopper
+              comes up for 4 sec.
+    Block 3:  Wait for peck to non-flashing L or R key (chosen at random). When pecked,
+              give food for 2.5 sec."""
     def __init__(self, panel, log, parameters, error_callback=None):
         super(ShaperFemalePref, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
@@ -400,19 +400,19 @@ class ShaperFemalePref(Shaper):
         raise NotImplementedError
 
 class Shaper3AC(Shaper):
-# run a shaping routine for 3AC the operant chamber
-# termial proc: peck center key for stimulus presentation then peck one of three keys L-C-R, or give no response.
-# Training sequence invoked as:
-# Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
-#           that the animal is in the apparatus. Center key flashes for 5 sec, prior
-#           to the hopper access. If the center key is pressed while flashing, then
-#           the hopper comes up and then the session jumps to block 2 immediately.
-# Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
-#           4 sec. Run 100 trials.
-# Block 3:  The center key flashes until pecked, then either the right, left, or center
-#           key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials.
-# Block 4:  Wait for peck to non-flashing center key, then right, center,or left key flashes
-#           until pecked, then food for 2.5 sec.   Run 150 trials.
+    """run a shaping routine for 3AC the operant chamber
+    termial proc: peck center key for stimulus presentation then peck one of three keys L-C-R, or give no response.
+    Training sequence invoked as:
+    Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
+              that the animal is in the apparatus. Center key flashes for 5 sec, prior
+              to the hopper access. If the center key is pressed while flashing, then
+              the hopper comes up and then the session jumps to block 2 immediately.
+    Block 2:  The center key flashes until pecked.  When pecked the hopper comes up for
+              4 sec. Run 100 trials.
+    Block 3:  The center key flashes until pecked, then either the right, left, or center
+              key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials.
+    Block 4:  Wait for peck to non-flashing center key, then right, center,or left key flashes
+              until pecked, then food for 2.5 sec.   Run 150 trials."""
     def __init__(self, panel, log, parameters, error_callback=None):
         super(Shaper3AC, self).__init__(panel, log, parameters, error_callback)
         self.block1 = self._hopper_block(1)
@@ -420,9 +420,9 @@ class Shaper3AC(Shaper):
         self.block3 = self._response_3ac_block(3)
         self.block4 = self._response_3ac_no_flash_block(4)
 
-# Block 3:  The center key flashes until pecked, then either the right, left, or center
-#           key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials.
     def _response_3ac_block(self, block_num, reps=100, revert_timeout=10800):
+        """Block 3:  The center key flashes until pecked, then either the right, left, or center
+        key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials."""
         def temp():
             self.recent_state = block_num
             self.log.info('Starting %s'%(self.block_name(block_num)))
@@ -449,9 +449,9 @@ class Shaper3AC(Shaper):
                 return self.block_name(block_num - 1)
         return temp
 
-# Block 4:  Wait for peck to non-flashing center key, then right, center,or left key flashes
-#           until pecked, then food for 2.5 sec.   Run 150 trials.
     def _response_3ac_no_flash_block(self, block_num, reps=150, revert_timeout=10800):
+        """Block 4:  Wait for peck to non-flashing center key, then right, center,or left key flashes
+        until pecked, then food for 2.5 sec.   Run 150 trials."""
         def temp():
             self.recent_state = block_num
             self.log.info('Starting %s'%(self.block_name(block_num)))
