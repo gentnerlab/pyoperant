@@ -1,7 +1,3 @@
-"""
-
-"""
-
 import random
 
 def random_queue(conditions,tr_max=100,weights=None):
