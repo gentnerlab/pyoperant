@@ -6,13 +6,10 @@ import subprocess
 import os
 import datetime as dt
 import numpy as np
+from contextlib import closing
 from argparse import ArgumentParser
 from pyoperant import Error
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
 
 class NumpyAwareJSONEncoder(json.JSONEncoder):
     """ this json encoder converts numpy arrays to lists so that json can write them.
@@ -27,6 +24,11 @@ class NumpyAwareJSONEncoder(json.JSONEncoder):
     '{"array": [0.0, 0.0, 0.0, 0.0, 0.0]}'
 
     """
+    try:
+        import simplejson as json
+    except ImportError:
+        import json
+
     def default(self, obj):
         if isinstance(obj, np.ndarray):
                 return obj.tolist()
@@ -222,6 +224,27 @@ def wait(secs=1.0, final_countdown=0.0,waitfunc=None):
         except:
             pass
 
+def auditory_stim_from_wav(wav):
+    with closing(wave.open(input_filename,'rb')) as wav:
+        (nchannels, sampwidth, framerate, nframes, comptype, compname) = wav.getparams()
+
+        duration = float(wav.getnframes())/sampwidth
+        stim = AuditoryStimulus(time=0.0,
+                                duration=duration,
+                                name=wav,
+                                label='wav',
+                                description='',
+                                file_origin=wav,
+                                annotations={'nchannels': nchannels,
+                                             'sampwidth': sampwidth,
+                                             'framerate': framerate,
+                                             'nframes': nframes,
+                                             'comptype': comptype,
+                                             'compname': compname,
+                                             }
+                                )
+        return stim
+
 def concat_wav(input_file_list, output_filename='concat.wav'):
     """ concat a set of wav files into a single wav file and return the output filename
 
@@ -241,24 +264,19 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
     cursor = 0
     epochs = [] # list of file epochs
     audio_data = ''
-    output = wave.open(output_filename, 'wb')
-
-    try:
+    with closing(wave.open(output_filename, 'wb')) as output:
         for input_filename, isi in input_file_list:
 
             # read in the wav file
-            wav_part = wave.open(input_filename,'rb')
+            with closing(wave.open(input_filename,'rb')) as wav_part:
+                try:
+                    params = wav_part.getparams()
+                    output.setparams(params)
+                    fs = output.getframerate()
+                except: # TODO: what was I trying to except here? be more specific
+                    pass
 
-
-            try:
-                params = wav_part.getparams()
-                output.setparams(params)
-                fs = output.getframerate()
-            except: # TODO: what was I trying to except here? be more specific
-                pass
-
-            audio_frames = wav_part.readframes(wav_part.getnframes())
-            wav_part.close()
+                audio_frames = wav_part.readframes(wav_part.getnframes())
 
             # append the audio data
             audio_data += audio_frames
@@ -284,8 +302,6 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
         # concat all of the audio together and write to file
         output.writeframes(audio_data)
 
-    finally:
-        output.close()
 
     description = 'concatenated on-the-fly'
     concat_wav = AuditoryStimulus(time=0.0,
@@ -298,6 +314,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
                                   )
 
     return (concat_wav,epochs)
+
 
 def get_num_open_fds():
     '''

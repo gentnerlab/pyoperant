@@ -62,10 +62,12 @@ class TwoAltChoiceExp(base.BaseExp):
         if 'block_design' not in self.parameters:
             self.parameters['block_design'] = {
                 'blocks': {
-                    'queue': 'random',
+                    'default': {
+                        'queue': 'random',
+                        'conditions': self.parameters['classes'].keys()
+                        }
                     },
-                'conditions': self.parameters['classes'].keys(),
-                'order': [0],
+                'order': ['default'],
                 }
 
     def make_data_csv(self):
@@ -90,15 +92,17 @@ class TwoAltChoiceExp(base.BaseExp):
                 pass
 
         n_blocks = len(self.parameters['block_design']['order'])
-        blk = self.parameters['block_design']['blocks'][self.session_id % n_blocks]
+        blk_name = self.parameters['block_design']['order'][self.session_id % n_blocks]
+        blk = self.parameters['block_design']['blocks'][blk_name]
 
+        q_type = blk.pop('queue')
         self.trial_q = None
         if blk['queue']=='random':
-            self.trial_q = queues.random_queue(**blk['params'])
+            self.trial_q = queues.random_queue(**blk)
         elif blk['queue']=='block':
-            self.trial_q = queues.block_queue(**blk['params'])
+            self.trial_q = queues.block_queue(**blk)
         elif blk['queue']=='staircase':
-            self.trial_q = queues.staircase_queue(self,**blk['params'])
+            self.trial_q = queues.staircase_queue(self,**blk)
 
         return 'main'
 
@@ -156,7 +160,7 @@ class TwoAltChoiceExp(base.BaseExp):
             if last_trial is not None:
                 os.remove(last_trial.stimulus_event.file_origin)
             trial = utils.Trial(index=index)
-            trial.class_ = conditions[0]
+            trial.class_ = conditions.pop(0)
             trial_stim, trial_motifs = self.get_stimuli(trial.class_,*conditions)
             trial.events.append(trial_stim)
             trial.stimulus_event = trial.events[-1]
@@ -175,11 +179,15 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def get_stimuli(self,trial_class,*conditions):
         # TODO: default stimulus selection
-        raise NotImplementedError()
+        stim_name = conditions[0]
+        stim_file = self.parameters.stims[stim_name]
+
+        stim = utils.auditory_stim_from_wav(stim_file)
+        return stim, epochs 
 
     def analyze_trial(self):
         # TODO: calculate reaction times
-        raise NotImplementedError()
+        pass
 
     def save_trial(self,trial):
         '''write trial results to CSV'''
