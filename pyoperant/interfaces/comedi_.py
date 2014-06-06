@@ -16,7 +16,7 @@ class ComediInterface(base_.BaseInterface):
 
     def open(self):
         self.device = comedi.comedi_open(self.device_name)
-        if self.device < 0:
+        if self.device is None:
             raise InterfaceError('could not open comedi device %s' % self.device_name)
 
     def close(self):
@@ -36,13 +36,14 @@ class ComediInterface(base_.BaseInterface):
     def _poll(self,subdevice,channel):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
         date_fmt = '%Y-%m-%d %H:%M:%S.%f'
-        timestamp = subprocess.check_output(['wait4peck', self.device_name, '-s', str(subdevice), '-c', str(channel)])
+        timestamp = subprocess.check_output(['comedi_poll', self.device_name, '-s', str(subdevice), '-c', str(channel)])
         return datetime.datetime.strptime(timestamp.strip(),date_fmt)
 
     def _write_bool(self,subdevice,channel,value):
         """Write to comedi port
         """
         value = not value #invert the value for comedi
+        
         s = comedi.comedi_dio_write(self.device,subdevice,channel,value)
         if s:
             return True
