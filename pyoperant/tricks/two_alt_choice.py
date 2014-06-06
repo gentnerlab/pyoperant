@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python
 
 import os
 import csv
@@ -64,7 +64,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 'blocks': {
                     'default': {
                         'queue': 'random',
-                        'conditions': self.parameters['classes'].keys()
+                        'conditions': [[k] for k in self.parameters['classes'].keys()]
                         }
                     },
                 'order': ['default'],

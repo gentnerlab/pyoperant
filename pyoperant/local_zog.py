@@ -1,5 +1,6 @@
 from pyoperant import hwio, components, panels, utils
 from pyoperant.interfaces import comedi_, pyaudio_
+from pyoperant import InterfaceError
 import time
 
 _ZOG_MAP = {
@@ -23,6 +24,18 @@ _ZOG_MAP = {
 
 dev_name_fmt = 'Adapter 1 (5316) - Output Stream %i'
 
+class ZogAudioInterface(pyaudio_.PyAudioInterface):
+    """docstring for ZogAudioInterface"""
+    def __init__(self, *args, **kwargs):
+        super(ZogAudioInterface, self).__init__(*args,**kwargs)
+    def validate(self):
+        super(ZogAudioInterface, self).validate()
+        if self.wf.getframerate()==48000:
+            return True
+        else:
+            raise InterfaceError('this wav file must be 48kHz')
+
+
 class ZogPanel(panels.BasePanel):
     """class for zog boxes """
     def __init__(self,id=None, *args, **kwargs):
@@ -31,7 +44,7 @@ class ZogPanel(panels.BasePanel):
 
         # define interfaces
         self.interfaces['comedi'] = comedi_.ComediInterface(device_name=_ZOG_MAP[self.id][0])
-        self.interfaces['pyaudio'] = pyaudio_.PyAudioInterface(device_name= (dev_name_fmt % self.id))
+        self.interfaces['pyaudio'] = ZogAudioInterface(device_name= (dev_name_fmt % self.id))
 
 
         # define inputs
