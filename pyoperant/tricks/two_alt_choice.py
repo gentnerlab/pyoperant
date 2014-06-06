@@ -4,9 +4,8 @@ import os
 import csv
 import copy
 import datetime as dt
-from numpy import random
 from pyoperant.tricks import base, shape
-from pyoperant import components, utils,reinf
+from pyoperant import components, utils, reinf, queues
 
 class TwoAltChoiceExp(base.BaseExp):
     """docstring for Experiment"""
@@ -60,6 +59,17 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             self.reinf_sched = reinf.ContinuousReinforcement()
 
+        if 'block_design' not in self.parameters:
+            self.parameters['block_design'] = {
+                'blocks': {
+                    'default': {
+                        'queue': 'random',
+                        'conditions': self.parameters['classes'].keys()
+                        }
+                    },
+                'order': ['default'],
+                }
+
     def make_data_csv(self):
         with open(self.data_csv, 'wb') as data_fh:
             trialWriter = csv.writer(data_fh)
@@ -81,14 +91,33 @@ class TwoAltChoiceExp(base.BaseExp):
             except KeyError:
                 pass
 
+        n_blocks = len(self.parameters['block_design']['order'])
+        blk_name = self.parameters['block_design']['order'][self.session_id % n_blocks]
+        blk = self.parameters['block_design']['blocks'][blk_name]
+
+        q_type = blk.pop('queue')
+        self.trial_q = None
+        if blk['queue']=='random':
+            self.trial_q = queues.random_queue(**blk)
+        elif blk['queue']=='block':
+            self.trial_q = queues.block_queue(**blk)
+        elif blk['queue']=='staircase':
+            self.trial_q = queues.staircase_queue(self,**blk)
+
         return 'main'
 
     def session_main(self):
-        self._run_trial()
+        
         if self.check_session_schedule():
-            return 'main'
+            try:
+                self._run_trial()
+                return 'main'
+            except StopIteration:
+                return 'post'
+
         else:
             return 'post'
+
     def session_post(self):
         self.log.info('ending session')
         return None
@@ -126,11 +155,13 @@ class TwoAltChoiceExp(base.BaseExp):
                     trial.events.append(copy.copy(ev))
             self.log.debug("correction trial: class is %s" % trial.class_)
         else:
+            conditions = next(self.trial_q)
+
             if last_trial is not None:
                 os.remove(last_trial.stimulus_event.file_origin)
             trial = utils.Trial(index=index)
-            trial.class_ = random.choice(self.class_assoc.keys())
-            trial_stim, trial_motifs = self.get_stimuli(trial.class_)
+            trial.class_ = conditions.pop(0)
+            trial_stim, trial_motifs = self.get_stimuli(trial.class_,*conditions)
             trial.events.append(trial_stim)
             trial.stimulus_event = trial.events[-1]
             trial.stimulus = trial.stimulus_event.name
@@ -146,9 +177,13 @@ class TwoAltChoiceExp(base.BaseExp):
 
         return True
 
-    def get_stimuli(self,trial_class):
+    def get_stimuli(self,trial_class,*conditions):
         # TODO: default stimulus selection
-        pass
+        stim_name = conditions[0]
+        stim_file = self.parameters.stims[stim_name]
+
+        stim = utils.auditory_stim_from_wav(stim_file)
+        return stim, epochs 
 
     def analyze_trial(self):
         # TODO: calculate reaction times
@@ -163,7 +198,6 @@ class TwoAltChoiceExp(base.BaseExp):
                 trial_dict[field] = getattr(trial,field)
             except AttributeError:
                 trial_dict[field] = trial.annotations[field]
-
 
         with open(self.data_csv,'ab') as data_fh:
             trialWriter = csv.DictWriter(data_fh,fieldnames=self.fields_to_save,extrasaction='ignore')
