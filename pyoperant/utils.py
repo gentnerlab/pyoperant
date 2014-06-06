@@ -10,6 +10,10 @@ from contextlib import closing
 from argparse import ArgumentParser
 from pyoperant import Error
 
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 class NumpyAwareJSONEncoder(json.JSONEncoder):
     """ this json encoder converts numpy arrays to lists so that json can write them.
@@ -24,10 +28,6 @@ class NumpyAwareJSONEncoder(json.JSONEncoder):
     '{"array": [0.0, 0.0, 0.0, 0.0, 0.0]}'
 
     """
-    try:
-        import simplejson as json
-    except ImportError:
-        import json
 
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -225,10 +225,11 @@ def wait(secs=1.0, final_countdown=0.0,waitfunc=None):
             pass
 
 def auditory_stim_from_wav(wav):
-    with closing(wave.open(input_filename,'rb')) as wav:
-        (nchannels, sampwidth, framerate, nframes, comptype, compname) = wav.getparams()
+    with closing(wave.open(wav,'rb')) as wf:
+        (nchannels, sampwidth, framerate, nframes, comptype, compname) = wf.getparams()
 
-        duration = float(wav.getnframes())/sampwidth
+        duration = float(nframes)/sampwidth
+        duration = duration * 2.0 / framerate
         stim = AuditoryStimulus(time=0.0,
                                 duration=duration,
                                 name=wav,
@@ -243,7 +244,7 @@ def auditory_stim_from_wav(wav):
                                              'compname': compname,
                                              }
                                 )
-        return stim
+    return stim
 
 def concat_wav(input_file_list, output_filename='concat.wav'):
     """ concat a set of wav files into a single wav file and return the output filename

@@ -13,7 +13,7 @@ class TwoAltChoiceExp(base.BaseExp):
         super(TwoAltChoiceExp,  self).__init__(*args, **kwargs)
         self.shaper = shape.Shaper2AC(self.panel, self.log, self.parameters, self.log_error_callback)
 
-        # assign stim files full names
+        # # assign stim files full names
         for name, filename in self.parameters['stims'].items():
             filename_full = os.path.join(self.parameters['stim_path'], filename)
             self.parameters['stims'][name] = filename_full
@@ -97,17 +97,17 @@ class TwoAltChoiceExp(base.BaseExp):
 
         q_type = blk.pop('queue')
         self.trial_q = None
-        if blk['queue']=='random':
+        if q_type=='random':
             self.trial_q = queues.random_queue(**blk)
-        elif blk['queue']=='block':
+        elif q_type=='block':
             self.trial_q = queues.block_queue(**blk)
-        elif blk['queue']=='staircase':
+        elif q_type=='staircase':
             self.trial_q = queues.staircase_queue(self,**blk)
 
         return 'main'
 
     def session_main(self):
-        
+
         if self.check_session_schedule():
             try:
                 self._run_trial()
@@ -157,8 +157,8 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             conditions = next(self.trial_q)
 
-            if last_trial is not None:
-                os.remove(last_trial.stimulus_event.file_origin)
+            # if last_trial is not None:
+            #     os.remove(last_trial.stimulus_event.file_origin)
             trial = utils.Trial(index=index)
             trial.class_ = conditions.pop(0)
             trial_stim, trial_motifs = self.get_stimuli(trial.class_,*conditions)
@@ -180,10 +180,12 @@ class TwoAltChoiceExp(base.BaseExp):
     def get_stimuli(self,trial_class,*conditions):
         # TODO: default stimulus selection
         stim_name = conditions[0]
-        stim_file = self.parameters.stims[stim_name]
+        stim_file = self.parameters['stims'][stim_name]
+        self.log.debug(stim_file)
 
         stim = utils.auditory_stim_from_wav(stim_file)
-        return stim, epochs 
+        epochs = []
+        return stim, epochs
 
     def analyze_trial(self):
         # TODO: calculate reaction times
@@ -246,6 +248,7 @@ class TwoAltChoiceExp(base.BaseExp):
     def stimulus_pre(self):
         # wait for bird to peck
         self.log.debug("presenting stimulus %s" % self.this_trial.stimulus)
+        self.log.debug("from file %s" % self.this_trial.stimulus_event.file_origin)
         self.panel.speaker.queue(self.this_trial.stimulus_event.file_origin)
         self.log.debug('waiting for peck...')
         self.panel.center.on()
@@ -271,6 +274,7 @@ class TwoAltChoiceExp(base.BaseExp):
         return 'post'
 
     def stimulus_post(self):
+        self.log.debug('waiting %s secs...' % self.this_trial.annotations['min_wait'])
         utils.wait(self.this_trial.annotations['min_wait'])
         return None
 
@@ -451,3 +455,24 @@ class TwoAltChoiceExp(base.BaseExp):
                                 pre=self.punish_pre,
                                 main=self.punish_main,
                                 post=self.punish_post)
+
+if __name__ == "__main__":
+
+    try: import simplejson as json
+    except ImportError: import json
+
+    from pyoperant.local import PANELS
+
+    cmd_line = utils.parse_commandline()
+    with open(cmd_line['config_file'], 'rb') as config:
+            parameters = json.load(config)
+
+
+    if parameters['debug']:
+        print parameters
+        print PANELS
+
+    panel = PANELS[parameters['panel_name']]()
+
+    exp = TwoAltChoiceExp(panel=panel,**parameters)
+    exp.run()
