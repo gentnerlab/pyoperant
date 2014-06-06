@@ -124,7 +124,10 @@ class BaseExp(object):
         return False
 
     def panel_reset(self):
-        self.panel.reset()
+        try:
+            self.panel.reset()
+        except components.ComponentError as err:
+            self.log.warning("component error: %s" % str(err))
 
     def run(self):
 

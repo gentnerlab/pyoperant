@@ -24,9 +24,18 @@ class PyAudioInterface(base_.BaseInterface):
         self.device_info = self.pa.get_device_info_by_index(self.device_index)
 
     def close(self):
-        self.stream.close()
-        self._wf.close()
-        self.pa.terminate()
+        try:
+            self.stream.close()
+        except:
+            pass
+        try:
+            self._wf.close()
+        except:
+            pass
+        try:
+            self.pa.terminate()
+        except:
+            pass
 
     def _get_stream(self,start=False):
         """
