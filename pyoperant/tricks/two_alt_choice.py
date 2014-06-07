@@ -93,7 +93,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
         n_blocks = len(self.parameters['block_design']['order'])
         blk_name = self.parameters['block_design']['order'][self.session_id % n_blocks]
-        blk = self.parameters['block_design']['blocks'][blk_name]
+        blk = copy.deepcopy(self.parameters['block_design']['blocks'][blk_name])
 
         q_type = blk.pop('queue')
         self.trial_q = None
@@ -160,8 +160,8 @@ class TwoAltChoiceExp(base.BaseExp):
             # if last_trial is not None:
             #     os.remove(last_trial.stimulus_event.file_origin)
             trial = utils.Trial(index=index)
-            trial.class_ = conditions.pop(0)
-            trial_stim, trial_motifs = self.get_stimuli(trial.class_,*conditions)
+            trial.class_ = conditions[0]
+            trial_stim, trial_motifs = self.get_stimuli(*conditions)
             trial.events.append(trial_stim)
             trial.stimulus_event = trial.events[-1]
             trial.stimulus = trial.stimulus_event.name
