@@ -24,6 +24,20 @@ class ComediInterface(base_.BaseInterface):
         if s < 0:
             raise InterfaceError('could not close comedi device %s(%s)' % (self.device_name, self.device))
 
+    def _config_read(self,subdevice,channel):
+        s = comedi.comedi_dio_config(self.device,subdevice,channel,comedi.COMEDI_INPUT)
+        if s < 0:
+            raise InterfaceError('could not configure comedi device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
+        else:
+            return True
+
+    def _config_write(self,subdevice,channel):
+        s = comedi.comedi_dio_config(self.device,subdevice,channel,comedi.COMEDI_OUTPUT)
+        if s < 0:
+            raise InterfaceError('could not configure comedi device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
+        else:
+            return True
+
     def _read_bool(self,subdevice,channel):
         """ read from comedi port
         """

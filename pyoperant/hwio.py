@@ -22,6 +22,13 @@ class BooleanInput(BaseIO):
         super(BooleanInput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
         assert hasattr(self.interface,'_read_bool')
+        self.config()
+
+    def config(self):
+        try:
+            return self.interface._config_read(**self.params)
+        except AttributeError:
+            return False
 
     def read(self):
         """read status"""
@@ -51,6 +58,13 @@ class BooleanOutput(BaseIO):
 
         assert hasattr(self.interface,'_write_bool')
         self.last_value = None
+        self.config()
+
+    def config(self):
+        try:
+            return self.interface._config_write(**self.params)
+        except AttributeError:
+            return False
 
     def read(self):
         """read status"""
