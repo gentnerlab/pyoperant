@@ -42,7 +42,7 @@ def block_queue(conditions,reps=1,shuffle=False):
     """
     conditions_repeated = []
     for rr in range(reps):
-        conditions_repeated.append(conditions)
+        conditions_repeated += conditions
     conditions = conditions_repeated
 
     if shuffle:
