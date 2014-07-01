@@ -5,6 +5,7 @@ import csv
 import copy
 import datetime as dt
 from pyoperant.tricks import base, shape
+from pyoperant.errors import EndSession
 from pyoperant import components, utils, reinf, queues
 
 class TwoAltChoiceExp(base.BaseExp):
@@ -67,7 +68,7 @@ class TwoAltChoiceExp(base.BaseExp):
                         'conditions': [[k] for k in self.parameters['classes'].keys()]
                         }
                     },
-                'order': ['default'],
+                'order': [[k] for k in self.parameters['classes'].keys()]
                 }
 
     def make_data_csv(self):
@@ -80,9 +81,6 @@ class TwoAltChoiceExp(base.BaseExp):
         return self.check_light_schedule()
 
     def session_pre(self):
-        self.trials = []
-        self.session_id += 1
-        self.log.info('starting session %s' % self.session_id)
 
         self.class_assoc = {}
         for class_, class_params in self.parameters['classes'].items():
@@ -91,62 +89,59 @@ class TwoAltChoiceExp(base.BaseExp):
             except KeyError:
                 pass
 
-        n_blocks = len(self.parameters['block_design']['order'])
-        blk_name = self.parameters['block_design']['order'][self.session_id % n_blocks]
-        blk = copy.deepcopy(self.parameters['block_design']['blocks'][blk_name])
-
-        q_type = blk.pop('queue')
-        self.trial_q = None
-        if q_type=='random':
-            self.trial_q = queues.random_queue(**blk)
-        elif q_type=='block':
-            self.trial_q = queues.block_queue(**blk)
-        elif q_type=='staircase':
-            self.trial_q = queues.staircase_queue(self,**blk)
-
         return 'main'
 
-    def session_main(self):
+    def session_main(self): 
 
-        if self.check_session_schedule():
-            try:
-                self._run_trial()
-                return 'main'
-            except StopIteration:
-                return 'post'
+        self.session_q = queues.block_queue(self.parameters['block_design']['order'])
 
-        else:
-            return 'post'
+        for sn_cond in self.session_q:
+
+            self.trials = []
+            self.do_correction = False
+            self.session_id += 1
+            self.log.info('starting session %s: %s' % (self.session_id,sn_cond))
+
+            # grab the block details
+            blk = copy.deepcopy(self.parameters['block_design']['blocks'][sn_cond])
+
+            # load the block details into the trial queue
+            self.trial_q = None
+            q_type = blk.pop('queue')
+            if q_type=='random':
+                self.trial_q = queues.random_queue(**blk)
+            elif q_type=='block':trial_q
+                self.trial_q = queues.block_queue(**blk)
+            elif q_type=='staircase':
+                self.trial_q = queues.staircase_queue(self,**blk)
+
+
+            for tr_cond in self.trial_q:
+                try:
+                    self.new_trial(tr_cond)
+                    self.run_trial()
+                    while self.do_correction:
+                        self.new_trial(tr_cond)
+                        self.run_trial()
+                except EndSession:
+                    return 'post'
+
+        return 'post'
 
     def session_post(self):
         self.log.info('ending session')
         return None
 
     ## trial flow
-    def new_trial(self):
+    def new_trial(self,conditions=None):
         '''create a new trial and append it to the trial list'''
-        do_correction = True
-        if len(self.trials) > 0:
-            last_trial = self.trials[-1]
-            index = last_trial.index+1
-            if self.parameters['correction_trials']:
-                if last_trial.correct == True:
-                    do_correction = False
-                elif last_trial.response == 'none':
-                    if last_trial.type_ == 'normal':
-                        do_correction = False
-            else:
-                do_correction = False
-        else:
-            last_trial = None
-            index = 0
-            do_correction = False
 
-        if do_correction:
+        if self.do_correction:
+            # for correction trials, we want to use the last trial as a template
             trial = utils.Trial(type_='correction',
                                 index=index,
-                                class_=last_trial.class_)
-            for ev in last_trial.events:
+                                class_=self.trials[-1].class_)
+            for ev in self.trials[-1].events:
                 if ev.label is 'wav':
                     trial.events.append(copy.copy(ev))
                     trial.stimulus_event = trial.events[-1]
@@ -155,10 +150,7 @@ class TwoAltChoiceExp(base.BaseExp):
                     trial.events.append(copy.copy(ev))
             self.log.debug("correction trial: class is %s" % trial.class_)
         else:
-            conditions = next(self.trial_q)
-
-            # if last_trial is not None:
-            #     os.remove(last_trial.stimulus_event.file_origin)
+            # otherwise, we'll create a new trial
             trial = utils.Trial(index=index)
             trial.class_ = conditions[0]
             trial_stim, trial_motifs = self.get_stimuli(*conditions)
@@ -205,11 +197,28 @@ class TwoAltChoiceExp(base.BaseExp):
             trialWriter = csv.DictWriter(data_fh,fieldnames=self.fields_to_save,extrasaction='ignore')
             trialWriter.writerow(trial_dict)
 
+    def run_trial(self):
+        self.trial_pre()
+
+        self.stimulus_pre()
+        self.stimulus_main()
+        self.stimulus_post()
+
+        self.response_pre()
+        self.response_main()
+        self.response_post()
+
+        self.consequence_pre()
+        self.consequence_main()
+        self.consequence_post()
+
+        self.trial_post()
+
     def trial_pre(self):
         ''' this is where we initialize a trial'''
         # make sure lights are on at the beginning of each trial, prep for trial
-
-        self.new_trial()
+        self.log.debug('running trial')
+        self.log.debug("number of open file descriptors: %d" %(utils.get_num_open_fds()))
 
         self.this_trial = self.trials[-1]
         min_wait = self.this_trial.stimulus_event.duration
@@ -217,35 +226,34 @@ class TwoAltChoiceExp(base.BaseExp):
         self.this_trial.annotate(min_wait=min_wait)
         self.this_trial.annotate(max_wait=max_wait)
         self.log.debug('created new trial')
-        return 'main'
 
-    def trial_main(self):
-        self._run_stimulus()
-        self._run_response()
-        self._run_consequence()
-        return 'post'
 
     def trial_post(self):
         '''things to do at the end of a trial'''
-
+        self.this_trial.duration = (dt.datetime.now() - self.this_trial.time).total_seconds()
         self.analyze_trial()
         self.save_trial(self.this_trial)
         self.write_summary()
         utils.wait(self.parameters['intertrial_min'])
-        return None
 
-    def _run_trial(self):
-        self.log.debug('running trial')
-        self.log.debug("number of open file descriptors: %d" %(utils.get_num_open_fds()))
-        utils.run_state_machine(start_in='pre',
-                                error_state='post',
-                                error_callback=self.log_error_callback,
-                                pre=self.trial_pre,
-                                main=self.trial_main,
-                                post=self.trial_post)
+        # determine if next trial should be a correction trial
+        self.do_correction = True
+        if len(self.trials) > 0:
+            if self.parameters['correction_trials']:
+                if self.this_trial.correct == True:
+                    self.do_correction = False
+                elif last_trial.response == 'none':
+                    if self.this_trial.type_ == 'normal':
+                        self.do_correction = False
+            else:
+                self.do_correction = False
+        else:
+            self.do_correction = False
 
-    ## stimulus flow
-    def stimulus_pre(self):
+        if utils.check_session_schedule()==False:
+            raise EndSession
+
+     def stimulus_pre(self):
         # wait for bird to peck
         self.log.debug("presenting stimulus %s" % self.this_trial.stimulus)
         self.log.debug("from file %s" % self.this_trial.stimulus_event.file_origin)
@@ -264,33 +272,22 @@ class TwoAltChoiceExp(base.BaseExp):
         self.summary['trials'] += 1
         self.summary['last_trial_time'] = self.this_trial.time.ctime()
         self.log.info("trial started at %s" % self.this_trial.time.ctime())
-        return 'main'
 
     def stimulus_main(self):
         ## 1. play stimulus
         stim_start = dt.datetime.now()
         self.this_trial.stimulus_event.time = (stim_start - self.this_trial.time).total_seconds()
         self.panel.speaker.play() # already queued in stimulus_pre()
-        return 'post'
 
     def stimulus_post(self):
         self.log.debug('waiting %s secs...' % self.this_trial.annotations['min_wait'])
         utils.wait(self.this_trial.annotations['min_wait'])
-        return None
-
-    def _run_stimulus(self):
-        utils.run_state_machine(start_in='pre',
-                                error_callback=self.log_error_callback,
-                                pre=self.stimulus_pre,
-                                main=self.stimulus_main,
-                                post=self.stimulus_post)
 
     #response flow
     def response_pre(self):
         for class_, port in self.class_assoc.items():
             port.on()
         self.log.debug('waiting for response')
-        return 'main'
 
     def response_main(self):
         elapsed_time = (dt.datetime.now() - self.this_trial.time).total_seconds()
@@ -314,23 +311,14 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.log.info('response: %s' % (self.this_trial.response))
                 return 'post'
         utils.wait(.015)
-        return 'main'
 
     def response_post(self):
         for class_, port in self.class_assoc.items():
             port.off()
-        return None
-
-    def _run_response(self):
-        utils.run_state_machine(start_in='pre',
-                                error_callback=self.log_error_callback,
-                                pre=self.response_pre,
-                                main=self.response_main,
-                                post=self.response_post)
 
     ## consequence flow
     def consequence_pre(self):
-        return 'main'
+        pass
 
     def consequence_main(self):
         # correct trial
@@ -344,7 +332,10 @@ class TwoAltChoiceExp(base.BaseExp):
             if self.this_trial.type_ == 'correction':
                 self._run_correction_reward()
             elif self.reinf_sched.consequate(trial=self.this_trial):
-                self._run_reward() # provide a reward
+                self.reward_pre()
+                self.reward_main() # provide a reward
+                self.reward_post()
+
         # no response
         elif self.this_trial.response is 'none':
             pass
@@ -353,19 +344,12 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             self.this_trial.correct = False
             if self.reinf_sched.consequate(trial=self.this_trial):
-                self._run_punish()
-        return 'post'
+                self.punish_pre()
+                self.punish_main()
+                self.punish_post()
 
     def consequence_post(self):
-        self.this_trial.duration = (dt.datetime.now() - self.this_trial.time).total_seconds()
-        return None
-
-    def _run_consequence(self):
-        utils.run_state_machine(start_in='pre',
-                                error_callback=self.log_error_callback,
-                                pre=self.consequence_pre,
-                                main=self.consequence_main,
-                                post=self.consequence_post)
+        pass
 
 
     def secondary_reinforcement(self,value=1.0):
@@ -373,16 +357,14 @@ class TwoAltChoiceExp(base.BaseExp):
 
     ## reward flow
     def reward_pre(self):
-        self.summary['feeds'] += 1
-        return 'main'
+        pass
 
     def reward_main(self):
+        self.summary['feeds'] += 1
         try:
             value = self.parameters['classes'][self.this_trial.class_]['reward_value']
             reward_event = self.panel.reward(value=value)
             self.this_trial.reward = True
-            ## TODO: make rewards into events
-            # self.this_trial.events.append(reward_event)
 
         # but catch the reward errors
 
@@ -418,43 +400,23 @@ class TwoAltChoiceExp(base.BaseExp):
         finally:
             self.panel.house_light.on()
 
-            # TODO: add errors as trial events
-
-        return 'post'
-
     def reward_post(self):
-        return None
-
-    def _run_reward(self):
-        utils.run_state_machine(start_in='pre',
-                                error_callback=self.log_error_callback,
-                                pre=self.reward_pre,
-                                main=self.reward_main,
-                                post=self.reward_post)
+        pass
 
     def _run_correction_reward(self):
         pass
 
     ## punishment flow
     def punish_pre(self):
-        return 'main'
+        pass
 
     def punish_main(self):
         value = self.parameters['classes'][self.this_trial.class_]['punish_value']
         punish_event = self.panel.punish(value=value)
-        # self.this_trial.events.append(punish_event)
         self.this_trial.punish = True
-        return 'post'
 
     def punish_post(self):
-        return None
-
-    def _run_punish(self):
-        utils.run_state_machine(start_in='pre',
-                                error_callback=self.log_error_callback,
-                                pre=self.punish_pre,
-                                main=self.punish_main,
-                                post=self.punish_post)
+        pass
 
 if __name__ == "__main__":
 
