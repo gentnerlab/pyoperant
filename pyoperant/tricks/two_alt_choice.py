@@ -91,7 +91,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
         return 'main'
 
-    def session_main(self): 
+    def session_main(self):
 
         self.session_q = queues.block_queue(self.parameters['block_design']['order'])
 
@@ -110,7 +110,7 @@ class TwoAltChoiceExp(base.BaseExp):
             q_type = blk.pop('queue')
             if q_type=='random':
                 self.trial_q = queues.random_queue(**blk)
-            elif q_type=='block':trial_q
+            elif q_type=='block':
                 self.trial_q = queues.block_queue(**blk)
             elif q_type=='staircase':
                 self.trial_q = queues.staircase_queue(self,**blk)
@@ -135,6 +135,10 @@ class TwoAltChoiceExp(base.BaseExp):
     ## trial flow
     def new_trial(self,conditions=None):
         '''create a new trial and append it to the trial list'''
+        if len(self.trials) > 0:
+            index = self.trials[-1].index+1
+        else:
+            index = 0
 
         if self.do_correction:
             # for correction trials, we want to use the last trial as a template
@@ -226,6 +230,7 @@ class TwoAltChoiceExp(base.BaseExp):
         self.this_trial.annotate(min_wait=min_wait)
         self.this_trial.annotate(max_wait=max_wait)
         self.log.debug('created new trial')
+        self.log.debug('min/max wait: %s/%s' % (min_wait,max_wait))
 
 
     def trial_post(self):
@@ -242,7 +247,7 @@ class TwoAltChoiceExp(base.BaseExp):
             if self.parameters['correction_trials']:
                 if self.this_trial.correct == True:
                     self.do_correction = False
-                elif last_trial.response == 'none':
+                elif self.this_trial.response == 'none':
                     if self.this_trial.type_ == 'normal':
                         self.do_correction = False
             else:
@@ -250,10 +255,10 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             self.do_correction = False
 
-        if utils.check_session_schedule()==False:
+        if self.check_session_schedule()==False:
             raise EndSession
 
-     def stimulus_pre(self):
+    def stimulus_pre(self):
         # wait for bird to peck
         self.log.debug("presenting stimulus %s" % self.this_trial.stimulus)
         self.log.debug("from file %s" % self.this_trial.stimulus_event.file_origin)
@@ -290,27 +295,28 @@ class TwoAltChoiceExp(base.BaseExp):
         self.log.debug('waiting for response')
 
     def response_main(self):
-        elapsed_time = (dt.datetime.now() - self.this_trial.time).total_seconds()
-        rt = elapsed_time - self.this_trial.stimulus_event.time
-        if rt > self.this_trial.annotations['max_wait']:
-            self.panel.speaker.stop()
-            self.this_trial.response = 'none'
-            self.log.info('no response')
-            return 'post'
-        for class_, port in self.class_assoc.items():
-            if port.status():
-                self.this_trial.rt = rt
+        while True:
+            elapsed_time = (dt.datetime.now() - self.this_trial.time).total_seconds()
+            rt = elapsed_time - self.this_trial.stimulus_event.time
+            if rt > self.this_trial.annotations['max_wait']:
                 self.panel.speaker.stop()
-                self.this_trial.response = class_
-                self.summary['responses'] += 1
-                response_event = utils.Event(name=self.parameters['classes'][class_]['component'],
-                                             label='peck',
-                                             time=elapsed_time,
-                                             )
-                self.this_trial.events.append(response_event)
-                self.log.info('response: %s' % (self.this_trial.response))
-                return 'post'
-        utils.wait(.015)
+                self.this_trial.response = 'none'
+                self.log.info('no response')
+                return
+            for class_, port in self.class_assoc.items():
+                if port.status():
+                    self.this_trial.rt = rt
+                    self.panel.speaker.stop()
+                    self.this_trial.response = class_
+                    self.summary['responses'] += 1
+                    response_event = utils.Event(name=self.parameters['classes'][class_]['component'],
+                                                 label='peck',
+                                                 time=elapsed_time,
+                                                 )
+                    self.this_trial.events.append(response_event)
+                    self.log.info('response: %s' % (self.this_trial.response))
+                    return
+            utils.wait(.015)
 
     def response_post(self):
         for class_, port in self.class_assoc.items():
