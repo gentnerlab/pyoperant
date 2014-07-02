@@ -55,7 +55,7 @@ class ZogPanel(panels.BasePanel):
                                                            },
                                                  )
                                )
-        for out_chan in [ii+_ZOG_MAP[self.id][4] for ii in range(5)]:
+        for out_chan in [ii+_ZOG_MAP[self.id][4] for ii in range(8)]:
             self.outputs.append(hwio.BooleanOutput(interface=self.interfaces['comedi'],
                                                  params = {'subdevice': _ZOG_MAP[self.id][3],
                                                            'channel': out_chan
