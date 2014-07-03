@@ -174,9 +174,9 @@ class ZogCuePanel(ZogPanel):
                                                            },
                                                    )
                                 )
-        self.cue = components.RGBLight(red=self.outputs[5],
-                                       green=self.outputs[6],
-                                       blue=self.outputs[7],
+        self.cue = components.RGBLight(red=self.outputs[7],
+                                       green=self.outputs[5],
+                                       blue=self.outputs[6],
                                        name='cue')
 
 class Zog5(ZogCuePanel):

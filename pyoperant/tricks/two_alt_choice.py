@@ -68,7 +68,7 @@ class TwoAltChoiceExp(base.BaseExp):
                         'conditions': [[k] for k in self.parameters['classes'].keys()]
                         }
                     },
-                'order': [[k] for k in self.parameters['classes'].keys()]
+                'order': ['default']
                 }
 
     def make_data_csv(self):
