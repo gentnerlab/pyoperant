@@ -3,6 +3,10 @@ class GoodNite(Exception):
     """ exception for when the lights should be off """
     pass
 
+class EndSession(Exception):
+    """ exception for when a session should terminate """
+    pass
+
 ## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in this module'''

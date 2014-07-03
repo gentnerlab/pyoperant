@@ -1,8 +1,8 @@
 debug:
-	gcc -Wall wait4peck.c -lcomedi -g -lm -o wait4peck_d
+	gcc -Wall comedi_poll.c -lcomedi -g -lm -o comedi_poll_d
 
 all: 
-	gcc -Wall wait4peck.c -lcomedi -lm -o wait4peck
+	gcc -Wall comedi_poll.c -lcomedi -lm -o comedi_poll
 
 clean:
 	rm -rf *.o 2ac

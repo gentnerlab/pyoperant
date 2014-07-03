@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python
 from pyoperant import utils, components
 from pyoperant.tricks import base
 
