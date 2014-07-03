@@ -33,21 +33,23 @@ class HopperWontDropError(HopperActiveError):
 class Hopper(BaseComponent):
     """ Class which holds information about a hopper
 
-    Keyword arguments:
-    solenoid(hwio.BooleanOutput) -- output channel to activate the solenoid &
-        raise the hopper
-    IR(hwio.BooleanInput) -- input channel for the IR beam to check if the
-        hopper is up
-    lag(float) -- time in seconds to wait before checking to make sure the
-        hopper is up (default=0.3)
+    Parameters
+    ----------
+    solenoid : `hwio.BooleanOutput`
+        output channel to activate the solenoid & raise the hopper
+    IR : :class:`hwio.BooleanInput` 
+       input channel for the IR beam to check if the hopper is up
+    lag : float, optional 
+        time in seconds to wait before checking to make sure the hopper is up (default=0.3)
 
-    Methods:
-    check() -- reads the status of solenoid & IR beam, then throws an error
-        if the don't match
-    up() -- raises the hopper up
-    down() -- drops the hopper down
-    feed(dur) -- delivers a feed for 'dur' seconds
-    reward(value) -- calls 'feed' for 'value' as 'dur'
+    Attributes
+    ----------
+    solenoid : hwio.BooleanOutput 
+        output channel to activate the solenoid & raise the hopper
+    IR : hwio.BooleanInput 
+       input channel for the IR beam to check if the hopper is up
+    lag : float 
+        time in seconds to wait before checking to make sure the hopper is up
 
     """
     def __init__(self,IR,solenoid,lag=0.3,*args,**kwargs):
@@ -63,7 +65,21 @@ class Hopper(BaseComponent):
             raise ValueError('%s is not an output channel' % solenoid)
 
     def check(self):
-        """get status of solenoid & IR beam, throw hopper error if mismatch"""
+        """reads the status of solenoid & IR beam, then throws an error if they don't match
+
+        Returns
+        -------
+        bool
+            True if the hopper is up.
+
+        Raises
+        ------
+        HopperActiveError
+            The Hopper is up and it shouldn't be. (The IR beam is tripped, but the solenoid is not active.)
+        HopperInactiveError
+            The Hopper is down and it shouldn't be. (The IR beam is not tripped, but the solenoid is active.)
+
+        """
         IR_status = self.IR.read()
         solenoid_status = self.solenoid.read()
         if IR_status != solenoid_status:
@@ -77,6 +93,18 @@ class Hopper(BaseComponent):
             return IR_status
 
     def up(self):
+        """Raises the hopper up.
+
+        Returns
+        -------
+        bool
+            True if the hopper comes up.
+
+        Raises
+        ------
+        HopperWontComeUpError
+            The Hopper did not raise.
+        """
         self.solenoid.write(True)
         utils.wait(self.lag)
         try:
@@ -86,7 +114,18 @@ class Hopper(BaseComponent):
         return True
 
     def down(self):
-        """ drop hopper """
+        """Lowers the hopper.
+
+        Returns
+        -------
+        bool
+            True if the hopper drops.
+
+        Raises
+        ------
+        HopperWontDropError
+            The Hopper did not drop.
+        """
         self.solenoid.write(False)
         utils.wait(self.lag)
         try:
@@ -98,8 +137,26 @@ class Hopper(BaseComponent):
     def feed(self,dur=2.0):
         """Performs a feed
 
-        arguments:
-        feedsecs -- duration of feed in seconds (default: %default)
+        Parameters
+        ---------
+        dur : float, optional 
+            duration of feed in seconds
+
+        Returns
+        -------
+        (datetime, float)
+            Timestamp of the feed and the feed duration
+
+
+        Raises
+        ------
+        HopperAlreadyUpError
+            The Hopper was already up at the beginning of the feed.
+        HopperWontComeUpError
+            The Hopper did not raise for the feed.
+        HopperWontDropError
+            The Hopper did not drop fater the feed.
+
         """
         assert self.lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
         try:
@@ -114,6 +171,7 @@ class Hopper(BaseComponent):
         return (feed_time,feed_duration)
 
     def reward(self,value=2.0):
+        """wrapper for `feed`, passes *value* into *dur* """
         return self.feed(dur=value)
 
 ## Peck Port ##
@@ -121,18 +179,19 @@ class Hopper(BaseComponent):
 class PeckPort(BaseComponent):
     """ Class which holds information about peck ports
 
-    Keyword arguments:
-    LED(hwio.BooleanOutput) -- output channel to activate the LED in the peck
-        port
-    IR(hwio.BooleanInput) -- input channel for the IR beam to check for a peck
+    Parameters
+    ----------
+    LED : hwio.BooleanOutput
+        output channel to activate the LED in the peck port
+    IR : hwio.BooleanInput
+        input channel for the IR beam to check for a peck
 
-    Methods:
-    status() -- reads the status of the IR beam
-    on() -- turns the LED on
-    off() -- turns the LED off
-    flash(dur,isi) -- flashes the LED for 'dur' seconds (default=1.0) with an
-        'isi' (default=0.1)
-    wait_for_peck() -- waits for a peck. returns the peck time.
+    Attributes
+    ----------
+    LED : hwio.BooleanOutput
+        output channel to activate the LED in the peck port
+    IR : hwio.BooleanInput
+        input channel for the IR beam to check for a peck
 
     """
     def __init__(self,IR,LED,*args,**kwargs):
@@ -147,21 +206,52 @@ class PeckPort(BaseComponent):
             raise ValueError('%s is not an output channel' % LED)
 
     def status(self):
-        """get the status of the IR beam """
+        """reads the status of the IR beam
+
+        Returns
+        -------
+        bool
+            True if beam is broken
+        """
         return self.IR.read()
 
     def off(self):
-        """ turn off the LED  """
+        """ Turns the LED off 
+
+        Returns
+        -------
+        bool
+            True if successful
+        """
         self.LED.write(False)
         return True
 
     def on(self):
-        """ turn on the LED  """
+        """Turns the LED on 
+
+        Returns
+        -------
+        bool
+            True if successful
+        """
         self.LED.write(True)
         return True
 
     def flash(self,dur=1.0,isi=0.1):
-        """ flash the LED """
+        """Flashes the LED on and off with *isi* seconds high and low for *dur* seconds, then revert LED to prior state.
+
+        Parameters
+        ----------
+        dur : float, optional
+            Duration of the light flash in seconds.
+        isi : float,optional
+            Time interval between toggles. (0.5 * period)
+
+        Returns
+        -------
+        (datetime, float)
+            Timestamp of the flash and the flash duration
+        """
         LED_state = self.LED.read()
         flash_time = datetime.datetime.now()
         flash_duration = datetime.datetime.now() - flash_time
@@ -173,19 +263,27 @@ class PeckPort(BaseComponent):
         return (flash_time,flash_duration)
 
     def poll(self):
-        """ poll peck port until there is a peck"""
+        """ Polls the peck port until there is a peck
+
+        Returns
+        -------
+        datetime
+            Timestamp of the IR beam being broken.
+        """
         return self.IR.poll()
 
 ## House Light ##
 class HouseLight(BaseComponent):
     """ Class which holds information about the house light
 
-    Keyword arguments:
-    light(hwio.BooleanOutput) -- output channel to turn the light on and off
+    Keywords
+    --------
+    light : hwio.BooleanOutput
+        output channel to turn the light on and off
 
     Methods:
-    on() -- turns the house light on
-    off() -- turns the house light off
+    on() -- 
+    off() -- 
     timeout(dur) -- turns off the house light for 'dur' seconds (default=10.0)
     punish() -- calls timeout() for 'value' as 'dur'
 
@@ -198,17 +296,42 @@ class HouseLight(BaseComponent):
             raise ValueError('%s is not an output channel' % light)
 
     def off(self):
-        """ drop  """
+        """Turns the house light off.
+
+        Returns
+        -------
+        bool
+            True if successful.
+
+        """
         self.light.write(False)
         return True
 
     def on(self):
-        """ drop  """
+        """Turns the house light on.
+
+        Returns
+        -------
+        bool
+            True if successful.
+        """
         self.light.write(True)
         return True
 
     def timeout(self,dur=10.0):
-        """ turn off light for a few seconds """
+        """Turn off the light for *dur* seconds 
+
+        Keywords
+        -------
+        dur : float, optional
+            The amount of time (in seconds) to turn off the light.
+
+        Returns
+        -------
+        (datetime, float)
+            Timestamp of the timeout and the timeout duration
+
+        """
         timeout_time = datetime.datetime.now()
         self.light.write(False)
         utils.wait(dur)
@@ -217,6 +340,7 @@ class HouseLight(BaseComponent):
         return (timeout_time,timeout_duration)
 
     def punish(self,value=10.0):
+        """Calls `timeout(dur)` with *value* as *dur* """
         return self.timeout(dur=value)
 
 
@@ -225,10 +349,14 @@ class HouseLight(BaseComponent):
 class RGBLight(BaseComponent):
     """ Class which holds information about an RGB cue light
 
-    Keyword arguments:
-    red(hwio.BooleanOutput) -- output channel for the red LED
-    green(hwio.BooleanOutput) -- output channel for the green LED
-    blue(hwio.BooleanOutput) -- output channel for the blue LED
+    Keywords
+    --------
+    red : hwio.BooleanOutput
+        output channel for the red LED
+    green : hwio.BooleanOutput
+        output channel for the green LED
+    blue : hwio.BooleanOutput
+        output channel for the blue LED
 
     Methods:
     red() -- turns the light red
@@ -253,21 +381,50 @@ class RGBLight(BaseComponent):
             raise ValueError('%s is not an output channel' % blue)
 
     def red(self):
+        """Turns the cue light to red
+
+        Returns
+        -------
+        bool
+            `True` if successful.
+        """
         self._green.write(False)
         self._blue.write(False)
         return self._red.write(True)
     def green(self):
+        """Turns the cue light to green
+
+        Returns
+        -------
+        bool
+            `True` if successful.
+        """
         self._red.write(False)
         self._blue.write(False)
         return self._green.write(True)
     def blue(self):
+        """Turns the cue light to blue
+
+        Returns
+        -------
+        bool
+            `True` if successful.
+        """
         self._red.write(False)
         self._green.write(False)
         return self._blue.write(True)
     def off(self):
+        """Turns the cue light off
+
+        Returns
+        -------
+        bool
+            `True` if successful.
+        """
         self._red.write(False)
         self._green.write(False)
         self._blue.write(False)
+        return True
 
 
 # ## Perch ##
