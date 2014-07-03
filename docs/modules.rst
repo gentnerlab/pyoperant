@@ -1,5 +1,5 @@
-..
-==
+pyoperant
+=========
 
 .. toctree::
    :maxdepth: 4

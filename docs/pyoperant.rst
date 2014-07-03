@@ -6,19 +6,25 @@ Subpackages
 
 .. toctree::
 
-    pyoperant.pyoperant
+    pyoperant.interfaces
+    pyoperant.tricks
 
 Submodules
 ----------
 
-pyoperant.setup module
-----------------------
+.. toctree::
 
-.. automodule:: pyoperant.setup
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
+   pyoperant.behavior
+   pyoperant.components
+   pyoperant.errors
+   pyoperant.hwio
+   pyoperant.local
+   pyoperant.local_vogel
+   pyoperant.local_zog
+   pyoperant.panels
+   pyoperant.queues
+   pyoperant.reinf
+   pyoperant.utils
 
 Module contents
 ---------------
