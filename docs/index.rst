@@ -3,7 +3,8 @@ Welcome to pyoperant's documentation!
 
 .. include:: ../README.rst
 
-Contents:
+Contents
+========
 
 .. toctree::
    :maxdepth: 4
