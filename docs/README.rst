@@ -8,11 +8,9 @@ With PyOperant, you should be able to write a single behavior script that works 
 Operant logic is easy
 ---------------------
 
-1. Present a stimulus
-
-1. Get the subject’s response
-
-1. If the response matches the stimulus, then reward the subject
+#. Present a stimulus
+#. Get the subject’s response
+#. If the response matches the stimulus, then reward the subject
 
 Writing operant protocols should be easy, but in practice...
 ------------------
@@ -22,9 +20,8 @@ You often have error checking, data storage, and machine-specific hardware inter
 A better way
 ------------
 
-1. Isolate hardware manipulation from operant logic
-
-2. Standardize operant experiment protocols for easy reuse
+#. Isolate hardware manipulation from operant logic
+#. Standardize operant experiment protocols for easy reuse
 
 Documentation
 -------------
