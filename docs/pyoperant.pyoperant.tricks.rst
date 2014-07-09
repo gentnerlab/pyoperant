@@ -1,45 +1,45 @@
-pyoperant.pyoperant.tricks package
+pyoperant.pyoperant.behavior package
 ==================================
 
 Submodules
 ----------
 
-pyoperant.pyoperant.tricks.base module
+pyoperant.pyoperant.behavior.base module
 --------------------------------------
 
-.. automodule:: pyoperant.pyoperant.tricks.base
+.. automodule:: pyoperant.pyoperant.behavior.base
     :members:
     :undoc-members:
     :show-inheritance:
 
-pyoperant.pyoperant.tricks.lights module
+pyoperant.pyoperant.behavior.lights module
 ----------------------------------------
 
-.. automodule:: pyoperant.pyoperant.tricks.lights
+.. automodule:: pyoperant.pyoperant.behavior.lights
     :members:
     :undoc-members:
     :show-inheritance:
 
-pyoperant.pyoperant.tricks.shape module
+pyoperant.pyoperant.behavior.shape module
 ---------------------------------------
 
-.. automodule:: pyoperant.pyoperant.tricks.shape
+.. automodule:: pyoperant.pyoperant.behavior.shape
     :members:
     :undoc-members:
     :show-inheritance:
 
-pyoperant.pyoperant.tricks.three_ac_matching module
+pyoperant.pyoperant.behavior.three_ac_matching module
 ---------------------------------------------------
 
-.. automodule:: pyoperant.pyoperant.tricks.three_ac_matching
+.. automodule:: pyoperant.pyoperant.behavior.three_ac_matching
     :members:
     :undoc-members:
     :show-inheritance:
 
-pyoperant.pyoperant.tricks.two_alt_choice module
+pyoperant.pyoperant.behavior.two_alt_choice module
 ------------------------------------------------
 
-.. automodule:: pyoperant.pyoperant.tricks.two_alt_choice
+.. automodule:: pyoperant.pyoperant.behavior.two_alt_choice
     :members:
     :undoc-members:
     :show-inheritance:
@@ -48,7 +48,7 @@ pyoperant.pyoperant.tricks.two_alt_choice module
 Module contents
 ---------------
 
-.. automodule:: pyoperant.pyoperant.tricks
+.. automodule:: pyoperant.pyoperant.behavior
     :members:
     :undoc-members:
     :show-inheritance:
