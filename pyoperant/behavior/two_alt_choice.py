@@ -225,7 +225,6 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             # otherwise, we'll create a new trial
             trial = utils.Trial(index=index)
-            trial.annotate(**conditions)
             trial.class_ = conditions['class']
             trial_stim, trial_motifs = self.get_stimuli(**conditions)
             trial.events.append(trial_stim)
@@ -235,6 +234,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 trial.events.append(mot)
 
         trial.session=self.session_id
+        trial.annotate(**conditions)
 
         self.trials.append(trial)
         self.this_trial = self.trials[-1]
