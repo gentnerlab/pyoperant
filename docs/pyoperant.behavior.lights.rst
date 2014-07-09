@@ -1,7 +1,7 @@
-pyoperant.tricks.lights module
+pyoperant.behavior.lights module
 ==============================
 
-.. automodule:: pyoperant.tricks.lights
+.. automodule:: pyoperant.behavior.lights
     :members:
     :undoc-members:
     :show-inheritance:
