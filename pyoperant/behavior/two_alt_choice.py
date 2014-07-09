@@ -66,6 +66,9 @@ class TwoAltChoiceExp(base.BaseExp):
                                'time',
                                ]
 
+        if 'add_fields_to_save' in self.parameters.keys():
+            self.fields_to_save += self.parameters['add_fields_to_save']
+
         self.trials = []
         self.session_id = 0
 
@@ -354,7 +357,30 @@ class TwoAltChoiceExp(base.BaseExp):
         self.log.info("trial started at %s" % self.this_trial.time.ctime())
 
     def stimulus_main(self):
-        ## 1. play stimulus
+        ## 1. play cue
+        cue = self.this_trial.annotations["cue"]
+        if  len(cue) > 0:
+            self.log.debug("cue light turning on")
+            cue_start = dt.datetime.now()
+            if cue=="red":
+                self.panel.cue.red()
+            elif cue=="green":
+                self.panel.cue.green()
+            elif cue=="blue":
+                self.panel.cue.blue()
+            utils.wait(self.parameters["cue_duration"])
+            self.panel.cue.off()
+            cue_dur = (dt.datetime.now() - cue_start).total_seconds()
+            cue_time = (cue_start - self.this_trial.time).total_seconds()
+            cue_event = utils.Event(time=cue_time,
+                                    duration=cue_dur,
+                                    label='cue',
+                                    name=cue,
+                                    )
+            self.this_trial.events.append(cue_event)
+            utils.wait(self.parameters["cuetostim_wait"])
+
+        ## 2. play stimulus
         stim_start = dt.datetime.now()
         self.this_trial.stimulus_event.time = (stim_start - self.this_trial.time).total_seconds()
         self.panel.speaker.play() # already queued in stimulus_pre()
