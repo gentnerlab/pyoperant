@@ -357,9 +357,9 @@ class TwoAltChoiceExp(base.BaseExp):
         self.log.info("trial started at %s" % self.this_trial.time.ctime())
 
     def stimulus_main(self):
-        ## 1. play cue
-        cue = self.this_trial.annotations["cue"]
-        if  len(cue) > 0:
+        ## 1. present cue
+        if 'cue' in self.this_trial.annotations:
+            cue = self.this_trial.annotations["cue"]
             self.log.debug("cue light turning on")
             cue_start = dt.datetime.now()
             if cue=="red":
