@@ -17,6 +17,8 @@ if __name__ == "__main__":
 
     assert utils.check_cmdline_params(parameters, cmd_line)
 
+    print 'passed!'
+
     #if parameters['debug']:
     #    print parameters
     #    print PANELS

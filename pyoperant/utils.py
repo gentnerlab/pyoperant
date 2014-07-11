@@ -148,10 +148,10 @@ def check_cmdline_params(parameters, cmd_line):
     # if someone is using red bands they should ammend the checks I perform here
     allchars=string.maketrans('','')
     nodigs=allchars.translate(allchars, string.digits)
-    if not ('box' not in cmd_line or cmd_line['box'] == int(parameters['panel_name'].translate(allchars, nodigs))):
+    if not ('box' not in cmd_line or cmd_line['box'] == int(parameters['panel_name'].encode('ascii','ignore').translate(allchars, nodigs))):
         print "box number doesn't match config and command line"
         return False
-    if not ('subj' not in cmd_line or int(cmd_line['subj'].translate(allchars, nodigs)) == int(parameters['subject'].translate(allchars, nodigs))):
+    if not ('subj' not in cmd_line or int(cmd_line['subj'].encode('ascii','ignore').translate(allchars, nodigs)) == int(parameters['subject'].encode('ascii','ignore').translate(allchars, nodigs))):
         print "subject number doesn't match config and command line"
         return False
     return True
