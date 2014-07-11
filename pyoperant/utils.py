@@ -193,8 +193,6 @@ def check_time(schedule,fmt="%H:%M"):
             end = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
             if time_in_range(start,end,now):
                 return True
-        else:
-            raise Error('unknown epoch: %s' % epoch)
     return False
 
 def wait(secs=1.0, final_countdown=0.0,waitfunc=None):
