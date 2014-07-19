@@ -71,6 +71,8 @@ class TwoAltChoiceExp(base.BaseExp):
 
         self.trials = []
         self.session_id = 0
+        self.trial_q = None
+        self.session_q = None
 
         self.data_csv = os.path.join(self.parameters['experiment_path'],
                                      self.parameters['subject']+'_trialdata_'+self.timestamp+'.csv')
@@ -147,7 +149,8 @@ class TwoAltChoiceExp(base.BaseExp):
 
         """
 
-        self.session_q = queues.block_queue(self.parameters['block_design']['order'])
+        if self.session_q is None:
+            self.session_q = queues.block_queue(self.parameters['block_design']['order'])
 
         for sn_cond in self.session_q:
 
@@ -156,19 +159,18 @@ class TwoAltChoiceExp(base.BaseExp):
             self.session_id += 1
             self.log.info('starting session %s: %s' % (self.session_id,sn_cond))
 
-            # grab the block details
-            blk = copy.deepcopy(self.parameters['block_design']['blocks'][sn_cond])
+            if self.trial_q is None:
+                # grab the block details
+                blk = copy.deepcopy(self.parameters['block_design']['blocks'][sn_cond])
 
-            # load the block details into the trial queue
-            self.trial_q = None
-            q_type = blk.pop('queue')
-            if q_type=='random':
-                self.trial_q = queues.random_queue(**blk)
-            elif q_type=='block':
-                self.trial_q = queues.block_queue(**blk)
-            elif q_type=='staircase':
-                self.trial_q = queues.staircase_queue(self,**blk)
-
+                # load the block details into the trial queue
+                q_type = blk.pop('queue')
+                if q_type=='random':
+                    self.trial_q = queues.random_queue(**blk)
+                elif q_type=='block':
+                    self.trial_q = queues.block_queue(**blk)
+                elif q_type=='staircase':
+                    self.trial_q = queues.staircase_queue(self,**blk)
 
             for tr_cond in self.trial_q:
                 try:
@@ -179,6 +181,9 @@ class TwoAltChoiceExp(base.BaseExp):
                         self.run_trial()
                 except EndSession:
                     return 'post'
+            self.trial_q = None
+
+        self.session_q = None
 
         return 'post'
 
