@@ -149,17 +149,27 @@ class TwoAltChoiceExp(base.BaseExp):
 
         """
 
+        def run_trial_queue():
+            for tr_cond in self.trial_q:
+                self.new_trial(tr_cond)
+                self.run_trial()
+                while self.do_correction:
+                    self.new_trial(tr_cond)
+                    self.run_trial()
+            self.trial_q = None
+
         if self.session_q is None:
+            self.log.info('Next sessions: %s' % self.parameters['block_design']['order'])
             self.session_q = queues.block_queue(self.parameters['block_design']['order'])
 
-        for sn_cond in self.session_q:
+        if self.trial_q is None:
+            for sn_cond in self.session_q:
 
-            self.trials = []
-            self.do_correction = False
-            self.session_id += 1
-            self.log.info('starting session %s: %s' % (self.session_id,sn_cond))
+                self.trials = []
+                self.do_correction = False
+                self.session_id += 1
+                self.log.info('starting session %s: %s' % (self.session_id,sn_cond))
 
-            if self.trial_q is None:
                 # grab the block details
                 blk = copy.deepcopy(self.parameters['block_design']['blocks'][sn_cond])
 
@@ -172,18 +182,19 @@ class TwoAltChoiceExp(base.BaseExp):
                 elif q_type=='staircase':
                     self.trial_q = queues.staircase_queue(self,**blk)
 
-            for tr_cond in self.trial_q:
-                try:
-                    self.new_trial(tr_cond)
-                    self.run_trial()
-                    while self.do_correction:
-                        self.new_trial(tr_cond)
-                        self.run_trial()
+                try: 
+                    run_trial_queue()
                 except EndSession:
                     return 'post'
-            self.trial_q = None
 
-        self.session_q = None
+            self.session_q = None
+        
+        else:
+            self.log.info('continuing last session')
+            try: 
+                run_trial_queue()
+            except EndSession:
+                return 'post'
 
         return 'post'
 
