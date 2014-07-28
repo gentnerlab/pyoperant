@@ -107,7 +107,7 @@ class BaseExp(object):
             SMTP_CONFIG['toaddrs'] = [self.parameters['experimenter']['email'],]
 
             email_handler = handlers.SMTPHandler(**SMTP_CONFIG)
-            email_handler.setLevel(logging.ERROR)
+            email_handler.setLevel(logging.WARNING)
 
             heading = '%s\n' % (self.parameters['subject'])
             formatter = logging.Formatter(heading+'%(levelname)s at %(asctime)s:\n%(message)s')
@@ -127,7 +127,7 @@ class BaseExp(object):
         try:
             self.panel.reset()
         except components.ComponentError as err:
-            self.log.warning("component error: %s" % str(err))
+            self.log.error("component error: %s" % str(err))
 
     def run(self):
 

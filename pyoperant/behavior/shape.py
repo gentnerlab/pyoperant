@@ -46,7 +46,7 @@ class Shaper(object):
                                     block4=self.block4,
                                     block5=self.block5,
                                     sleep_block=self._run_sleep)
-        self.log.info('Shaping procedure complete')
+        self.log.warning('Shaping procedure complete.  Remember to disable shaping in your config file')
 
     def _null_block(self, block_num):
         def temp():
