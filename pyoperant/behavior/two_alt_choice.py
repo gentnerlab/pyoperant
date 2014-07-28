@@ -536,6 +536,7 @@ if __name__ == "__main__":
     with open(cmd_line['config_file'], 'rb') as config:
             parameters = json.load(config)
 
+    assert utils.check_cmdline_params(parameters, cmd_line)
 
     if parameters['debug']:
         print parameters
