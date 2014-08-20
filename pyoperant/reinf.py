@@ -109,3 +109,32 @@ class VariableRatioSchedule(FixedRatioSchedule):
     def __unicode__(self):
         return "VR%i" % self.ratio
 
+class PercentReinforcement(BaseSchedule):
+    """Maintains logic for deciding whether to consequate trials.
+
+    This class implements a probabalistic reinforcement, where a reward reinforcement
+    is provided x percent of the time.
+
+    Incorrect trials are always reinforced.
+
+    Methods:
+    consequate(trial) -- returns a boolean value based on whether the trial
+        should be consequated.
+
+    """
+    def __init__(self, ratio=1):
+        super(PercentReinforcement, self).__init__()
+        self.ratio = ratio
+
+    def consequate(self,trial):
+        if trial.correct==True:
+            rval = random.random()
+            if rval < self.ratio:
+                return True
+            else:
+                return False
+        elif trial.correct==False:
+            return False
+
+    def __unicode__(self):
+        return "PR%i" % self.ratio

@@ -6,6 +6,7 @@ import subprocess
 import os
 import datetime as dt
 import numpy as np
+import string
 from contextlib import closing
 from argparse import ArgumentParser
 from pyoperant import Error
@@ -143,6 +144,19 @@ def parse_commandline(arg_str=sys.argv[1:]):
     args = parser.parse_args(arg_str)
     return vars(args)
 
+def check_cmdline_params(parameters, cmd_line):
+    # if someone is using red bands they should ammend the checks I perform here
+    allchars=string.maketrans('','')
+    nodigs=allchars.translate(allchars, string.digits)
+    if not ('box' not in cmd_line or cmd_line['box'] == int(parameters['panel_name'].encode('ascii','ignore').translate(allchars, nodigs))):
+        print "box number doesn't match config and command line"
+        return False
+    if not ('subj' not in cmd_line or int(cmd_line['subj'].encode('ascii','ignore').translate(allchars, nodigs)) == int(parameters['subject'].encode('ascii','ignore').translate(allchars, nodigs))):
+        print "subject number doesn't match config and command line"
+        return False
+    return True
+
+
 
 def time_in_range(start, end, x):
     """Return true if x is in the range [start, end]"""
@@ -193,8 +207,6 @@ def check_time(schedule,fmt="%H:%M"):
             end = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))
             if time_in_range(start,end,now):
                 return True
-        else:
-            raise Error('unknown epoch: %s' % epoch)
     return False
 
 def wait(secs=1.0, final_countdown=0.0,waitfunc=None):

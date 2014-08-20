@@ -358,12 +358,6 @@ class RGBLight(BaseComponent):
     blue : hwio.BooleanOutput
         output channel for the blue LED
 
-    Methods:
-    red() -- turns the light red
-    green() -- turns the light green
-    blue() -- turns the light blue
-    off() -- turns the light off
-
     """
     def __init__(self,red,green,blue,*args,**kwargs):
         super(RGBLight, self).__init__(*args,**kwargs)

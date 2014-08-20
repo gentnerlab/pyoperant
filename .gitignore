@@ -29,3 +29,5 @@ MANIFEST
 
 #fabric deployment details
 fabfile.py
+
+.DS_Store

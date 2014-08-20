@@ -4,12 +4,37 @@ import os
 import csv
 import copy
 import datetime as dt
-from pyoperant.tricks import base, shape
+from pyoperant.behavior import base, shape
 from pyoperant.errors import EndSession
 from pyoperant import components, utils, reinf, queues
 
 class TwoAltChoiceExp(base.BaseExp):
-    """docstring for Experiment"""
+    """A two alternative choice experiment
+
+    Parameters
+    ----------
+
+
+    Attributes
+    ----------
+    req_panel_attr : list
+        list of the panel attributes that are required for this behavior
+    fields_to_save : list
+        list of the fields of the Trial object that will be saved
+    trials : list
+        all of the trials that have run
+    shaper : Shaper
+        the protocol for shaping 
+    parameters : dict 
+        all additional parameters for the experiment
+    data_csv : string 
+        path to csv file to save data
+    reinf_sched : object
+        does logic on reinforcement
+
+
+
+    """
     def __init__(self, *args, **kwargs):
         super(TwoAltChoiceExp,  self).__init__(*args, **kwargs)
         self.shaper = shape.Shaper2AC(self.panel, self.log, self.parameters, self.log_error_callback)
@@ -41,8 +66,13 @@ class TwoAltChoiceExp(base.BaseExp):
                                'time',
                                ]
 
+        if 'add_fields_to_save' in self.parameters.keys():
+            self.fields_to_save += self.parameters['add_fields_to_save']
+
         self.trials = []
         self.session_id = 0
+        self.trial_q = None
+        self.session_q = None
 
         self.data_csv = os.path.join(self.parameters['experiment_path'],
                                      self.parameters['subject']+'_trialdata_'+self.timestamp+'.csv')
@@ -52,8 +82,10 @@ class TwoAltChoiceExp(base.BaseExp):
             reinforcement = self.parameters['reinforcement']
             if reinforcement['schedule'] == 'variable_ratio':
                 self.reinf_sched = reinf.VariableRatioSchedule(ratio=reinforcement['ratio'])
-            elif reinf['schedule'] == 'fixed_ratio':
+            elif reinforcement['schedule'] == 'fixed_ratio':
                 self.reinf_sched = reinf.FixedRatioSchedule(ratio=reinforcement['ratio'])
+            elif reinforcement['schedule'] == 'percent_reinf':
+                self.reinf_sched = reinf.PercentReinforcement(ratio=reinforcement['ratio'])
             else:
                 self.reinf_sched = reinf.ContinuousReinforcement()
 
@@ -65,23 +97,42 @@ class TwoAltChoiceExp(base.BaseExp):
                 'blocks': {
                     'default': {
                         'queue': 'random',
-                        'conditions': [[k] for k in self.parameters['classes'].keys()]
+                        'conditions': [{'class': k} for k in self.parameters['classes'].keys()]
                         }
                     },
                 'order': ['default']
                 }
 
     def make_data_csv(self):
+        """ Create the csv file to save trial data
+
+        This creates a new csv file at experiment.data_csv and writes a header row 
+        with the fields in experiment.fields_to_save
+        """
         with open(self.data_csv, 'wb') as data_fh:
             trialWriter = csv.writer(data_fh)
             trialWriter.writerow(self.fields_to_save)
 
     ## session flow
     def check_session_schedule(self):
+        """ Check the session schedule
+
+        Returns
+        -------
+        bool
+            True if sessions should be running
+        """
         return self.check_light_schedule()
 
     def session_pre(self):
+        """ Runs before the session starts
 
+        For each stimulus class, if there is a component associated with it, that
+        component is mapped onto `experiment.class_assoc[class]`. For example, 
+        if the `left` port is registered with the 'L' class, you can access the response 
+        port through `experiment.class_assoc['L']`.
+
+        """
         self.class_assoc = {}
         for class_, class_params in self.parameters['classes'].items():
             try:
@@ -92,49 +143,85 @@ class TwoAltChoiceExp(base.BaseExp):
         return 'main'
 
     def session_main(self):
+        """ Runs the sessions
 
-        self.session_q = queues.block_queue(self.parameters['block_design']['order'])
+        Inside of `session_main`, we loop through sessions and through the trials within
+        them. This relies heavily on the 'block_design' parameter, which controls trial
+        conditions and the selection of queues to generate trial conditions.
 
-        for sn_cond in self.session_q:
+        """
 
-            self.trials = []
-            self.do_correction = False
-            self.session_id += 1
-            self.log.info('starting session %s: %s' % (self.session_id,sn_cond))
-
-            # grab the block details
-            blk = copy.deepcopy(self.parameters['block_design']['blocks'][sn_cond])
-
-            # load the block details into the trial queue
-            self.trial_q = None
-            q_type = blk.pop('queue')
-            if q_type=='random':
-                self.trial_q = queues.random_queue(**blk)
-            elif q_type=='block':
-                self.trial_q = queues.block_queue(**blk)
-            elif q_type=='staircase':
-                self.trial_q = queues.staircase_queue(self,**blk)
-
-
+        def run_trial_queue():
             for tr_cond in self.trial_q:
-                try:
+                self.new_trial(tr_cond)
+                self.run_trial()
+                while self.do_correction:
                     self.new_trial(tr_cond)
                     self.run_trial()
-                    while self.do_correction:
-                        self.new_trial(tr_cond)
-                        self.run_trial()
+            self.trial_q = None
+
+        if self.session_q is None:
+            self.log.info('Next sessions: %s' % self.parameters['block_design']['order'])
+            self.session_q = queues.block_queue(self.parameters['block_design']['order'])
+
+        if self.trial_q is None:
+            for sn_cond in self.session_q:
+
+                self.trials = []
+                self.do_correction = False
+                self.session_id += 1
+                self.log.info('starting session %s: %s' % (self.session_id,sn_cond))
+
+                # grab the block details
+                blk = copy.deepcopy(self.parameters['block_design']['blocks'][sn_cond])
+
+                # load the block details into the trial queue
+                q_type = blk.pop('queue')
+                if q_type=='random':
+                    self.trial_q = queues.random_queue(**blk)
+                elif q_type=='block':
+                    self.trial_q = queues.block_queue(**blk)
+                elif q_type=='staircase':
+                    self.trial_q = queues.staircase_queue(self,**blk)
+
+                try: 
+                    run_trial_queue()
                 except EndSession:
                     return 'post'
+
+            self.session_q = None
+        
+        else:
+            self.log.info('continuing last session')
+            try: 
+                run_trial_queue()
+            except EndSession:
+                return 'post'
 
         return 'post'
 
     def session_post(self):
+        """ Closes out the sessions
+
+        """
         self.log.info('ending session')
         return None
 
     ## trial flow
     def new_trial(self,conditions=None):
-        '''create a new trial and append it to the trial list'''
+        """Creates a new trial and appends it to the trial list
+
+        If `self.do_correction` is `True`, then the conditions are ignored and a new
+        trial is created which copies the conditions of the last trial.
+
+        Parameters
+        ----------
+        conditions : dict
+            The conditions dict must have a 'class' key, which specifys the trial
+            class. The entire dict is passed to `exp.get_stimuli()` as keyword
+            arguments and saved to the trial annotations.
+
+        """
         if len(self.trials) > 0:
             index = self.trials[-1].index+1
         else:
@@ -156,8 +243,8 @@ class TwoAltChoiceExp(base.BaseExp):
         else:
             # otherwise, we'll create a new trial
             trial = utils.Trial(index=index)
-            trial.class_ = conditions[0]
-            trial_stim, trial_motifs = self.get_stimuli(*conditions)
+            trial.class_ = conditions['class']
+            trial_stim, trial_motifs = self.get_stimuli(**conditions)
             trial.events.append(trial_stim)
             trial.stimulus_event = trial.events[-1]
             trial.stimulus = trial.stimulus_event.name
@@ -165,6 +252,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 trial.events.append(mot)
 
         trial.session=self.session_id
+        trial.annotate(**conditions)
 
         self.trials.append(trial)
         self.this_trial = self.trials[-1]
@@ -173,9 +261,17 @@ class TwoAltChoiceExp(base.BaseExp):
 
         return True
 
-    def get_stimuli(self,trial_class,*conditions):
+    def get_stimuli(self,**conditions):
+        """ Get the trial's stimuli from the conditions
+
+        Returns
+        -------
+        stim, epochs : Event, list 
+
+
+        """
         # TODO: default stimulus selection
-        stim_name = conditions[0]
+        stim_name = conditions['stim_name']
         stim_file = self.parameters['stims'][stim_name]
         self.log.debug(stim_file)
 
@@ -279,7 +375,30 @@ class TwoAltChoiceExp(base.BaseExp):
         self.log.info("trial started at %s" % self.this_trial.time.ctime())
 
     def stimulus_main(self):
-        ## 1. play stimulus
+        ## 1. present cue
+        if 'cue' in self.this_trial.annotations:
+            cue = self.this_trial.annotations["cue"]
+            self.log.debug("cue light turning on")
+            cue_start = dt.datetime.now()
+            if cue=="red":
+                self.panel.cue.red()
+            elif cue=="green":
+                self.panel.cue.green()
+            elif cue=="blue":
+                self.panel.cue.blue()
+            utils.wait(self.parameters["cue_duration"])
+            self.panel.cue.off()
+            cue_dur = (dt.datetime.now() - cue_start).total_seconds()
+            cue_time = (cue_start - self.this_trial.time).total_seconds()
+            cue_event = utils.Event(time=cue_time,
+                                    duration=cue_dur,
+                                    label='cue',
+                                    name=cue,
+                                    )
+            self.this_trial.events.append(cue_event)
+            utils.wait(self.parameters["cuetostim_wait"])
+
+        ## 2. play stimulus
         stim_start = dt.datetime.now()
         self.this_trial.stimulus_event.time = (stim_start - self.this_trial.time).total_seconds()
         self.panel.speaker.play() # already queued in stimulus_pre()
@@ -435,6 +554,7 @@ if __name__ == "__main__":
     with open(cmd_line['config_file'], 'rb') as config:
             parameters = json.load(config)
 
+    assert utils.check_cmdline_params(parameters, cmd_line)
 
     if parameters['debug']:
         print parameters
