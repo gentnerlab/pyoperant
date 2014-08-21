@@ -1,7 +1,7 @@
-pyoperant.tricks.two_alt_choice module
+pyoperant.behavior.two_alt_choice module
 ======================================
 
-.. automodule:: pyoperant.tricks.two_alt_choice
+.. automodule:: pyoperant.behavior.two_alt_choice
     :members:
     :undoc-members:
     :show-inheritance:

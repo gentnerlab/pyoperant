@@ -1,7 +1,7 @@
-pyoperant.tricks.shape module
+pyoperant.behavior.shape module
 =============================
 
-.. automodule:: pyoperant.tricks.shape
+.. automodule:: pyoperant.behavior.shape
     :members:
     :undoc-members:
     :show-inheritance:

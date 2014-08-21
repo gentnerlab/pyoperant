@@ -7,7 +7,7 @@ Subpackages
 .. toctree::
 
     pyoperant.interfaces
-    pyoperant.tricks
+    pyoperant.behavior
 
 Submodules
 ----------

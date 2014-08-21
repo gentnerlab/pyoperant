@@ -30,5 +30,5 @@ setup(
         "Programming Language :: Python :: 2.7",
         "Topic :: Scientific/Engineering",
         ],
-    ext_modules = [comedi_poll]
+#     ext_modules = [comedi_poll]
     )

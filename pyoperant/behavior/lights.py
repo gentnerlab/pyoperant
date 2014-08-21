@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 from pyoperant import utils, components
-from pyoperant.tricks import base
+from pyoperant.behavior import base
 
 class Lights(base.BaseExp):
     """docstring for Lights"""

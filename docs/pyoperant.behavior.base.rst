@@ -1,7 +1,7 @@
-pyoperant.tricks.base module
+pyoperant.behavior.base module
 ============================
 
-.. automodule:: pyoperant.tricks.base
+.. automodule:: pyoperant.behavior.base
     :members:
     :undoc-members:
     :show-inheritance:
