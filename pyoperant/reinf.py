@@ -127,14 +127,11 @@ class PercentReinforcement(BaseSchedule):
         self.ratio = ratio
 
     def consequate(self,trial):
-        if trial.correct==True:
-            rval = random.random()
-            if rval < self.ratio:
-                return True
-            else:
-                return False
-        elif trial.correct==False:
-            return False
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
+        if trial.correct:
+            return random.random() < self.ratio
+        else:
+            return True
 
     def __unicode__(self):
         return "PR%i" % self.ratio
