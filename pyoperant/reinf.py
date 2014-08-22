@@ -15,6 +15,7 @@ class BaseSchedule(object):
         super(BaseSchedule, self).__init__()
 
     def consequate(self,trial):
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
         if trial.correct:
             return True
         else:
@@ -35,6 +36,7 @@ class ContinuousReinforcement(BaseSchedule):
         super(ContinuousReinforcement, self).__init__()
 
     def consequate(self,trial):
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
         if trial.correct:
             return True
         else:
@@ -63,6 +65,7 @@ class FixedRatioSchedule(BaseSchedule):
         self.threshold = self.ratio
 
     def consequate(self,trial):
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
         if trial.correct==True:
             self.cumulative_correct += 1
             if self.cumulative_correct >= self.threshold:
@@ -122,16 +125,16 @@ class PercentReinforcement(BaseSchedule):
         should be consequated.
 
     """
-    def __init__(self, ratio=1):
+    def __init__(self, prob=1):
         super(PercentReinforcement, self).__init__()
-        self.ratio = ratio
+        self.prob = prob
 
     def consequate(self,trial):
         assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
         if trial.correct:
-            return random.random() < self.ratio
+            return random.random() < self.prob
         else:
             return True
 
     def __unicode__(self):
-        return "PR%i" % self.ratio
+        return "PR%i" % self.prob
