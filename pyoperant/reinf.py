@@ -15,6 +15,7 @@ class BaseSchedule(object):
         super(BaseSchedule, self).__init__()
 
     def consequate(self,trial):
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
         if trial.correct:
             return True
         else:
@@ -35,6 +36,7 @@ class ContinuousReinforcement(BaseSchedule):
         super(ContinuousReinforcement, self).__init__()
 
     def consequate(self,trial):
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
         if trial.correct:
             return True
         else:
@@ -63,6 +65,7 @@ class FixedRatioSchedule(BaseSchedule):
         self.threshold = self.ratio
 
     def consequate(self,trial):
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
         if trial.correct==True:
             self.cumulative_correct += 1
             if self.cumulative_correct >= self.threshold:
@@ -109,3 +112,29 @@ class VariableRatioSchedule(FixedRatioSchedule):
     def __unicode__(self):
         return "VR%i" % self.ratio
 
+class PercentReinforcement(BaseSchedule):
+    """Maintains logic for deciding whether to consequate trials.
+
+    This class implements a probabalistic reinforcement, where a reward reinforcement
+    is provided x percent of the time.
+
+    Incorrect trials are always reinforced.
+
+    Methods:
+    consequate(trial) -- returns a boolean value based on whether the trial
+        should be consequated.
+
+    """
+    def __init__(self, prob=1):
+        super(PercentReinforcement, self).__init__()
+        self.prob = prob
+
+    def consequate(self,trial):
+        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
+        if trial.correct:
+            return random.random() < self.prob
+        else:
+            return True
+
+    def __unicode__(self):
+        return "PR%i" % self.prob

@@ -82,8 +82,10 @@ class TwoAltChoiceExp(base.BaseExp):
             reinforcement = self.parameters['reinforcement']
             if reinforcement['schedule'] == 'variable_ratio':
                 self.reinf_sched = reinf.VariableRatioSchedule(ratio=reinforcement['ratio'])
-            elif reinf['schedule'] == 'fixed_ratio':
+            elif reinforcement['schedule'] == 'fixed_ratio':
                 self.reinf_sched = reinf.FixedRatioSchedule(ratio=reinforcement['ratio'])
+            elif reinforcement['schedule'] == 'percent_reinf':
+                self.reinf_sched = reinf.PercentReinforcement(ratio=reinforcement['ratio'])
             else:
                 self.reinf_sched = reinf.ContinuousReinforcement()
 
