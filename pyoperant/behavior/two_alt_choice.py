@@ -562,5 +562,11 @@ if __name__ == "__main__":
 
     panel = PANELS[parameters['panel_name']]()
 
+    def close_panel(panel):
+        panel.close()
+
     exp = TwoAltChoiceExp(panel=panel,**parameters)
+
+    atexit.register(close_panel,exp.panel)
+
     exp.run()

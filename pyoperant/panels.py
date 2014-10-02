@@ -44,3 +44,10 @@ class BasePanel(object):
 
     def reset(self):
          raise NotImplementedError
+
+    def close(self):
+        for lbl, interface in self.interfaces:
+            try:
+                interface.close()
+            except AttributeError:
+                pass
