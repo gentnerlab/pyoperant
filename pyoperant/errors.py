@@ -7,6 +7,10 @@ class EndSession(Exception):
     """ exception for when a session should terminate """
     pass
 
+class EndBlock(Exception):
+    """ exception for when a block should terminate """
+    pass
+
 ## defining Error classes for operant HW control
 class Error(Exception):
     '''base class for exceptions in this module'''
