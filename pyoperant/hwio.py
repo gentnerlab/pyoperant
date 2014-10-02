@@ -114,8 +114,107 @@ class AudioOutput(BaseIO):
     def stop(self):
         return self.interface._stop_wav()
 
+class TestBooleanInput(BooleanInput):
+    def __init__(self,interface=None,params={},*args,**kwargs):
+        self.call_queue = []
+        super(TestBooleanInput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
+    def config(self):
+        self.call_queue.append('config')
+        return super(TestBooleanInput, self).config()
 
+    def read(self):
+        self.call_queue.append('read')
+        return super(TestBooleanInput, self).read()
 
+    def poll(self):
+        self.call_queue.append('poll')
+        return super(TestBooleanInput, self).poll()
 
+class TestBooleanOutput(BooleanOutput):
+    def __init__(self,interface=None,params={},*args,**kwargs):
+        self.call_queue = []
+        super(TestBooleanOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
+    def config(self):
+        self.call_queue.append('config')
+        return super(TestBooleanOutput, self).config()
+
+    def read(self):
+        self.call_queue.append('read')
+        return super(TestBooleanOutput, self).read()
+
+    def write(self,value=False):
+        self.call_queue.append('write')
+        return super(TestBooleanOutput, self).write(value=value)
+
+    def toggle(self):
+        self.call_queue.append('toggle')
+        return super(TestBooleanOutput, self).toggle()
+
+class TestAudioOutput(AudioOutput):
+    def __init__(self, interface=None,params={},*args,**kwargs):
+        self.call_queue = []
+        super(TestAudioOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
+
+    def queue(self,wav_filename):
+        self.call_queue.append('queue')
+        return super(TestAudioOutput, self).queue(wav_filename)
+
+    def play(self):
+        self.call_queue.append('play')
+        return super(TestAudioOutput, self).play()
+
+    def stop(self):
+        self.call_queue.append('stop')
+        return super(TestAudioOutput, self).stop()
+
+def test_BooleanInput():
+    from interfaces.base_ import TestBaseInterface
+    base_int = TestBaseInterface()
+    bool_inp = TestBooleanInput(interface=base_int, params= {'subdevice': 0,
+                                                           'channel': 0 })
+    assert 'config' in bool_inp.call_queue
+    assert '_config_read' in base_int.call_queue
+    bool_inp.read()
+    assert '_read_bool' in base_int.call_queue
+    bool_inp.poll()
+    assert '_poll' in base_int.call_queue
+
+def test_BooleanOutput():
+    from interfaces.base_ import TestBaseInterface
+    base_int = TestBaseInterface()
+    bool_out = TestBooleanOutput(interface=base_int, params= {'subdevice': 0,
+                                                           'channel': 0 })
+    assert 'config' in bool_out.call_queue
+    assert '_config_write' in base_int.call_queue
+    
+    bool_out.read()
+    assert '_read_bool' in base_int.call_queue
+
+    bool_out.write(value=False)
+    assert '_write_bool' in base_int.call_queue
+    assert bool_out.last_value == False
+
+    bool_out.write(value=True)
+    assert bool_out.last_value == True
+
+    bool_out.toggle()
+    #TestBaseInterface doesn't return a value for _read_bool
+
+def test_AudioOutput():
+    from interfaces.base_ import TestBaseInterface
+    base_int = TestBaseInterface()
+    audio_out = TestAudioOutput(interface=base_int)
+
+    audio_out.queue('filename')
+    assert '_queue_wav' in base_int.call_queue
+    audio_out.play()
+    assert '_play_wav' in base_int.call_queue
+    audio_out.stop()
+    assert '_stop_wav' in base_int.call_queue
+
+def test_hwio():
+    test_BooleanInput()
+    test_BooleanOutput()
+    test_AudioOutput()
