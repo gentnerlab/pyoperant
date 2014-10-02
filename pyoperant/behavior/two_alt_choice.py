@@ -5,7 +5,7 @@ import csv
 import copy
 import datetime as dt
 from pyoperant.behavior import base, shape
-from pyoperant.errors import EndSession
+from pyoperant.errors import EndSession, EndBlock
 from pyoperant import components, utils, reinf, queues
 
 class TwoAltChoiceExp(base.BaseExp):
@@ -85,7 +85,7 @@ class TwoAltChoiceExp(base.BaseExp):
             elif reinforcement['schedule'] == 'fixed_ratio':
                 self.reinf_sched = reinf.FixedRatioSchedule(ratio=reinforcement['ratio'])
             elif reinforcement['schedule'] == 'percent_reinf':
-                self.reinf_sched = reinf.PercentReinforcement(ratio=reinforcement['ratio'])
+                self.reinf_sched = reinf.PercentReinforcement(prob=reinforcement['prob'])
             else:
                 self.reinf_sched = reinf.ContinuousReinforcement()
 
@@ -153,11 +153,15 @@ class TwoAltChoiceExp(base.BaseExp):
 
         def run_trial_queue():
             for tr_cond in self.trial_q:
-                self.new_trial(tr_cond)
-                self.run_trial()
-                while self.do_correction:
+                try:
                     self.new_trial(tr_cond)
                     self.run_trial()
+                    while self.do_correction:
+                        self.new_trial(tr_cond)
+                        self.run_trial()
+                except EndBlock:
+                    self.trial_q = None
+                    break
             self.trial_q = None
 
         if self.session_q is None:
