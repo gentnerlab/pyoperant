@@ -13,9 +13,11 @@ class BaseInterface(object):
     def __del__(self):
         self.close()
 
+# Classes and functions for testing purposes
+
 class TestBaseInterface(BaseInterface):
-    def __init__(self, *args, **kwargs):
-        super(TestBaseInterface, self).__init__()
+    def __init__(self,device_name='test',*args,**kwargs):
+        super(TestBaseInterface, self).__init__(*args,**kwargs)
         self.call_queue = []
 
     def open(self):

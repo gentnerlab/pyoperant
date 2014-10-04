@@ -9,7 +9,6 @@ import numpy as np
 import string
 from contextlib import closing
 from argparse import ArgumentParser
-from pyoperant import Error
 
 try:
     import simplejson as json

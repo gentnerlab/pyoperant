@@ -1,5 +1,6 @@
 import datetime
-from pyoperant import hwio, utils, ComponentError
+import hwio, utils
+from errors import ComponentError
 
 class BaseComponent(object):
     """Base class for physcal component"""
@@ -158,7 +159,7 @@ class Hopper(BaseComponent):
             The Hopper did not drop fater the feed.
 
         """
-        assert self.lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
+        assert self.lag <= dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
         try:
             self.check()
         except HopperInactiveError as e:
@@ -333,10 +334,10 @@ class HouseLight(BaseComponent):
 
         """
         timeout_time = datetime.datetime.now()
-        self.light.write(False)
+        self.off()
         utils.wait(dur)
         timeout_duration = datetime.datetime.now() - timeout_time
-        self.light.write(True)
+        self.on()
         return (timeout_time,timeout_duration)
 
     def punish(self,value=10.0):
@@ -433,3 +434,201 @@ class RGBLight(BaseComponent):
 #     def __init__(self,*args,**kwargs):
 #         super(Perch, self).__init__(*args,**kwargs)
 
+
+# Classes and functions for testing purposes
+
+class TestHopper(Hopper):
+    def __init__(self,IR=None,solenoid=None,lag=0.0,*args,**kwargs):
+        self.call_queue = []
+        
+        if IR is None:
+            IR = hwio.TestBooleanInput()
+        if solenoid is None:
+            solenoid = hwio.TestBooleanOutput()
+        
+        super(TestHopper, self).__init__(IR, solenoid, lag=lag, *args, **kwargs)
+        self.IR.test_set_state(False)
+        self.solenoid.write(False)
+
+    def check(self):
+        self.call_queue.append('check')
+        return super(TestHopper, self).check()
+
+    def up(self):
+        self.call_queue.append('up')
+        self.IR.test_set_state(True)
+        return super(TestHopper, self).up()
+
+    def down(self):
+        self.call_queue.append('down')
+        self.IR.test_set_state(False)
+        return super(TestHopper, self).down()
+
+    def feed(self,dur=2.0):
+        self.call_queue.append('feed:%d' % (dur))
+        return super(TestHopper, self).feed(dur=0.0)
+
+    def reward(self,value=2.0):
+        """wrapper for `feed`, passes *value* into *dur* """
+        return self.feed(dur=value)
+
+class TestPeckPort(PeckPort):
+    def __init__(self,IR=None,LED=None,*args,**kwargs):
+        self.call_queue = []
+
+        if IR is None:
+            IR = hwio.TestBooleanInput()
+        if LED is None:
+            LED = hwio.TestBooleanOutput()
+
+        super(TestPeckPort, self).__init__(IR, LED, *args,**kwargs)
+        self.IR.test_set_state(False)
+        self.LED.write(False)
+
+    def status(self):
+        self.call_queue.append('status')
+        return super(TestPeckPort, self).status()
+
+    def off(self):
+        self.call_queue.append('off')
+        return super(TestPeckPort, self).off()
+
+    def on(self):
+        self.call_queue.append('on')
+        return super(TestPeckPort, self).on()
+
+    def flash(self,dur=1.0,isi=0.1):
+        self.call_queue.append('flash')
+        # TODO: should be togglable to use real time
+        return super(TestPeckPort, self).flash(dur=0.0, isi=0.0)
+
+    def poll(self):
+        self.call_queue.append('poll')
+        return super(TestPeckPort, self).poll()
+
+class TestHouseLight(HouseLight):
+    def __init__(self,light=None,*args,**kwargs):
+        self.call_queue = []
+
+        if light is None:
+            light = hwio.TestBooleanOutput()
+
+        super(TestHouseLight, self).__init__(light=light, *args,**kwargs)
+        super(TestHouseLight, self).off()
+
+    def off(self):
+        self.call_queue.append('off')
+        return super(TestHouseLight, self).off()
+
+    def on(self):
+        self.call_queue.append('on')
+        return super(TestHouseLight, self).on()
+
+    def timeout(self,dur=0.0):
+        self.call_queue.append('timeout')
+        #TODO: should be togglable to use real time
+        return super(TestHouseLight, self).timeout(dur=0.0)
+
+    def punish(self,value=10.0):
+        self.call_queue.append('punish')
+        return super(TestHouseLight, self).punish(value=value)
+
+class TestRGBLight(RGBLight):
+    def __init__(self,red=None,green=None,blue=None,*args,**kwargs):
+        self.call_queue = []
+
+        if red is None:
+            red = hwio.TestBooleanOutput()
+        if green is None:
+            green = hwio.TestBooleanOutput()
+        if blue is None:
+            blue = hwio.TestBooleanOutput()
+
+        super(TestRGBLight, self).__init__(red, green, blue, *args,**kwargs)
+
+    def red(self):
+        self.call_queue.append('red')
+        return super(TestRGBLight, self).red()
+    def green(self):
+        self.call_queue.append('green')
+        return super(TestRGBLight, self).green()
+    def blue(self):
+        self.call_queue.append('blue')
+        return super(TestRGBLight, self).blue()
+    def off(self):
+        self.call_queue.append('off')
+        return super(TestRGBLight, self).off()
+
+def test_Hopper():
+    IR = hwio.TestBooleanInput()
+    solenoid = hwio.TestBooleanOutput()
+    hopper = TestHopper(IR=IR, solenoid=solenoid)
+
+    assert not hopper.check()
+    hopper.up()
+    assert hopper.check()
+    hopper.down()
+    assert not hopper.check()
+    hopper.reward()
+    assert not hopper.check()
+
+def test_PeckPort():
+    IR = hwio.TestBooleanInput()
+    LED = hwio.TestBooleanOutput()
+    peck_port = TestPeckPort(IR=IR, LED=LED)
+
+    assert not peck_port.status()
+    IR.test_set_state(True)
+    assert peck_port.status()
+    assert not LED.read()
+    peck_port.on()
+    assert LED.read()
+    peck_port.off()
+    assert not LED.read()
+
+def test_HouseLight():
+    light = hwio.TestBooleanOutput()
+    house_light = TestHouseLight(light=light)
+
+    assert not light.read()
+    house_light.on()
+    assert light.read()
+    house_light.off()
+    assert not light.read()
+    house_light.on()
+    house_light.call_queue = []
+    house_light.punish()
+    assert 'timeout' in house_light.call_queue
+    assert 'off' in house_light.call_queue
+    assert 'on' in house_light.call_queue
+    assert house_light.call_queue.index('off') < house_light.call_queue.index('on')
+
+def test_RGBLight():
+    red = hwio.TestBooleanOutput()
+    green = hwio.TestBooleanOutput()
+    blue = hwio.TestBooleanOutput()
+    rgb_light = TestRGBLight(red=red, green=green, blue=blue)
+
+    rgb_light.off()
+
+    assert not red.read()
+    assert not green.read()
+    assert not blue.read()
+
+    rgb_light.red()
+
+    assert red.read()
+
+    rgb_light.green()
+
+    assert green.read()
+
+    rgb_light.blue()
+
+    assert blue.read()
+
+def test_components():
+    test_Hopper()
+    test_PeckPort()
+    test_HouseLight()
+    test_RGBLight()
