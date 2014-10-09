@@ -56,6 +56,8 @@ class TestPanel(BasePanel):
     def __init__(self, *args, **kwargs):
         super(TestPanel, self).__init__(*args, **kwargs)
         self.call_queue = []
+        self.response_queue = []
+
         self.id = 0
 
         self.interfaces['test_interface'] = interfaces.base_.TestBaseInterface()
@@ -87,9 +89,37 @@ class TestPanel(BasePanel):
         self.house_light.on()
         self.hopper.down()
 
+    def test_enable_response_queue(self, new_response_queue):
+        self.response_queue.extend(new_response_queue)
+        def make_response_queue_checker(name):
+            def response_queue_check():
+                if self.response_queue and name is self.response_queue[0]:
+                    self.response_queue.pop(0)
+                    return True
+                else:
+                    return False
+            return response_queue_check
+        self.left.status = make_response_queue_checker('left')
+        self.right.status = make_response_queue_checker('right')
+        self.center.status = make_response_queue_checker('center')
+
 def test_Panel():
     panel = TestPanel()
     panel.reset()
+    
+    panel.test_enable_response_queue(['center', 'right', 'left'])
+    assert not panel.left.status()
+    assert not panel.right.status()
+    assert panel.center.status()
+    assert not panel.center.status()
+    assert not panel.left.status()
+    assert panel.right.status()
+    assert not panel.right.status()
+    assert not panel.center.status()
+    assert panel.left.status()
+    assert not panel.left.status()
+    assert not panel.right.status()
+    assert not panel.center.status()
 
 def test_panels():
     test_Panel()
