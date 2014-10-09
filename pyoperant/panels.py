@@ -43,4 +43,53 @@ class BasePanel(object):
         self.outputs = []
 
     def reset(self):
-         raise NotImplementedError
+        raise NotImplementedError
+
+# Classes and functions for testing purposes
+
+
+import hwio
+import components
+import interfaces.base_
+class TestPanel(BasePanel):
+
+    def __init__(self, *args, **kwargs):
+        super(TestPanel, self).__init__(*args, **kwargs)
+        self.call_queue = []
+        self.id = 0
+
+        self.interfaces['test_interface'] = interfaces.base_.TestBaseInterface()
+
+        for in_chan in range(4):
+            self.inputs.append(hwio.TestBooleanInput(interface = self.interfaces['test_interface']))
+
+        for out_chan in range(8):
+            self.outputs.append(hwio.TestBooleanOutput(interface = self.interfaces['test_interface']))
+
+        self.speaker =  hwio.TestAudioOutput(interface=self.interfaces['test_interface'])
+
+        # assemble inputs into components
+        self.left = components.TestPeckPort(IR=self.inputs[0],LED=self.outputs[0],name='l')
+        self.center = components.TestPeckPort(IR=self.inputs[1],LED=self.outputs[1],name='c')
+        self.right = components.TestPeckPort(IR=self.inputs[2],LED=self.outputs[2],name='r')
+        self.house_light = components.TestHouseLight(light=self.outputs[3])
+        self.hopper = components.TestHopper(IR=self.inputs[3],solenoid=self.outputs[4])
+
+        # define reward & punishment methods
+        self.reward = self.hopper.reward
+        self.punish = self.house_light.punish
+
+
+    def reset(self):
+        self.call_queue.append('reset')
+        for output in self.outputs:
+            output.write(False)
+        self.house_light.on()
+        self.hopper.down()
+
+def test_Panel():
+    panel = TestPanel()
+    panel.reset()
+
+def test_panels():
+    test_Panel()
