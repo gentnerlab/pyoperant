@@ -221,6 +221,12 @@ PANELS = {
           "Zog16": Zog16,
           }
 
+BEHAVIORS = ['pyoperant.behavior',
+             # 'py-behaviors'
+            ]
+
+DATA_PATH = '/home/bird/opdat/'
+
 # SMTP_CONFIG
 
 DEFAULT_EMAIL = 'justin.kiggins@gmail.com'
@@ -229,6 +235,6 @@ SMTP_CONFIG = {'mailhost': 'localhost',
                'toaddrs': [DEFAULT_EMAIL],
                'fromaddr': 'Zog <bird@zog.ucsd.edu>',
                'subject': '[pyoperant notice] on zog',
-               'credentials': None, 
+               'credentials': None,
                'secure': None,
                }

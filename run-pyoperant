@@ -1,70 +1,89 @@
 #!/usr/bin/env python
 
+import sys, os
+import argparse
+import importlib
+try: import simplejson as json
+except ImportError: import json
+
+
 def parse_commandline(arg_str=sys.argv[1:]):
     """ parse command line arguments
 
     """
-    parser=ArgumentParser()
-    parser.add_argument('protocol', 
-                        action='store', 
-                        type=str, 
-                        required=True,
+    parser = argparse.ArgumentParser()
+    parser.add_argument('protocol',
+                        action='store',
+                        type=str,
                         help='(str) experiment protocol'
                         )
     parser.add_argument('-P', '--panel',
-                        action='store', 
-                        type=str, 
-                        dest='panel', 
+                        action='store',
+                        type=str,
+                        dest='panel',
                         required=True,
                         help='(string) panel identifier'
                         )
     parser.add_argument('-S', '--subject',
-                        action='store', 
-                        type=str, 
-                        dest='subject', 
+                        action='store',
+                        type=str,
+                        dest='subject',
                         required=True,
                         help='subject identifier'
                         )
     parser.add_argument('-c','--config',
-                        action='store', 
-                        type=str, 
-                        dest='config_file', 
-                        default='config.json', 
+                        action='store',
+                        type=str,
+                        dest='config_file',
+                        default='config.json',
                         required=False,
                         help='configuration file [default: %(default)s]'
                         )
     args = parser.parse_args(arg_str)
     return vars(args)
 
+def find_protocol(protocol,package_list):
+    packages = [importlib.import_module(pstr) for pstr in package_list]
+    for p in packages:
+        try:
+            return getattr(p, protocol)
+        except AttributeError:
+            continue
+
 if __name__ == "__main__":
 
-    try: import simplejson as json
-    except ImportError: import json
 
     from pyoperant.local import PANELS
 
     try:
-        from pyoperant.local import BEHAVIORS:
+        from pyoperant.local import BEHAVIORS
     except ImportError:
         BEHAVIORS = ['pyoperant.behavior']
 
-    cmd_line = parse_commandline()
-    with open(cmd_line['config_file'], 'rb') as config:
-            parameters = json.load(config)
+    try:
+        from pyoperant.local import DATAPATH
+    except ImportError:
+        DATAPATH = '/home/bird/opdat'
 
-    for package in BEHAVIORS:
-        try:
-            BehaviorProtocol = getattr(__import__(package, fromlist=[cmd_line.protocol]), cmd_line.protocol)
-            break
-        except ImportError:
-            continue
+    cmd_line = parse_commandline()
+
+    config_file = os.path.join(DATAPATH,cmd_line['subject'],cmd_line['config_file'])
+
+    with open(config_file, 'rb') as config:
+        parameters = json.load(config)
+
+    BehaviorProtocol = find_protocol(cmd_line['protocol'],BEHAVIORS)
 
     if parameters['debug']:
         print parameters
         print PANELS
 
-    behavior = BehaviorProtocol(panel=PANELS[parameters[cmd_line.panel]](),
-                                subject=cmd_line.subject,
-                                **parameters,
-                                )
+    behavior = BehaviorProtocol(
+        panel=PANELS[cmd_line['panel']](),
+        subject=cmd_line['subject'],
+        panel_name=cmd_line['panel'],
+        **parameters
+        )
+
     behavior.run()
+

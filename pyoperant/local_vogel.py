@@ -110,14 +110,20 @@ class Vogel8(VogelPanel):
 
 # in the end, 'PANELS' should contain each operant panel available for use
 
-PANELS = {"Vogel1": Vogel1,
-          "Vogel2": Vogel2,
-          "Vogel3": Vogel3,
-          "Vogel4": Vogel4,
-          "Vogel6": Vogel6,
-          "Vogel7": Vogel7,
-          "Vogel8": Vogel8,
+PANELS = {"1": Vogel1,
+          "2": Vogel2,
+          "3": Vogel3,
+          "4": Vogel4,
+          "6": Vogel6,
+          "7": Vogel7,
+          "8": Vogel8,
           }
+
+BEHAVIORS = ['pyoperant.behavior',
+             # 'py-behaviors'
+            ]
+
+DATA_PATH = '/home/bird/opdat/'
 
 # SMTP_CONFIG
 
@@ -127,6 +133,6 @@ SMTP_CONFIG = {'mailhost': 'localhost',
                'toaddrs': [DEFAULT_EMAIL],
                'fromaddr': 'Vogel <bird@vogel.ucsd.edu>',
                'subject': '[pyoperant notice] on vogel',
-               'credentials': None, 
+               'credentials': None,
                'secure': None,
                }
