@@ -103,6 +103,9 @@ class TwoAltChoiceExp(base.BaseExp):
                 'order': ['default']
                 }
 
+        if 'session_schedule' not in self.parameters:
+            self.parameters['session_schedule'] = self.parameters['light_schedule']
+
     def make_data_csv(self):
         """ Create the csv file to save trial data
 
@@ -122,7 +125,7 @@ class TwoAltChoiceExp(base.BaseExp):
         bool
             True if sessions should be running
         """
-        return self.check_light_schedule()
+        return utils.check_time(self.parameters['session_schedule'])
 
     def session_pre(self):
         """ Runs before the session starts
