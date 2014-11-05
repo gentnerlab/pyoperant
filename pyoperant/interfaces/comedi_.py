@@ -47,11 +47,17 @@ class ComediInterface(base_.BaseInterface):
         else:
             raise InterfaceError('could not read from comedi device "%s", subdevice %s, channel %s' % (self.device,subdevice,channel))
 
-    def _poll(self,subdevice,channel):
+    def _poll(self,subdevice,channel,timeout=None):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
         date_fmt = '%Y-%m-%d %H:%M:%S.%f'
-        timestamp = subprocess.check_output(['comedi_poll', self.device_name, '-s', str(subdevice), '-c', str(channel)])
-        return datetime.datetime.strptime(timestamp.strip(),date_fmt)
+        cmd = ['comedi_poll', self.device_name, '-s', str(subdevice), '-c', str(channel)]
+        poll_command = utils.Command(cmd)
+        status, output, error = poll_command.run(timeout=timeout)
+        if status < 0:
+            return None
+        else:
+            timestamp = output
+            return datetime.datetime.strptime(timestamp.strip(),date_fmt)
 
     def _write_bool(self,subdevice,channel,value):
         """Write to comedi port

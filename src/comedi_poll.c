@@ -11,7 +11,7 @@ struct timespec rsi = { 0, POLLING_INTERVAL};
 /* helper functions */
 void do_usage()
 {
-  fprintf(stderr, "wait4peck usage:\n");
+  fprintf(stderr, "comedi_poll usage:\n");
   fprintf(stderr, "     [-help] [-d str] [-s int] [-c int]       \n\n");
   fprintf(stderr, "        -help        = show this help message \n");
   fprintf(stderr, "        -d str       = device file handler    \n");
