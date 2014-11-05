@@ -262,7 +262,7 @@ class PeckPort(BaseComponent):
         self.LED.write(LED_state)
         return (flash_time,flash_duration)
 
-    def poll(self,timeout=60.0):
+    def poll(self,timeout=None):
         """ Polls the peck port until there is a peck
 
         Returns
