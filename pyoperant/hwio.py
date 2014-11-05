@@ -34,7 +34,7 @@ class BooleanInput(BaseIO):
         """read status"""
         return self.interface._read_bool(**self.params)
 
-    def poll(self,timeout=60.0):
+    def poll(self,timeout=None):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
         return self.interface._poll(timeout=timeout,**self.params)
 
