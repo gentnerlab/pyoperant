@@ -262,7 +262,7 @@ class PeckPort(BaseComponent):
         self.LED.write(LED_state)
         return (flash_time,flash_duration)
 
-    def poll(self):
+    def poll(self,timeout=60.0):
         """ Polls the peck port until there is a peck
 
         Returns
@@ -270,7 +270,7 @@ class PeckPort(BaseComponent):
         datetime
             Timestamp of the IR beam being broken.
         """
-        return self.IR.poll()
+        return self.IR.poll(timeout)
 
 ## House Light ##
 class HouseLight(BaseComponent):

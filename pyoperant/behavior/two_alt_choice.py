@@ -368,7 +368,16 @@ class TwoAltChoiceExp(base.BaseExp):
         self.panel.speaker.queue(self.this_trial.stimulus_event.file_origin)
         self.log.debug('waiting for peck...')
         self.panel.center.on()
-        self.this_trial.time = self.panel.center.poll() ## need to add a 1 minute timeout to check the sched
+        trial_time = None
+        while trial_time is None:
+            if self.check_session_schedule()==False:
+                self.panel.center.off()
+                raise EndSession
+            else:
+                trial_time = self.panel.center.poll(timeout=60.0)
+
+        self.this_trial.time = trial_time
+
         self.panel.center.off()
         self.this_trial.events.append(utils.Event(name='center',
                                                   label='peck',
