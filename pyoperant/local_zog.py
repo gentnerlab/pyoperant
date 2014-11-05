@@ -199,6 +199,16 @@ class Zog11(ZogCuePanel):
     def __init__(self):
         super(Zog11, self).__init__(id=11)
 
+class Zog10(ZogCuePanel):
+    """Zog10 panel"""
+    def __init__(self):
+        super(Zog10, self).__init__(id=10)
+
+class Zog12(ZogCuePanel):
+    """Zog12 panel"""
+    def __init__(self):
+        super(Zog12, self).__init__(id=12)
+
 
 # in the end, 'PANELS' should contain each operant panel available for use
 
