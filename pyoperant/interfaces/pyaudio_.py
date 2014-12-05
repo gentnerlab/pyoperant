@@ -91,3 +91,7 @@ class PyAudioInterface(base_.BaseInterface):
             self.stream.close()
         except AttributeError:
             self.stream = None
+        try:    
+            self.wf.close()
+        except AttributeError:
+            self.wf = None
