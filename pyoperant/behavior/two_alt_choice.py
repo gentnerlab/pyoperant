@@ -372,6 +372,7 @@ class TwoAltChoiceExp(base.BaseExp):
         while trial_time is None:
             if self.check_session_schedule()==False:
                 self.panel.center.off()
+                self.panel.speaker.stop()
                 raise EndSession
             else:
                 trial_time = self.panel.center.poll(timeout=60.0)
