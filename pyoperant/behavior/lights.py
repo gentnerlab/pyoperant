@@ -1,4 +1,5 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python
+import os
 from pyoperant import utils, components
 from pyoperant.behavior import base
 
@@ -18,19 +19,36 @@ if __name__ == "__main__":
     try: import simplejson as json
     except ImportError: import json
 
-
     from pyoperant.local import PANELS
 
-    cmd_line = utils.parse_commandline()
-    with open(cmd_line['config_file'], 'rb') as config:
-            parameters = json.load(config)
+    try:
+        from pyoperant.local import DATAPATH
+    except ImportError:
+        DATAPATH = '/home/bird/opdat'
 
+
+    cmd_line = utils.parse_commandline()
+
+    experiment_path = os.path.join(DATAPATH,'B'+cmd_line['subj'])
+    config_file = os.path.join(experiment_path,cmd_line['config_file'])
+    stimuli_path = os.path.join(experiment_path,'Stimuli')
+
+    with open(config_file, 'rb') as config:
+            parameters = json.load(config)
 
     if parameters['debug']:
         print parameters
         print PANELS
 
-    panel = PANELS[parameters['panel_name']]()
+    BehaviorProtocol = Lights
 
-    exp = Lights(panel=panel,**parameters)
-    exp.run()
+    behavior = BehaviorProtocol(
+        panel=PANELS[str(cmd_line['box'])](),
+        subject='B'+cmd_line['subj'],
+        panel_name=cmd_line['box'],
+        experiment_path=experiment_path,
+        stim_path=stimuli_path,
+        **parameters
+        )
+
+    behavior.run()

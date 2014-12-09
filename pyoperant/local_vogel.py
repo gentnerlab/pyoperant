@@ -120,7 +120,7 @@ PANELS = {"1": Vogel1,
           }
 
 BEHAVIORS = ['pyoperant.behavior',
-             # 'py-behaviors'
+             'evidence_accum'
             ]
 
 DATA_PATH = '/home/bird/opdat/'
