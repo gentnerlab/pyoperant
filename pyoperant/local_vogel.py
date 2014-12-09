@@ -120,7 +120,7 @@ PANELS = {"1": Vogel1,
           }
 
 BEHAVIORS = ['pyoperant.behavior',
-             'evidence_accum'
+             'glab_behaviors.evidence_accum',
             ]
 
 DATA_PATH = '/home/bird/opdat/'
