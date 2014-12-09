@@ -43,15 +43,17 @@ def parse_commandline(arg_str=sys.argv[1:]):
     return vars(args)
 
 def find_protocol(protocol,package_list):
-    packages = [importlib.import_module(pstr) for pstr in package_list]
-    for p in packages:
+    packages = []
+    for pstr in package_list:
+        p = importlib.import_module(pstr)
+
         try:
             Protocol = getattr(p, protocol)
-            break
+            return Protocol
         except AttributeError:
             continue
+    raise ImportError('%s not found' % protocol)
 
-    return Protocol
 
 def main():
     from pyoperant.local import PANELS
@@ -68,7 +70,7 @@ def main():
 
     cmd_line = parse_commandline()
 
-    experiment_path = os.path.join(DATAPATH,cmd_line['subj'])
+    experiment_path = os.path.join(DATAPATH,cmd_line['subject'])
     config_file = os.path.join(experiment_path,cmd_line['config_file'])
     stimuli_path = os.path.join(experiment_path,'Stimuli')
 

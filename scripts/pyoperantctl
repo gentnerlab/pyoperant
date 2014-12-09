@@ -8,7 +8,7 @@ $opdatdir="/home/bird/opdat/";
 
 #here you should list the programs that may be run
 #this program will kill these processes if they are running for a box if the file above has a line for that box that doesn't match
-@psnames=("rand","gngseq","gngseq_vr","JCgngseq","shape","shape_hold","gng","femxpeck","femxperch","femxentropy","2ac_entropy", "2ac","2acQLT", "2acsnip", "2acstreamchg_train", "2acstreamchg","lights","pylights", "3ac", "3ac2", "songchoice", "songchoicetrain", "gngpass","gngpeck","holdbeak","spkchoice","spkchoicetrn", "spkchcholdtrn","classchoice","cc1spk","changepeck","2acmatchblock","lights.py","evidence_accum.py","three_ac_matching.py","three_ac_matching_shape.py","diag_trans.py","two_alt_choice.py","run-pyoperant");
+@psnames=("behave",);
 
 sub checkoptions(@);
 
@@ -65,14 +65,14 @@ while(scalar(@processes)>0){
     $ps=pop(@processes);
     @info=split(" ",$ps,11);
     chop($info[10]);
-    $info[10] =~ s/^(\/usr\/local\/bin\/python \/usr\/local\/bin\/)//;
+    $info[10] =~ s/^(\/usr\/bin\/python \/usr\/local\/bin\/)//;
     print($info[10]."\n");
     if($info[10] =~ /^($psnames)/){
 	@pspieces=split(" ",$info[10]);
 
 	$j=0;
 	while(scalar(@pspieces)>$j){
-	    if($pspieces[$j] eq "-B"){
+	    if($pspieces[$j] eq "-P"){
 		$boxNum = $pspieces[1 + $j];
 	    } elsif ($pspieces[$j] eq "-S") {
 		$birdID = $pspieces[1 + $j];
