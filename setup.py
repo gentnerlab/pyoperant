@@ -22,6 +22,7 @@ setup(
     scripts = [
         'scripts/behave',
         'scripts/pyoperantctl',
+        'scripts/allsummary.py',
         ],
     license = "GNU Affero General Public License v3",
     classifiers = [
