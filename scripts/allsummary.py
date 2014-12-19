@@ -31,7 +31,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     behav_data = load_data_pandas(subjects, DATA_PATH);
 
-f = open('/home/bird/all.summary', 'w')
+f = open(DATA_PATH + 'all.summary', 'w')
 
 f.write("this all.summary generated at %s\n" % (dt.datetime.now().strftime('%x %X')))
 
