@@ -21,7 +21,7 @@ with open(process_fname, 'rt') as in_f:
             if spl_line[1] == "1": #box enabled
                 box_nums.append(int(spl_line[0]))
                 bird_nums.append(int(spl_line[2]))
-                processes.append(spl_line[4])
+                processes.append(spl_line[-1])
 
 subjects = ['B%d' % (bird_num) for bird_num in bird_nums]
 # load all data
@@ -38,13 +38,12 @@ with open(DATA_PATH+'all.summary','w') as f:
     # Now loop through each bird and grab the error info from each summaryDAT file
     for (box, bird, proc) in zip(box_nums, bird_nums, processes):
         try:
-            if proc in ('shape','lights','pylights', 'lights.py'):
+            if proc in ('Lights',):
                 f.write("box %d\tB%d\t %s\n" % (box, bird, proc))
             else:
                 summaryfname = "/home/bird/opdat/B%d/%d.summaryDAT" % (bird, bird)
-                sdat = open(summaryfname, 'rt')
-                sdata = sdat.read()
-                sdat.close()
+                with open(summaryfname, 'rt') as sdat:
+                    sdata = sdat.read()
 
                 m = re.search(r"failures today: (\w+)", sdata)
                 hopper_failures = m.group(1)
