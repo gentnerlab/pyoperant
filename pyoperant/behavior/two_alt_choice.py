@@ -431,17 +431,18 @@ class TwoAltChoiceExp(base.BaseExp):
         self.log.debug('waiting for response')
 
     def response_main(self):
+        response_start = dt.datetime.now()
         while True:
             elapsed_time = (dt.datetime.now() - self.this_trial.time).total_seconds()
-            rt = elapsed_time - self.this_trial.stimulus_event.time
-            if rt > self.this_trial.annotations['max_wait']:
+            response_time = elapsed_time - self.this_trial.stimulus_event.time
+            if response_time > self.this_trial.annotations['max_wait']:
                 self.panel.speaker.stop()
                 self.this_trial.response = 'none'
                 self.log.info('no response')
                 return
             for class_, port in self.class_assoc.items():
                 if port.status():
-                    self.this_trial.rt = rt
+                    self.this_trial.rt = (dt.datetime.now() - response_start).total_seconds()
                     self.panel.speaker.stop()
                     self.this_trial.response = class_
                     self.summary['responses'] += 1
