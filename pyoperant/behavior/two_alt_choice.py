@@ -189,7 +189,10 @@ class TwoAltChoiceExp(base.BaseExp):
                 elif q_type=='block':
                     self.trial_q = queues.block_queue(**blk)
                 elif q_type=='staircase':
-                    self.trial_q = queues.staircase_queue(self,**blk)
+                    self.trial_q = queues.staircase_queue(**blk)
+                elif q_type=='doublestaircase':
+                    blk.pop('conditions')
+                    self.trial_q = queues.double_staircase_queue(self,**blk)
 
                 try: 
                     run_trial_queue()
