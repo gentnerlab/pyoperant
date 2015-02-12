@@ -74,14 +74,22 @@ def main():
     config_file = os.path.join(experiment_path,cmd_line['config_file'])
     stimuli_path = os.path.join(experiment_path,'Stimuli')
 
-    with open(config_file, 'rb') as config:
-        parameters = json.load(config)
+    try:
+        with open(config_file, 'rb') as config:
+            parameters = json.load(config)
+    except IOError:
+        parameters = {}
 
     BehaviorProtocol = find_protocol(cmd_line['protocol'],BEHAVIORS)
 
-    if parameters['debug']:
+    if ('debug' in parameters) and parameters['debug']:
         print parameters
         print PANELS
+
+    for k in ['subject','panel_name','experiment_path']:
+        parameters.pop(k) if k in parameters.keys() else None
+
+    stimuli_path = parameters.pop('stim_path') if 'stim_path' in parameters else stimuli_path
 
     behavior = BehaviorProtocol(
         panel=PANELS[cmd_line['panel']](),

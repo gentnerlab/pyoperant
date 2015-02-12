@@ -136,6 +136,7 @@ while(scalar(@processes)>0){
     @info=split(" ",$ps,11);
     chop($info[10]);
     $info[10] =~ s/^(\/usr\/bin\/python \/usr\/local\/bin\/)//;
+    $info[10] =~ s/^(\/usr\/local\/anaconda\/bin\/python \/usr\/local\/anaconda\/bin\/)//;
     print($info[10]."\n");
     if($info[10] =~ /^($psnames)/){
 	@pspieces=split(" ",$info[10]);
