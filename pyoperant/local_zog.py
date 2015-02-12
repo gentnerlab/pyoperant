@@ -214,25 +214,25 @@ class Zog12(ZogCuePanel):
 
 PANELS = {
           # "Zog1": Zog1,
-          "Zog2": Zog2,
-          "Zog3": Zog3,
-          "Zog4": Zog4,
-          "Zog5": Zog5,
-          "Zog6": Zog6,
-          "Zog7": Zog7,
-          "Zog8": Zog8,
-          "Zog9": Zog9,
-          "Zog10": Zog10,
-          "Zog11": Zog11,
-          "Zog12": Zog12,
-          "Zog13": Zog13,
-          "Zog14": Zog14,
-          "Zog15": Zog15,
-          "Zog16": Zog16,
+          "2": Zog2,
+          "3": Zog3,
+          "4": Zog4,
+          "5": Zog5,
+          "6": Zog6,
+          "7": Zog7,
+          "8": Zog8,
+          "9": Zog9,
+          "10": Zog10,
+          "11": Zog11,
+          "12": Zog12,
+          "13": Zog13,
+          "14": Zog14,
+          "15": Zog15,
+          "16": Zog16,
           }
 
 BEHAVIORS = ['pyoperant.behavior',
-             # 'py-behaviors'
+             'glab_behaviors'
             ]
 
 DATA_PATH = '/home/bird/opdat/'
