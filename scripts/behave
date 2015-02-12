@@ -43,16 +43,19 @@ def parse_commandline(arg_str=sys.argv[1:]):
     return vars(args)
 
 def find_protocol(protocol,package_list):
-    packages = [importlib.import_module(pstr) for pstr in package_list]
-    for p in packages:
+    packages = []
+    for pstr in package_list:
+        p = importlib.import_module(pstr)
+
         try:
-            return getattr(p, protocol)
+            Protocol = getattr(p, protocol)
+            return Protocol
         except AttributeError:
             continue
+    raise ImportError('%s not found' % protocol)
 
-if __name__ == "__main__":
 
-
+def main():
     from pyoperant.local import PANELS
 
     try:
@@ -67,7 +70,9 @@ if __name__ == "__main__":
 
     cmd_line = parse_commandline()
 
-    config_file = os.path.join(DATAPATH,cmd_line['subject'],cmd_line['config_file'])
+    experiment_path = os.path.join(DATAPATH,cmd_line['subject'])
+    config_file = os.path.join(experiment_path,cmd_line['config_file'])
+    stimuli_path = os.path.join(experiment_path,'Stimuli')
 
     with open(config_file, 'rb') as config:
         parameters = json.load(config)
@@ -82,8 +87,12 @@ if __name__ == "__main__":
         panel=PANELS[cmd_line['panel']](),
         subject=cmd_line['subject'],
         panel_name=cmd_line['panel'],
+        experiment_path=experiment_path,
+        stim_path=stimuli_path,
         **parameters
         )
 
     behavior.run()
 
+if __name__ == "__main__":
+    main()

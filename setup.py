@@ -19,6 +19,11 @@ setup(
     long_description = open('docs/README.rst', 'rt').read(),
     packages = ['pyoperant'],
     requires = ['pyephem','numpy'],
+    scripts = [
+        'scripts/behave',
+        'scripts/pyoperantctl',
+        'scripts/allsummary.py',
+        ],
     license = "GNU Affero General Public License v3",
     classifiers = [
         "Development Status :: 4 - Beta",

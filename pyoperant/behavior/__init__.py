@@ -1,2 +1,2 @@
-from pyoperant.behavior.two_alt_choice import *
-from pyoperant.behavior.lights import *
+from two_alt_choice import *
+from lights import *

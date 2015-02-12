@@ -36,7 +36,7 @@ class Shaper(object):
         self.block5 = self._null_block(5)
 
     def run_shape(self, start_state='block1'):
-        self.log.info('Starting shaping procedure')
+        self.log.warning('Starting shaping procedure')
         utils.run_state_machine(    start_in=start_state,
                                     error_state='block1',
                                     error_callback=self.error_callback,
@@ -62,7 +62,7 @@ class Shaper(object):
 
         def temp():
             self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
+            self.log.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
@@ -84,7 +84,7 @@ class Shaper(object):
         reverts to revert_state if no response before timeout (60*60*3=10800)"""
         def temp():
             self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
+            self.log.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -116,7 +116,7 @@ class Shaper(object):
             if not self.responded_block:
                 elapsed_time = (dt.datetime.now() - self.block_start).total_seconds()
                 if elapsed_time > revert_timeout:
-                    self.log.info("No response in block %d, reverting to block %d.  Time: %s"%(self.recent_state, self.recent_state - 1, dt.datetime.now().isoformat(' ')))
+                    self.log.warning("No response in block %d, reverting to block %d.  Time: %s"%(self.recent_state, self.recent_state - 1, dt.datetime.now().isoformat(' ')))
                     return None
             else:
                 if self.response_counter >= reps:
@@ -302,7 +302,7 @@ class Shaper2AC(Shaper):
         key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
+            self.log.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -329,7 +329,7 @@ class Shaper2AC(Shaper):
         until pecked, then food for 2.5 sec.   Run 100 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
+            self.log.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -425,7 +425,7 @@ class Shaper3AC(Shaper):
         key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
+            self.log.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -454,7 +454,7 @@ class Shaper3AC(Shaper):
         until pecked, then food for 2.5 sec.   Run 150 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
+            self.log.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
