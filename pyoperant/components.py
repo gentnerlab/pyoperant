@@ -161,7 +161,7 @@ class Hopper(BaseComponent):
         assert self.lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
         try:
             self.check()
-        except HopperInactiveError as e:
+        except HopperActiveError as e:
             raise HopperAlreadyUpError(e)
         feed_time = datetime.datetime.now()
         self.up() # includes a lag
