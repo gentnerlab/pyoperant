@@ -26,8 +26,9 @@ def parse_commandline(arg_str=sys.argv[1:]):
     """
     parser = argparse.ArgumentParser(
         description='Run Pyoperant scripts from the command line',
-        epilog='The following protocols are installed and registered: ' + \
-               ', '.join(list_protocols())
+        epilog=('The following protocols are installed and registered: ',
+                ', '.join(list_protocols())
+                )
         )
     parser.add_argument('protocol',
                         action='store',
