@@ -4,14 +4,31 @@ import sys, os
 import argparse
 import importlib
 try: import simplejson as json
+
 except ImportError: import json
+
+from pyoperant.local import PANELS
+
+try:
+    from pyoperant.local import BEHAVIORS
+except ImportError:
+    BEHAVIORS = ['pyoperant.behavior']
+
+try:
+    from pyoperant.local import DATAPATH
+except ImportError:
+    DATAPATH = '/home/bird/opdat'
 
 
 def parse_commandline(arg_str=sys.argv[1:]):
     """ parse command line arguments
 
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Run Pyoperant scripts from the command line',
+        epilog='The following protocols are installed and registered: ' + \
+               ', '.join(list_protocols())
+        )
     parser.add_argument('protocol',
                         action='store',
                         type=str,
@@ -42,9 +59,23 @@ def parse_commandline(arg_str=sys.argv[1:]):
     args = parser.parse_args(arg_str)
     return vars(args)
 
-def find_protocol(protocol,package_list):
+def list_protocols():
+    from pyoperant.behavior.base import BaseExp
+    l = []
+    behav_modules = [importlib.import_module(pstr) for pstr in BEHAVIORS]
+    for mod in behav_modules:
+        for name, obj in mod.__dict__.iteritems():
+            try:
+                if issubclass(obj,BaseExp):
+                    l.append(name)
+
+            except TypeError:
+                pass
+    return l
+
+def find_protocol(protocol):
     packages = []
-    for pstr in package_list:
+    for pstr in BEHAVIORS:
         p = importlib.import_module(pstr)
 
         try:
@@ -56,17 +87,6 @@ def find_protocol(protocol,package_list):
 
 
 def main():
-    from pyoperant.local import PANELS
-
-    try:
-        from pyoperant.local import BEHAVIORS
-    except ImportError:
-        BEHAVIORS = ['pyoperant.behavior']
-
-    try:
-        from pyoperant.local import DATAPATH
-    except ImportError:
-        DATAPATH = '/home/bird/opdat'
 
     cmd_line = parse_commandline()
 
@@ -80,7 +100,7 @@ def main():
     except IOError:
         parameters = {}
 
-    BehaviorProtocol = find_protocol(cmd_line['protocol'],BEHAVIORS)
+    BehaviorProtocol = find_protocol(cmd_line['protocol'])
 
     if ('debug' in parameters) and parameters['debug']:
         print parameters
