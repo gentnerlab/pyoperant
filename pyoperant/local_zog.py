@@ -213,7 +213,7 @@ class Zog12(ZogCuePanel):
 # in the end, 'PANELS' should contain each operant panel available for use
 
 PANELS = {
-          # "Zog1": Zog1,
+          "1": Zog1,
           "2": Zog2,
           "3": Zog3,
           "4": Zog4,
