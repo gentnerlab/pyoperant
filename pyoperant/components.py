@@ -39,7 +39,7 @@ class Hopper(BaseComponent):
         output channel to activate the solenoid & raise the hopper
     IR : :class:`hwio.BooleanInput` 
        input channel for the IR beam to check if the hopper is up
-    lag : float, optional 
+    max_lag : float, optional 
         time in seconds to wait before checking to make sure the hopper is up (default=0.3)
 
     Attributes
@@ -48,13 +48,13 @@ class Hopper(BaseComponent):
         output channel to activate the solenoid & raise the hopper
     IR : hwio.BooleanInput 
        input channel for the IR beam to check if the hopper is up
-    lag : float 
+    max_lag : float 
         time in seconds to wait before checking to make sure the hopper is up
 
     """
-    def __init__(self,IR,solenoid,lag=0.3,*args,**kwargs):
+    def __init__(self,IR,solenoid,max_lag=0.3,*args,**kwargs):
         super(Hopper, self).__init__(*args,**kwargs)
-        self.lag = lag
+        self.max_lag = max_lag
         if isinstance(IR,hwio.BooleanInput):
             self.IR = IR
         else:
@@ -105,13 +105,15 @@ class Hopper(BaseComponent):
         HopperWontComeUpError
             The Hopper did not raise.
         """
+
         self.solenoid.write(True)
-        utils.wait(self.lag)
-        try:
-            self.check()
-        except HopperInactiveError as e:
-            raise HopperWontComeUpError(e)
-        return True
+        time_up = self.IR.poll(timeout=self.max_lag)
+
+        if time_up is None: # poll timed out
+            self.solenoid.write(False)
+            raise HopperWontComeUpError
+        else:
+            return time_up
 
     def down(self):
         """Lowers the hopper.
@@ -127,14 +129,15 @@ class Hopper(BaseComponent):
             The Hopper did not drop.
         """
         self.solenoid.write(False)
-        utils.wait(self.lag)
+        time_down = datetime.datetime.now()
+        utils.wait(self.max_lag)
         try:
             self.check()
         except HopperActiveError as e:
             raise HopperWontDropError(e)
-        return True
+        return time_down
 
-    def feed(self,dur=2.0):
+    def feed(self,dur=2.0,error_check=True):
         """Performs a feed
 
         Parameters
@@ -158,16 +161,16 @@ class Hopper(BaseComponent):
             The Hopper did not drop fater the feed.
 
         """
-        assert self.lag < dur, "lag (%ss) must be shorter than duration (%ss)" % (self.lag,dur)
+        assert self.max_lag < dur, "max_lag (%ss) must be shorter than duration (%ss)" % (self.max_lag,dur)
         try:
             self.check()
         except HopperActiveError as e:
+            self.solenoid.write(False)
             raise HopperAlreadyUpError(e)
-        feed_time = datetime.datetime.now()
-        self.up() # includes a lag
-        utils.wait(dur - self.lag)
-        feed_duration = datetime.datetime.now() - feed_time
-        self.down() # includes a lag
+        feed_time = self.up()
+        utils.wait(dur)
+        feed_over = self.down()
+        feed_duration = feed_over - feed_time
         return (feed_time,feed_duration)
 
     def reward(self,value=2.0):
