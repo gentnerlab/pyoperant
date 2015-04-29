@@ -31,7 +31,7 @@ class VogelPanel(panels.BasePanel):
                                                            },
                                                  )
                                )
-        for out_chan in [ii+_VOGEL_MAP[self.id][4] for ii in range(5)]:
+        for out_chan in [ii+_VOGEL_MAP[self.id][4] for ii in range(8)]:
             self.outputs.append(hwio.BooleanOutput(interface=self.interfaces['comedi'],
                                                  params = {'subdevice': _VOGEL_MAP[self.id][3],
                                                            'channel': out_chan
@@ -58,16 +58,24 @@ class VogelPanel(panels.BasePanel):
         self.hopper.down()
 
     def test(self):
+        print ('reset')
         self.reset()
         dur = 2.0
         for output in self.outputs:
+            print ('output %s on' % output)
             output.write(True)
             utils.wait(dur)
+            print ('output %s off' % output)
             output.write(False)
+        print ('reset')
         self.reset()
+        print ('feed')
         self.reward(value=dur)
+        print ('timeout')
         self.punish(value=dur)
+        print ('queue file')
         self.speaker.queue('/usr/local/stimuli/A1.wav')
+        print ('play file')
         self.speaker.play()
         return True
 
