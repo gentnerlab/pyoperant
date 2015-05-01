@@ -11,11 +11,11 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
 
         if 'reduced_stims' not in self.parameters or self.parameters['reduced_stims'] not in [True, False]:
             self.parameters['reduced_stims'] = False
-            self.log.debug('Using full stimuli set')
+            logging.debug('Using full stimuli set')
         else:
-            self.log.debug('Using reduced stimuli set only')
+            logging.debug('Using reduced stimuli set only')
 
-        self.shaper = shape.Shaper3ACMatching(self.panel, self.log, self.parameters, self.get_stimuli, self.log_error_callback)
+        self.shaper = shape.Shaper3ACMatching(self.panel, self.parameters, self.get_stimuli, self.log_error_callback)
         self.num_stims = len(self.parameters['stims'].items())
 
     def get_stimuli(self, trial_class):
@@ -70,28 +70,28 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
         except components.HopperAlreadyUpError as err:
             self.this_trial.reward = True
             self.summary['hopper_already_up'] += 1
-            self.log.warning("hopper already up on panel %s" % str(err))
+            logging.warning("hopper already up on panel %s" % str(err))
             utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
             self.panel.reset()
 
         except components.HopperWontComeUpError as err:
             self.this_trial.reward = 'error'
             self.summary['hopper_failures'] += 1
-            self.log.error("hopper didn't come up on panel %s" % str(err))
+            logging.error("hopper didn't come up on panel %s" % str(err))
             utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
             self.panel.reset()
 
         # except components.ResponseDuringFeedError as err:
         #     trial['reward'] = 'Error'
         #     self.summary['responses_during_reward'] += 1
-        #     self.log.error("response during reward on panel %s" % str(err))
+        #     logging.error("response during reward on panel %s" % str(err))
         #     utils.wait(self.reward_dur[trial['class']])
         #     self.panel.reset()
 
         except components.HopperWontDropError as err:
             self.this_trial.reward = 'error'
             self.summary['hopper_wont_go_down'] += 1
-            self.log.warning("hopper didn't go down on panel %s" % str(err))
+            logging.warning("hopper didn't go down on panel %s" % str(err))
             self.panel.reset()
 
         finally:

@@ -1,4 +1,5 @@
 import random
+import logging
 import datetime as dt
 from pyoperant import panels
 from pyoperant import utils
@@ -19,11 +20,9 @@ class Shaper(object):
     Block 4:  Wait for peck to non-flashing center key, then right or left key flashes
               until pecked, then food for 2.5 sec.   Run 100 trials."""
 
-    def __init__(self, panel, log, parameters, error_callback=None):
+    def __init__(self, panel, parameters, error_callback=None):
         self.panel = panel
         assert isinstance(panel, panels.BasePanel)
-        self.log = log
-        assert log is not None
         self.parameters = parameters
         assert 'light_schedule' in self.parameters
         self.error_callback = error_callback
@@ -36,7 +35,7 @@ class Shaper(object):
         self.block5 = self._null_block(5)
 
     def run_shape(self, start_state='block1'):
-        self.log.warning('Starting shaping procedure')
+        logging.warning('Starting shaping procedure')
         utils.run_state_machine(    start_in=start_state,
                                     error_state='block1',
                                     error_callback=self.error_callback,
@@ -46,7 +45,7 @@ class Shaper(object):
                                     block4=self.block4,
                                     block5=self.block5,
                                     sleep_block=self._run_sleep)
-        self.log.warning('Shaping procedure complete.  Remember to disable shaping in your config file')
+        logging.warning('Shaping procedure complete.  Remember to disable shaping in your config file')
 
     def _null_block(self, block_num):
         def temp():
@@ -62,7 +61,7 @@ class Shaper(object):
 
         def temp():
             self.recent_state = block_num
-            self.log.warning('Starting %s'%(self.block_name(block_num)))
+            logging.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
@@ -84,7 +83,7 @@ class Shaper(object):
         reverts to revert_state if no response before timeout (60*60*3=10800)"""
         def temp():
             self.recent_state = block_num
-            self.log.warning('Starting %s'%(self.block_name(block_num)))
+            logging.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -104,8 +103,8 @@ class Shaper(object):
     def _block_init(self, next_state):
         def temp():
             self.block_start = dt.datetime.now()
-            self.log.info('Block start time: %s'%(self.block_start.isoformat(' ')))
-            self.log.info("Blk #\tTrl #\tResp Key\tResp Time")
+            logging.info('Block start time: %s'%(self.block_start.isoformat(' ')))
+            logging.info("Blk #\tTrl #\tResp Key\tResp Time")
             self.responded_block = False
             self.response_counter = 0
             return next_state
@@ -116,7 +115,7 @@ class Shaper(object):
             if not self.responded_block:
                 elapsed_time = (dt.datetime.now() - self.block_start).total_seconds()
                 if elapsed_time > revert_timeout:
-                    self.log.warning("No response in block %d, reverting to block %d.  Time: %s"%(self.recent_state, self.recent_state - 1, dt.datetime.now().isoformat(' ')))
+                    logging.warning("No response in block %d, reverting to block %d.  Time: %s"%(self.recent_state, self.recent_state - 1, dt.datetime.now().isoformat(' ')))
                     return None
             else:
                 if self.response_counter >= reps:
@@ -228,7 +227,7 @@ class Shaper(object):
 #TODO: catch errors here
     def reward(self, value, next_state):
         def temp():
-            self.log.info('%d\t%d\t%s\t%s'%(self.recent_state, self.response_counter, self.last_response, dt.datetime.now().isoformat(' ')))
+            logging.info('%d\t%d\t%s\t%s'%(self.recent_state, self.response_counter, self.last_response, dt.datetime.now().isoformat(' ')))
             self.panel.reward(value=value)
             return next_state
         return temp
@@ -241,12 +240,12 @@ class Shaper(object):
     # defining functions for sleep
     #TODO: there should really be a separate sleeper or some better solution
     def sleep_pre(self):
-        self.log.debug('lights off. going to sleep...')
+        logging.debug('lights off. going to sleep...')
         return 'main'
 
     def sleep_main(self):
         """ reset expal parameters for the next day """
-        self.log.debug('sleeping...')
+        logging.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['idle_poll_interval'])
         if not utils.check_time(self.parameters['light_schedule']):
@@ -255,7 +254,7 @@ class Shaper(object):
             return 'post'
 
     def sleep_post(self):
-        self.log.debug('ending sleep')
+        logging.debug('ending sleep')
         self.panel.house_light.on()
 #        self.init_summary()
         return None
@@ -302,7 +301,7 @@ class Shaper2AC(Shaper):
         key flashes until pecked, then the hopper comes up for 3 sec. Run 100 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.warning('Starting %s'%(self.block_name(block_num)))
+            logging.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -329,7 +328,7 @@ class Shaper2AC(Shaper):
         until pecked, then food for 2.5 sec.   Run 100 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.warning('Starting %s'%(self.block_name(block_num)))
+            logging.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -425,7 +424,7 @@ class Shaper3AC(Shaper):
         key flashes (p=0.333) until pecked, then the hopper comes up for 3 sec. Run 150 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.warning('Starting %s'%(self.block_name(block_num)))
+            logging.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -454,7 +453,7 @@ class Shaper3AC(Shaper):
         until pecked, then food for 2.5 sec.   Run 150 trials."""
         def temp():
             self.recent_state = block_num
-            self.log.warning('Starting %s'%(self.block_name(block_num)))
+            logging.warning('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -488,7 +487,7 @@ class Shaper3ACMatching(Shaper3AC):
     def _response_3ac_matching_audio_block(self, block_num, reps=150, revert_timeout=10800):
         def temp():
             self.recent_state = block_num
-            self.log.info('Starting %s'%(self.block_name(block_num)))
+            logging.info('Starting %s'%(self.block_name(block_num)))
             utils.run_state_machine(    start_in='init',
                                         error_state='check',
                                         error_callback=self.error_callback,
@@ -519,7 +518,7 @@ class Shaper3ACMatching(Shaper3AC):
     def _play_audio(self, next_state, trial_class):
         def temp():
             trial_stim, trial_motifs = self.get_stimuli(trial_class)
-            self.log.debug("presenting stimulus %s" % trial_stim.name)
+            logging.debug("presenting stimulus %s" % trial_stim.name)
             self.panel.speaker.queue(trial_stim.file_origin)
             self.panel.speaker.play()
             return next_state

@@ -11,9 +11,6 @@ try:
 except ImportError:
     import json
 
-def _log_except_hook(*exc_info):
-    text = "".join(traceback.format_exception(*exc_info))
-    logging.error("Unhandled exception: %s", text)
 
 class BaseExp(object):
     """Base class for an experiment.
@@ -45,7 +42,6 @@ class BaseExp(object):
                  stim_path='',
                  subject='',
                  panel=None,
-                 log_handlers=[],
                  *args, **kwargs):
         super(BaseExp,  self).__init__()
 
@@ -65,55 +61,21 @@ class BaseExp(object):
             self.parameters['stim_path'] = stim_path
         self.parameters['subject'] = subject
 
-        # configure logging
-        self.parameters['log_handlers'] = log_handlers
-        self.log_config()
-
         self.req_panel_attr= ['house_light',
                               'reset',
                               ]
         self.panel = panel
-        self.log.debug('panel %s initialized' % self.parameters['panel_name'])
+        logging.debug('panel %s initialized' % self.parameters['panel_name'])
 
         if 'shape' not in self.parameters or self.parameters['shape'] not in ['block1', 'block2', 'block3', 'block4', 'block5']:
             self.parameters['shape'] = None
 
-        self.shaper = shape.Shaper(self.panel, self.log, self.parameters, self.log_error_callback)
+        self.shaper = shape.Shaper(self.panel, self.parameters, self.log_error_callback)
 
     def save(self):
         self.snapshot_f = os.path.join(self.parameters['experiment_path'], self.timestamp+'.json')
         with open(self.snapshot_f, 'wb') as config_snap:
             json.dump(self.parameters, config_snap, sort_keys=True, indent=4)
-
-    def log_config(self):
-
-        self.log_file = os.path.join(self.parameters['experiment_path'], self.parameters['subject'] + '.log')
-
-        if self.debug:
-            self.log_level = logging.DEBUG
-        else:
-            self.log_level = logging.INFO
-
-        sys.excepthook = _log_except_hook # send uncaught exceptions to log file
-
-        logging.basicConfig(filename=self.log_file,
-                            level=self.log_level,
-                            format='"%(asctime)s","%(levelname)s","%(message)s"')
-        self.log = logging.getLogger()
-
-        if 'email' in self.parameters['log_handlers']:
-            from pyoperant.local import SMTP_CONFIG
-            from logging import handlers
-            SMTP_CONFIG['toaddrs'] = [self.parameters['experimenter']['email'],]
-
-            email_handler = handlers.SMTPHandler(**SMTP_CONFIG)
-            email_handler.setLevel(logging.WARNING)
-
-            heading = '%s\n' % (self.parameters['subject'])
-            formatter = logging.Formatter(heading+'%(levelname)s at %(asctime)s:\n%(message)s')
-            email_handler.setFormatter(formatter)
-
-            self.log.addHandler(email_handler)
 
     def check_light_schedule(self):
         """returns true if the lights should be on"""
@@ -127,7 +89,7 @@ class BaseExp(object):
         try:
             self.panel.reset()
         except components.ComponentError as err:
-            self.log.error("component error: %s" % str(err))
+            logging.error("component error: %s" % str(err))
 
     def run(self):
 
@@ -137,7 +99,7 @@ class BaseExp(object):
         self.save()
         self.init_summary()
 
-        self.log.info('%s: running %s with parameters in %s' % (self.name,
+        logging.info('%s: running %s with parameters in %s' % (self.name,
                                                                 self.__class__.__name__,
                                                                 self.snapshot_f,
                                                                 )
@@ -159,7 +121,7 @@ class BaseExp(object):
             return 'session'
         else:
             self.panel_reset()
-            self.log.debug('idling...')
+            logging.debug('idling...')
             utils.wait(self.parameters['idle_poll_interval'])
             return 'idle'
 
@@ -167,12 +129,12 @@ class BaseExp(object):
 
     # defining functions for sleep
     def sleep_pre(self):
-        self.log.debug('lights off. going to sleep...')
+        logging.debug('lights off. going to sleep...')
         return 'main'
 
     def sleep_main(self):
         """ reset expal parameters for the next day """
-        self.log.debug('sleeping...')
+        logging.debug('sleeping...')
         self.panel.house_light.off()
         utils.wait(self.parameters['idle_poll_interval'])
         if self.check_light_schedule() == False:
@@ -181,7 +143,7 @@ class BaseExp(object):
             return 'post'
 
     def sleep_post(self):
-        self.log.debug('ending sleep')
+        logging.debug('ending sleep')
         self.panel.house_light.on()
         self.init_summary()
         return None
@@ -244,4 +206,4 @@ class BaseExp(object):
 
     def log_error_callback(self, err):
         if err.__class__ is InterfaceError or err.__class__ is ComponentError:
-            self.log.critical(str(err))
+            logging.critical(str(err))

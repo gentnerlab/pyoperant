@@ -35,7 +35,7 @@ class TwoAltChoiceExp(base.BaseExp):
     """
     def __init__(self, *args, **kwargs):
         super(TwoAltChoiceExp,  self).__init__(*args, **kwargs)
-        self.shaper = shape.Shaper2AC(self.panel, self.log, self.parameters, self.log_error_callback)
+        self.shaper = shape.Shaper2AC(self.panel, self.parameters, self.log_error_callback)
 
         # # assign stim files full names
         for name, filename in self.parameters['stims'].items():
@@ -166,7 +166,7 @@ class TwoAltChoiceExp(base.BaseExp):
             self.trial_q = None
 
         if self.session_q is None:
-            self.log.info('Next sessions: %s' % self.parameters['block_design']['order'])
+            logging.info('Next sessions: %s' % self.parameters['block_design']['order'])
             self.session_q = queues.block_queue(self.parameters['block_design']['order'])
 
         if self.trial_q is None:
@@ -175,7 +175,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.trials = []
                 self.do_correction = False
                 self.session_id += 1
-                self.log.info('starting session %s: %s' % (self.session_id,sn_cond))
+                logging.info('starting session %s: %s' % (self.session_id,sn_cond))
 
                 # grab the block details
                 blk = copy.deepcopy(self.parameters['block_design']['blocks'][sn_cond])
@@ -197,7 +197,7 @@ class TwoAltChoiceExp(base.BaseExp):
             self.session_q = None
         
         else:
-            self.log.info('continuing last session')
+            logging.info('continuing last session')
             try: 
                 run_trial_queue()
             except EndSession:
@@ -209,7 +209,7 @@ class TwoAltChoiceExp(base.BaseExp):
         """ Closes out the sessions
 
         """
-        self.log.info('ending session')
+        logging.info('ending session')
         return None
 
     ## trial flow
@@ -244,7 +244,7 @@ class TwoAltChoiceExp(base.BaseExp):
                     trial.stimulus = trial.stimulus_event.name
                 elif ev.label is 'motif':
                     trial.events.append(copy.copy(ev))
-            self.log.debug("correction trial: class is %s" % trial.class_)
+            logging.debug("correction trial: class is %s" % trial.class_)
         else:
             # otherwise, we'll create a new trial
             trial = utils.Trial(index=index)
@@ -262,7 +262,7 @@ class TwoAltChoiceExp(base.BaseExp):
         self.trials.append(trial)
         self.this_trial = self.trials[-1]
         self.this_trial_index = self.trials.index(self.this_trial)
-        self.log.debug("trial %i: %s, %s" % (self.this_trial.index,self.this_trial.type_,self.this_trial.class_))
+        logging.debug("trial %i: %s, %s" % (self.this_trial.index,self.this_trial.type_,self.this_trial.class_))
 
         return True
 
@@ -278,7 +278,7 @@ class TwoAltChoiceExp(base.BaseExp):
         # TODO: default stimulus selection
         stim_name = conditions['stim_name']
         stim_file = self.parameters['stims'][stim_name]
-        self.log.debug(stim_file)
+        logging.debug(stim_file)
 
         stim = utils.auditory_stim_from_wav(stim_file)
         epochs = []
@@ -322,16 +322,16 @@ class TwoAltChoiceExp(base.BaseExp):
     def trial_pre(self):
         ''' this is where we initialize a trial'''
         # make sure lights are on at the beginning of each trial, prep for trial
-        self.log.debug('running trial')
-        self.log.debug("number of open file descriptors: %d" %(utils.get_num_open_fds()))
+        logging.debug('running trial')
+        logging.debug("number of open file descriptors: %d" %(utils.get_num_open_fds()))
 
         self.this_trial = self.trials[-1]
         min_wait = self.this_trial.stimulus_event.duration
         max_wait = self.this_trial.stimulus_event.duration + self.parameters['response_win']
         self.this_trial.annotate(min_wait=min_wait)
         self.this_trial.annotate(max_wait=max_wait)
-        self.log.debug('created new trial')
-        self.log.debug('min/max wait: %s/%s' % (min_wait,max_wait))
+        logging.debug('created new trial')
+        logging.debug('min/max wait: %s/%s' % (min_wait,max_wait))
 
 
     def trial_post(self):
@@ -361,10 +361,10 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def stimulus_pre(self):
         # wait for bird to peck
-        self.log.debug("presenting stimulus %s" % self.this_trial.stimulus)
-        self.log.debug("from file %s" % self.this_trial.stimulus_event.file_origin)
+        logging.debug("presenting stimulus %s" % self.this_trial.stimulus)
+        logging.debug("from file %s" % self.this_trial.stimulus_event.file_origin)
         self.panel.speaker.queue(self.this_trial.stimulus_event.file_origin)
-        self.log.debug('waiting for peck...')
+        logging.debug('waiting for peck...')
         self.panel.center.on()
         trial_time = None
         while trial_time is None:
@@ -387,13 +387,13 @@ class TwoAltChoiceExp(base.BaseExp):
         # record trial initiation
         self.summary['trials'] += 1
         self.summary['last_trial_time'] = self.this_trial.time.ctime()
-        self.log.info("trial started at %s" % self.this_trial.time.ctime())
+        logging.info("trial started at %s" % self.this_trial.time.ctime())
 
     def stimulus_main(self):
         ## 1. present cue
         if 'cue' in self.this_trial.annotations:
             cue = self.this_trial.annotations["cue"]
-            self.log.debug("cue light turning on")
+            logging.debug("cue light turning on")
             cue_start = dt.datetime.now()
             if cue=="red":
                 self.panel.cue.red()
@@ -419,14 +419,14 @@ class TwoAltChoiceExp(base.BaseExp):
         self.panel.speaker.play() # already queued in stimulus_pre()
 
     def stimulus_post(self):
-        self.log.debug('waiting %s secs...' % self.this_trial.annotations['min_wait'])
+        logging.debug('waiting %s secs...' % self.this_trial.annotations['min_wait'])
         utils.wait(self.this_trial.annotations['min_wait'])
 
     #response flow
     def response_pre(self):
         for class_, port in self.class_assoc.items():
             port.on()
-        self.log.debug('waiting for response')
+        logging.debug('waiting for response')
 
     def response_main(self):
         response_start = dt.datetime.now()
@@ -436,7 +436,7 @@ class TwoAltChoiceExp(base.BaseExp):
             if response_time > self.this_trial.annotations['max_wait']:
                 self.panel.speaker.stop()
                 self.this_trial.response = 'none'
-                self.log.info('no response')
+                logging.info('no response')
                 return
             for class_, port in self.class_assoc.items():
                 if port.status():
@@ -449,7 +449,7 @@ class TwoAltChoiceExp(base.BaseExp):
                                                  time=elapsed_time,
                                                  )
                     self.this_trial.events.append(response_event)
-                    self.log.info('response: %s' % (self.this_trial.response))
+                    logging.info('response: %s' % (self.this_trial.response))
                     return
             utils.wait(.015)
 
@@ -514,28 +514,28 @@ class TwoAltChoiceExp(base.BaseExp):
         except components.HopperAlreadyUpError as err:
             self.this_trial.reward = True
             self.summary['hopper_already_up'] += 1
-            self.log.warning("hopper already up on panel %s" % str(err))
+            logging.warning("hopper already up on panel %s" % str(err))
             utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
             self.panel.reset()
 
         except components.HopperWontComeUpError as err:
             self.this_trial.reward = 'error'
             self.summary['hopper_failures'] += 1
-            self.log.error("hopper didn't come up on panel %s" % str(err))
+            logging.error("hopper didn't come up on panel %s" % str(err))
             utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
             self.panel.reset()
 
         # except components.ResponseDuringFeedError as err:
         #     trial['reward'] = 'Error'
         #     self.summary['responses_during_reward'] += 1
-        #     self.log.error("response during reward on panel %s" % str(err))
+        #     logging.error("response during reward on panel %s" % str(err))
         #     utils.wait(self.reward_dur[trial['class']])
         #     self.panel.reset()
 
         except components.HopperWontDropError as err:
             self.this_trial.reward = 'error'
             self.summary['hopper_wont_go_down'] += 1
-            self.log.warning("hopper didn't go down on panel %s" % str(err))
+            logging.warning("hopper didn't go down on panel %s" % str(err))
             self.panel.reset()
 
         finally:

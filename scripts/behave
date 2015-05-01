@@ -4,21 +4,18 @@ import sys, os
 import signal
 import argparse
 import importlib
-try: import simplejson as json
+import logging
+from logging import handlers
 
+try: import simplejson as json
 except ImportError: import json
 
-from pyoperant.local import PANELS
+from pyoperant import local
 
 try:
-    from pyoperant.local import BEHAVIORS
-except ImportError:
-    BEHAVIORS = ['pyoperant.behavior']
-
-try:
-    from pyoperant.local import DATAPATH
-except ImportError:
-    DATAPATH = '/home/bird/opdat'
+    registered_protocols = local.BEHAVIORS
+except AttributeError:
+    registered_protocols = ['pyoperant.behavior',]
 
 
 def parse_commandline(arg_str=sys.argv[1:]):
@@ -57,6 +54,12 @@ def parse_commandline(arg_str=sys.argv[1:]):
                         required=False,
                         help='configuration file [default: %(default)s]'
                         )
+    parser.add_argument('--debug',
+                        action='store_true',
+                        dest='debug',
+                        required=False,
+                        help='turn on debugging [default: %(default)s]'
+                        )
     args = parser.parse_args(arg_str)
 
     return vars(args)
@@ -64,7 +67,7 @@ def parse_commandline(arg_str=sys.argv[1:]):
 def list_protocols():
     from pyoperant.behavior.base import BaseExp
     l = []
-    behav_modules = [importlib.import_module(pstr) for pstr in BEHAVIORS]
+    behav_modules = [importlib.import_module(pstr) for pstr in registered_protocols]
     for mod in behav_modules:
         for name, obj in mod.__dict__.iteritems():
             try:
@@ -77,7 +80,7 @@ def list_protocols():
 
 def find_protocol(protocol):
     packages = []
-    for pstr in BEHAVIORS:
+    for pstr in registered_protocols:
         p = importlib.import_module(pstr)
 
         try:
@@ -87,40 +90,76 @@ def find_protocol(protocol):
             continue
     raise ImportError('%s not found' % protocol)
 
-def clean(*args):
-    sys.exit(0)
+def load_config(config_file):
 
+    if 'json' in config_file:
+        with open(config_file, 'rb') as config:
+            parameters = json.load(config)
+
+    return parameters
+
+def _log_except_hook(*exc_info):
+    text = "".join(traceback.format_exception(*exc_info))
+    logging.error("Unhandled exception: %s", text)
+
+def _clean_exit(*args):
+    sys.exit(0)
 
 def main():
 
+    # setup a clean exit when killing the processes
     for sig in (signal.SIGINT,signal.SIGTERM,):
-        signal.signal(sig, clean)
+        signal.signal(sig,_clean_exit)
 
+    # parse the command line and start setting up default paths
     cmd_line = parse_commandline()
 
-    experiment_path = os.path.join(DATAPATH,cmd_line['subject'])
+    experiment_path = os.path.join(local.DATAPATH,cmd_line['subject'])
     config_file = os.path.join(experiment_path,cmd_line['config_file'])
     stimuli_path = os.path.join(experiment_path,'Stimuli')
 
+    # setup basic logger
+    log_file = os.path.join(experiment_path,cmd_line['subject']+'.log')
+    log_level = logging.DEBUG if cmd_line['debug'] else logging.INFO
+    sys.excepthook = _log_except_hook # send uncaught exceptions to log file
+
+    logging.basicConfig(
+        filename=log_file,
+        level=log_level,
+        format='"%(asctime)s","%(levelname)s","%(message)s"',
+        )
+
+    log = logging.getLogger()
+    log.getLogger('pyoperant').set_level(log_level)
+
+    # load parameters
     try:
-        with open(config_file, 'rb') as config:
-            parameters = json.load(config)
+        parameters = load_config(config_file)
     except IOError:
         parameters = {}
 
-    BehaviorProtocol = find_protocol(cmd_line['protocol'])
-
-    if ('debug' in parameters) and parameters['debug']:
-        print parameters
-        print PANELS
-
     for k in ['subject','panel_name','experiment_path']:
-        parameters.pop(k) if k in parameters.keys() else None
+        if k in parameters.keys():
+            parameters.pop(k)
 
+    # setup email handler for logging errors
+    smtp_config = local.SMTP_CONFIG
+    smtp_config.update(toaddrs=[parameters['experimenter']['email'],])
+    email_handler = handlers.SMTPHandler(**smtp_config)
+    email_handler.setLevel(logging.WARNING)
+
+    heading = '%s\n' % (cmd_line['subject'])
+    formatter = logging.Formatter(heading+'%(levelname)s at %(asctime)s:\n%(message)s')
+    email_handler.setFormatter(formatter)
+    log.addHandler(email_handler)
+
+    # override stim path if present in config file
     stimuli_path = parameters.pop('stim_path') if 'stim_path' in parameters else stimuli_path
 
+    # define and initialize the protocol
+    BehaviorProtocol = find_protocol(cmd_line['protocol'])
     behavior = BehaviorProtocol(
-        panel=PANELS[cmd_line['panel']](),
+        panel=local.PANELS[cmd_line['panel']](),
         subject=cmd_line['subject'],
         panel_name=cmd_line['panel'],
         experiment_path=experiment_path,
@@ -128,8 +167,8 @@ def main():
         **parameters
         )
 
+    # run the protocol
     behavior.run()
-
 
 if __name__ == "__main__":
     main()
