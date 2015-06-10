@@ -516,7 +516,7 @@ class TwoAltChoiceExp(base.BaseExp):
             self.summary['hopper_already_up'] += 1
             self.log.warning("hopper already up on panel %s" % str(err))
             utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
-            self.panel.reset()
+            #self.panel.reset()
 
         except components.HopperWontComeUpError as err:
             self.this_trial.reward = 'error'
@@ -536,7 +536,7 @@ class TwoAltChoiceExp(base.BaseExp):
             self.this_trial.reward = 'error'
             self.summary['hopper_wont_go_down'] += 1
             self.log.warning("hopper didn't go down on panel %s" % str(err))
-            self.panel.reset()
+            #self.panel.reset()
 
         finally:
             self.panel.house_light.on()
