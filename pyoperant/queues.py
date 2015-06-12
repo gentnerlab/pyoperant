@@ -1,6 +1,7 @@
 import random
 from pyoperant.utils import rand_from_log_shape_dist
 import cPickle as pickle
+import numpy as np
 
 def random_queue(conditions,tr_max=100,weights=None):
     """ generator which randomly samples conditions
@@ -59,11 +60,8 @@ class AdaptiveBase(object):
     a staircase. Importantly, any objects inheriting this need to define the
     `update()` and `next()` methods.
     """
-    def __init__(self):
-        super(AdaptiveBase, self).__init__()
+    def __init__(self, **kwargs):
         self.updated = True # for first trial, no update needed
-        self.save()
-        self.saved = True
 
     def __iter__(self):
         return self
@@ -72,7 +70,11 @@ class AdaptiveBase(object):
         self.updated = True
 
     def next(self):
-        assert self.updated, "hasn't been updated since last trial"
+        if not self.updated: #hasn't been updated since last trial
+            self.no_response()
+        self.updated = False
+
+    def no_response(self):
         self.updated = False
 
 class PersistentBase(object):
@@ -80,8 +82,9 @@ class PersistentBase(object):
     A mixin that allows for the creation of an obj through a load command that
     first checks for a pickled file to load an object before generating a new one.
     """
-    def __init__(self, filename):
-        super(PersistentBase, self).__init__()
+    def __init__(self, filename=None, **kwargs):
+        assert filename != None
+        super(PersistentBase, self).__init__(**kwargs)
         self.filename = filename
         self.save()
 
@@ -92,11 +95,11 @@ class PersistentBase(object):
                 ab = pickle.load(handle)
             return ab
         except IOError:
-            return cls(filename, *args, **kwargs)
+            return cls(*args, filename=filename, **kwargs)
 
     def save(self):
         with open(self.filename, 'wb') as handle:
-            pickle.dump(self)
+            pickle.dump(self, handle)
 
 
 class KaernbachStaircase(AdaptiveBase):
@@ -174,8 +177,8 @@ class DoubleStaircase(AdaptiveBase):
     stims: an array of stimuli names ordered from most easily left to most easily right
     rate_constant: the step size is the rate_constant*(high_idx-low_idx)
     """
-    def __init__(self, stims, rate_constant=.05):
-        super(DoubleStaircase, self).__init__()
+    def __init__(self, stims, rate_constant=.05, **kwargs):
+        super(DoubleStaircase, self).__init__(**kwargs)
         self.stims = stims
         self.low_idx = 0
         self.high_idx = len(self.stims) - 1
@@ -191,11 +194,11 @@ class DoubleStaircase(AdaptiveBase):
         self.trial = {}
 
     def next(self):
-        super(DoubleStaircase, self).next(self)
+        super(DoubleStaircase, self).next()
         if self.high_idx - self.low_idx <= 1:
             raise StopIteration
         
-        delta = np.ceil((self.high_idx - self.low_idx) * self.rate_constant)
+        delta = int(np.ceil((self.high_idx - self.low_idx) * self.rate_constant))
         if random.random() < .5: # probe low side
             self.trial['low'] = True
             self.trial['value'] = self.low_idx + delta
@@ -204,6 +207,10 @@ class DoubleStaircase(AdaptiveBase):
             self.trial['low'] = False
             self.trial['value'] = self.high_idx - delta
             return {'class': 'R',  'stim_name': self.stims[self.trial['value']]}
+
+    def no_response(self):
+        super(DoubleStaircase, self).no_response()
+        self.trial = {}
 
 class DoubleStaircaseReinforced(AdaptiveBase):
     """
@@ -217,20 +224,20 @@ class DoubleStaircaseReinforced(AdaptiveBase):
     rate_constant: the step size is the rate_constant*(high_idx-low_idx)
     probe_rate: proportion of trials that are between [0, low_idx] or [high_idx, length(stims)]
     """
-    def __init__(self, stims, rate_constant=.05, probe_rate=.1):
-        super(DoubleStaircaseReinforced, self).__init__()
+    def __init__(self, stims, rate_constant=.05, probe_rate=.1, **kwargs):
+        super(DoubleStaircaseReinforced, self).__init__(**kwargs)
         self.dblstaircase = DoubleStaircase(stims, rate_constant)
         self.stims = stims
         self.probe_rate = probe_rate
 
     def update(self, correct):
-        super(DoubleStaircase, self).update(self, correct)
+        super(DoubleStaircaseReinforced, self).update(self, correct)
         if self.last_probe:
             self.dblstaircase.update(correct)
         self.last_probe = False
 
     def next(self):
-        super(DoubleStaircase, self).next(self)
+        super(DoubleStaircaseReinforced, self).next()
 
         if random.random() < self.probe_rate:
             try:
@@ -243,13 +250,18 @@ class DoubleStaircaseReinforced(AdaptiveBase):
                 return self.next()
         else:
             if random.random() < .5: # probe left
-                val = np.floor((1 - rand_from_log_shape_dist()) * self.dblstaircase.low_idx)
+                val = int((1 - rand_from_log_shape_dist()) * self.dblstaircase.low_idx)
                 return {'class': 'L',  'stim_name': self.stims[val]}
             else: # probe right
-                val = self.dblstaircase.high_idx - np.floor(rand_from_log_shape_dist() * (len(self.stims) - 1 - self.dblstaircase.high_idx)) 
+                val = self.dblstaircase.high_idx - int(rand_from_log_shape_dist() * (len(self.stims) - 1 - self.dblstaircase.high_idx)) 
                 return {'class': 'R',  'stim_name': self.stims[val]}
 
-class MixedAdaptiveQueue(AdaptiveBase, PersistentBase):
+    def no_response(self):
+        super(DoubleStaircaseReinforced).no_response()
+        self.last_probe = False
+
+
+class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
     """
     Generates conditions from multiple adaptive sub queues.
 
@@ -263,16 +275,15 @@ class MixedAdaptiveQueue(AdaptiveBase, PersistentBase):
                         NotImplemented
     filename: filename of pickle to save itself
     """
-    def __init__(self, filename, sub_queues, probabilities=None):
-        AdaptiveBase.__init__(self)
-        PersistentBase.__init__(self, filename)
+    def __init__(self, sub_queues, probabilities=None, **kwargs):
+        super(MixedAdaptiveQueue, self).__init__(self, **kwargs)
         self.sub_queues = sub_queues
         self.probabilities = probabilities
         self.sub_queue_idx = -1
         self.save()
 
     def update(self, correct):
-        super(MixedAdaptiveQueue, self).update(self, correct):
+        super(MixedAdaptiveQueue, self).update(self, correct)
         self.sub_queues[self.sub_queue_idx].update(correct)
         self.save()
 

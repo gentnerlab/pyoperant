@@ -187,9 +187,8 @@ class TwoAltChoiceExp(base.BaseExp):
                 elif q_type=='block':
                     self.trial_q = queues.block_queue(**blk)
                 elif q_type=='mixedDblStaircase':
-                    dbl_staircases = [queues.DoubleStaircaseReinforced(stims) for stims in blk.stim_lists]
-                    self.trial_q = queues.MixedAdaptiveQueue.load(os.path.join(self.parameters['experiment_path'], 'persistentQ.pkl'), 
-                                                                    dbl_staircases)
+                    dbl_staircases = [queues.DoubleStaircaseReinforced(stims) for stims in blk['stim_lists']]
+                    self.trial_q = queues.MixedAdaptiveQueue.load(os.path.join(self.parameters['experiment_path'], 'persistentQ.pkl'), dbl_staircases)
                 try: 
                     run_trial_queue()
                 except EndSession:
