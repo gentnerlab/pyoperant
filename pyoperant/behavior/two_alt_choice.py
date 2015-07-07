@@ -478,7 +478,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.reward_post()
 
         # no response
-        elif self.this_trial.response is 'none':
+        elif self.this_trial.response == 'none':
             pass
 
         # incorrect trial
@@ -490,7 +490,8 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.punish_post()
 
     def consequence_post(self):
-        pass
+        if self.this_trial.type_ == 'normal' and isinstance(self.trial_q, queues.AdaptiveBase):
+            self.trial_q.update(self.this_trial.correct, self.this_trial.response == 'none')
 
 
     def secondary_reinforcement(self,value=1.0):

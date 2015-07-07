@@ -66,12 +66,14 @@ class AdaptiveBase(object):
     def __iter__(self):
         return self
 
-    def update(self,correct):
+    def update(self, correct, no_resp):
         self.updated = True
+        if no_resp:
+            no_response()
 
     def next(self):
         if not self.updated: #hasn't been updated since last trial
-            self.no_response()
+            raise Exception("queue hasn't been updated since last trial")
         self.updated = False
 
     def no_response(self):
@@ -140,8 +142,8 @@ class KaernbachStaircase(AdaptiveBase):
         self.counter = 0
         self.going_up = False
 
-    def update(self,correct):
-        super(KaernbachStaircase, self).update(correct)
+    def update(self, correct, no_resp):
+        super(KaernbachStaircase, self).update(correct, no_resp)
             
         self.val += -1*self.stepsize_dn if correct else self.stepsize_up
 
@@ -185,8 +187,8 @@ class DoubleStaircase(AdaptiveBase):
         self.high_idx = len(self.stims) - 1
         self.trial = {}
 
-    def update(self, correct):
-        super(DoubleStaircase, self).update(correct)
+    def update(self, correct, no_resp):
+        super(DoubleStaircase, self).update(correct, no_resp)
         if correct:
             if self.trial['low']:
                 self.low_idx = self.trial['value']
@@ -232,10 +234,10 @@ class DoubleStaircaseReinforced(AdaptiveBase):
         self.probe_rate = probe_rate
         self.last_probe = False
 
-    def update(self, correct):
-        super(DoubleStaircaseReinforced, self).update(correct)
+    def update(self, correct, no_resp):
+        super(DoubleStaircaseReinforced, self).update(correct, no_resp)
         if self.last_probe:
-            self.dblstaircase.update(correct)
+            self.dblstaircase.update(correct, no_resp)
         self.last_probe = False
 
     def next(self):
@@ -285,9 +287,9 @@ class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
         self.sub_queue_idx = -1
         self.save()
 
-    def update(self, correct):
-        super(MixedAdaptiveQueue, self).update(correct)
-        self.sub_queues[self.sub_queue_idx].update(correct)
+    def update(self, correct, no_resp):
+        super(MixedAdaptiveQueue, self).update(correct, no_resp)
+        self.sub_queues[self.sub_queue_idx].update(correct, no_resp)
         self.save()
 
     def next(self):
