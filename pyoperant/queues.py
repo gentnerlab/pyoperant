@@ -69,7 +69,7 @@ class AdaptiveBase(object):
     def update(self, correct, no_resp):
         self.updated = True
         if no_resp:
-            no_response()
+            self.no_response()
 
     def next(self):
         if not self.updated: #hasn't been updated since last trial
