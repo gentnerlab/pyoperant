@@ -371,6 +371,7 @@ class TwoAltChoiceExp(base.BaseExp):
             if self.check_session_schedule()==False:
                 self.panel.center.off()
                 self.panel.speaker.stop()
+                self.update_adaptive_queue(presented=False)
                 raise EndSession
             else:
                 trial_time = self.panel.center.poll(timeout=60.0)
@@ -490,8 +491,14 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.punish_post()
 
     def consequence_post(self):
+        self.update_adaptive_queue()
+
+    def update_adaptive_queue(self, presented=True):
         if self.this_trial.type_ == 'normal' and isinstance(self.trial_q, queues.AdaptiveBase):
-            self.trial_q.update(self.this_trial.correct, self.this_trial.response == 'none')
+            if presented:
+                self.trial_q.update(self.this_trial.correct, self.this_trial.response == 'none')
+            else:
+                self.trial_q.update(False, True)
 
 
     def secondary_reinforcement(self,value=1.0):
