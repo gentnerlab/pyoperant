@@ -62,6 +62,7 @@ class AdaptiveBase(object):
     """
     def __init__(self, **kwargs):
         self.updated = True # for first trial, no update needed
+        self.update_error_str = "queue hasn't been updated since last trial"
 
     def __iter__(self):
         return self
@@ -73,11 +74,19 @@ class AdaptiveBase(object):
 
     def next(self):
         if not self.updated: #hasn't been updated since last trial
-            raise Exception("queue hasn't been updated since last trial")
+            raise Exception(self.update_error_str)
         self.updated = False
 
     def no_response(self):
         pass
+
+    def on_load(self):
+        try:
+            super(AdaptiveBase, self).on_load()
+        except AttributeError:
+            pass
+        self.updated = True
+        self.no_response()
 
 class PersistentBase(object):
     """
@@ -95,9 +104,16 @@ class PersistentBase(object):
         try:
             with open(filename, 'rb') as handle:
                 ab = pickle.load(handle)
+                ab.on_load()
             return ab
         except IOError:
             return cls(*args, filename=filename, **kwargs)
+
+    def on_load(self):
+        try:
+            super(PersistentBase, self).on_load()
+        except AttributeError:
+            pass
 
     def save(self):
         with open(self.filename, 'wb') as handle:
@@ -186,6 +202,7 @@ class DoubleStaircase(AdaptiveBase):
         self.low_idx = 0
         self.high_idx = len(self.stims) - 1
         self.trial = {}
+        self.update_error_str = "double staircase queue %s hasn't been updated since last trial" % (self.stims[0])
 
     def update(self, correct, no_resp):
         super(DoubleStaircase, self).update(correct, no_resp)
@@ -233,6 +250,7 @@ class DoubleStaircaseReinforced(AdaptiveBase):
         self.stims = stims
         self.probe_rate = probe_rate
         self.last_probe = False
+        self.update_error_str = "reinforced double staircase queue %s hasn't been updated since last trial" % (self.stims[0])
 
     def update(self, correct, no_resp):
         super(DoubleStaircaseReinforced, self).update(correct, no_resp)
@@ -265,6 +283,10 @@ class DoubleStaircaseReinforced(AdaptiveBase):
         super(DoubleStaircaseReinforced, self).no_response()
         self.last_probe = False
 
+    def on_load(self):
+        super(DoubleStaircaseReinforced, self).on_load()
+        self.dblstaircase.on_load()
+
 
 class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
     """
@@ -285,6 +307,7 @@ class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
         self.sub_queues = sub_queues
         self.probabilities = probabilities
         self.sub_queue_idx = -1
+        self.update_error_str = "MixedAdaptiveQueue hasn't been updated since last trial"
         self.save()
 
     def update(self, correct, no_resp):
@@ -304,6 +327,15 @@ class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
         else:
             #TODO: support variable probabilities for each sub_queue
             raise NotImplementedError
+
+    def on_load(self):
+        super(MixedAdaptiveQueue, self).on_load()
+        for sub_queue in self.sub_queues:
+            try:
+                sub_queue.on_load()
+            except AttributeError:
+                pass
+
 
 
 
