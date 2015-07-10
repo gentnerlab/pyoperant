@@ -244,11 +244,12 @@ class DoubleStaircaseReinforced(AdaptiveBase):
     rate_constant: the step size is the rate_constant*(high_idx-low_idx)
     probe_rate: proportion of trials that are between [0, low_idx] or [high_idx, length(stims)]
     """
-    def __init__(self, stims, rate_constant=.05, probe_rate=.1, **kwargs):
+    def __init__(self, stims, rate_constant=.05, probe_rate=.1, sample_log=False, **kwargs):
         super(DoubleStaircaseReinforced, self).__init__(**kwargs)
         self.dblstaircase = DoubleStaircase(stims, rate_constant)
         self.stims = stims
         self.probe_rate = probe_rate
+        self.sample_log = sample_log
         self.last_probe = False
         self.update_error_str = "reinforced double staircase queue %s hasn't been updated since last trial" % (self.stims[0])
 
@@ -273,10 +274,16 @@ class DoubleStaircaseReinforced(AdaptiveBase):
         else:
             self.last_probe = False
             if random.random() < .5: # probe left
-                val = int((1 - rand_from_log_shape_dist()) * self.dblstaircase.low_idx)
+                if self.sample_log:
+                    val = int((1 - rand_from_log_shape_dist()) * self.dblstaircase.low_idx)
+                else:
+                    val = random.randrange(self.dblstaircase.low_idx)
                 return {'class': 'L',  'stim_name': self.stims[val]}
             else: # probe right
-                val = self.dblstaircase.high_idx - int(rand_from_log_shape_dist() * (len(self.stims) - 1 - self.dblstaircase.high_idx)) 
+                if self.sample_log:
+                    val = self.dblstaircase.high_idx + int(rand_from_log_shape_dist() * (len(self.stims) - self.dblstaircase.high_idx)) 
+                else:
+                    val = self.dblstaircase.high_idx + random.randrange(len(self.stims) - self.dblstaircase.high_idx)
                 return {'class': 'R',  'stim_name': self.stims[val]}
 
     def no_response(self):
