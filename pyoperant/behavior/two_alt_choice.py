@@ -134,6 +134,8 @@ class TwoAltChoiceExp(base.BaseExp):
         port through `experiment.class_assoc['L']`.
 
         """
+        assert len(self.parameters['classes'])==2, 'does not currently support > 2 classes'
+
         self.class_assoc = {}
         for class_, class_params in self.parameters['classes'].items():
             try:
