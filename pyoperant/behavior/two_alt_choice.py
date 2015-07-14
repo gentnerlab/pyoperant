@@ -134,14 +134,17 @@ class TwoAltChoiceExp(base.BaseExp):
         port through `experiment.class_assoc['L']`.
 
         """
-        assert len(self.parameters['classes'])==2, 'does not currently support > 2 classes'
-
-        self.class_assoc = {}
+        
+        self.response_ports = {}
         for class_, class_params in self.parameters['classes'].items():
             try:
-                self.class_assoc[class_] = getattr(self.panel,class_params['component'])
+                port_name = class_params['component']
+                port = getattr(self.panel,port_name)
+                self.response_ports.update({port_name:port})
             except KeyError:
                 pass
+
+
 
         return 'main'
 
@@ -427,7 +430,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     #response flow
     def response_pre(self):
-        for class_, port in self.class_assoc.items():
+        for port_name, port in self.response_ports.items()
             port.on()
         self.log.debug('waiting for response')
 
@@ -441,13 +444,13 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.this_trial.response = 'none'
                 self.log.info('no response')
                 return
-            for class_, port in self.class_assoc.items():
+            for port_name, port in self.response_ports.items()
                 if port.status():
                     self.this_trial.rt = (dt.datetime.now() - response_start).total_seconds()
                     self.panel.speaker.stop()
-                    self.this_trial.response = class_
+                    self.this_trial.response = port_name
                     self.summary['responses'] += 1
-                    response_event = utils.Event(name=self.parameters['classes'][class_]['component'],
+                    response_event = utils.Event(name=port_name,
                                                  label='peck',
                                                  time=elapsed_time,
                                                  )
@@ -457,7 +460,7 @@ class TwoAltChoiceExp(base.BaseExp):
             utils.wait(.015)
 
     def response_post(self):
-        for class_, port in self.class_assoc.items():
+        for port_name, port in self.response_ports.items():
             port.off()
 
     ## consequence flow
@@ -466,7 +469,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def consequence_main(self):
         # correct trial
-        if self.this_trial.response==self.this_trial.class_:
+        if self.this_trial.response==self.parameters['classes'][self.this_trial.class_]['component']:
             self.this_trial.correct = True
 
             if self.parameters['reinforcement']['secondary']:
