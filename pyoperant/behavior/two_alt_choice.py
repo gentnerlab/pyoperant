@@ -104,6 +104,9 @@ class TwoAltChoiceExp(base.BaseExp):
         if 'session_schedule' not in self.parameters:
             self.parameters['session_schedule'] = self.parameters['light_schedule']
 
+        if 'no_response_correction_trials' not in self.parameters:
+            self.parameters['no_response_correction_trials'] = False
+
     def make_data_csv(self):
         """ Create the csv file to save trial data
 
@@ -352,7 +355,7 @@ class TwoAltChoiceExp(base.BaseExp):
                     self.do_correction = False
                 elif self.this_trial.response == 'none':
                     if self.this_trial.type_ == 'normal':
-                        self.do_correction = False
+                        self.do_correction = self.parameters['no_response_correction_trials']
             else:
                 self.do_correction = False
         else:
