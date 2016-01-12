@@ -104,6 +104,9 @@ class TwoAltChoiceExp(base.BaseExp):
         if 'session_schedule' not in self.parameters:
             self.parameters['session_schedule'] = self.parameters['light_schedule']
 
+        if 'no_response_correction_trials' not in self.parameters:
+            self.parameters['no_response_correction_trials'] = False
+
     def make_data_csv(self):
         """ Create the csv file to save trial data
 
@@ -134,6 +137,8 @@ class TwoAltChoiceExp(base.BaseExp):
         port through `experiment.class_assoc['L']`.
 
         """
+        assert len(self.parameters['classes'])==2, 'does not currently support > 2 classes'
+
         self.class_assoc = {}
         for class_, class_params in self.parameters['classes'].items():
             try:
@@ -186,9 +191,9 @@ class TwoAltChoiceExp(base.BaseExp):
                     self.trial_q = queues.random_queue(**blk)
                 elif q_type=='block':
                     self.trial_q = queues.block_queue(**blk)
-                elif q_type=='staircase':
-                    self.trial_q = queues.staircase_queue(self,**blk)
-
+                elif q_type=='mixedDblStaircase':
+                    dbl_staircases = [queues.DoubleStaircaseReinforced(stims) for stims in blk['stim_lists']]
+                    self.trial_q = queues.MixedAdaptiveQueue.load(os.path.join(self.parameters['experiment_path'], 'persistentQ.pkl'), dbl_staircases)
                 try: 
                     run_trial_queue()
                 except EndSession:
@@ -350,7 +355,7 @@ class TwoAltChoiceExp(base.BaseExp):
                     self.do_correction = False
                 elif self.this_trial.response == 'none':
                     if self.this_trial.type_ == 'normal':
-                        self.do_correction = False
+                        self.do_correction = self.parameters['no_response_correction_trials']
             else:
                 self.do_correction = False
         else:
@@ -371,6 +376,7 @@ class TwoAltChoiceExp(base.BaseExp):
             if self.check_session_schedule()==False:
                 self.panel.center.off()
                 self.panel.speaker.stop()
+                self.update_adaptive_queue(presented=False)
                 raise EndSession
             else:
                 trial_time = self.panel.center.poll(timeout=60.0)
@@ -478,7 +484,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.reward_post()
 
         # no response
-        elif self.this_trial.response is 'none':
+        elif self.this_trial.response == 'none':
             pass
 
         # incorrect trial
@@ -490,7 +496,14 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.punish_post()
 
     def consequence_post(self):
-        pass
+        self.update_adaptive_queue()
+
+    def update_adaptive_queue(self, presented=True):
+        if self.this_trial.type_ == 'normal' and isinstance(self.trial_q, queues.AdaptiveBase):
+            if presented:
+                self.trial_q.update(self.this_trial.correct, self.this_trial.response == 'none')
+            else:
+                self.trial_q.update(False, True)
 
 
     def secondary_reinforcement(self,value=1.0):

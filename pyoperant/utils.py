@@ -7,9 +7,12 @@ import threading
 import traceback
 import shlex
 import os
+import string
+import random
 import datetime as dt
 import numpy as np
-import string
+import scipy as sp
+import scipy.special
 from contextlib import closing
 from argparse import ArgumentParser
 from pyoperant import Error
@@ -395,3 +398,13 @@ def get_num_open_fds():
         )
     return nprocs
 
+def rand_from_log_shape_dist(alpha=10):
+    """
+    randomly samples from a distribution between 0 and 1 with pdf shaped like the log function
+    low probability of getting close to zero, increasing probability going towards 1
+    alpha determines how sharp the curve is, higher alpha, sharper curve.
+    """
+    beta = (alpha + 1) * np.log(alpha + 1) - alpha
+    t = random.random()
+    ret = ((beta * t-1)/(sp.special.lambertw((beta*t-1)/np.e)) - 1) / alpha
+    return max(min(np.real(ret), 1), 0)
