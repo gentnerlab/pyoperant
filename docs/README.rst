@@ -1,6 +1,11 @@
 pyoperant
 =========
 
+
+.. image:: https://badges.gitter.im/Join%20Chat.svg
+   :alt: Join the chat at https://gitter.im/gentnerlab/pyoperant
+   :target: https://gitter.im/gentnerlab/pyoperant?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
 Pyoperant is a framework to easily construct and share new operant behavior paradigms.
 
 With PyOperant, you can write a single behavior script that works across different species, different computers, different hardware, different rewards, different modalities.
