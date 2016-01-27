@@ -409,7 +409,7 @@ def rand_from_log_shape_dist(alpha=10):
     ret = ((beta * t-1)/(sp.special.lambertw((beta*t-1)/np.e)) - 1) / alpha
     return max(min(np.real(ret), 1), 0)
     
- '''
+'''
 Resample
 
 Created on Apr 7, 2011
