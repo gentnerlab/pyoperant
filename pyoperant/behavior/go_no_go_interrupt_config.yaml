@@ -1,0 +1,96 @@
+---
+# The main format is as follows:
+# Each section contains information that will help to configure your
+# experiment. Where possible, values that are not supplied will be filled in
+# with default values supplied by the given experiment. The author of a
+# particular behavior script should also write a config file that will serve as
+# a template and possibly be used to provide the default values. If a section
+# requires specification of a python object, the formatting should go something
+# like this:
+# object_name: !!python/object/apply:module.submodule.Class
+#   args: [list of arguments]
+#   kwds:
+#     param1: value1
+#     param2: value2
+#     ...
+#     paramn: valuen
+# You can refer to a previously defined object using "&some_name" before
+# defining the object and "*some_name" when referencing the object
+
+# Experiment description
+name: Go No-Go Interruption
+description: >
+    Runs a Go No-Go Interruption experiment
+experimenter:
+    name: First Last
+    email: &def_email "test@somewhere.com"
+
+# File paths
+experiment_path: "/path/to/data/directory"
+
+# Verbose logging
+debug: false
+
+# Number of sessions to run
+num_sessions: 1
+
+# Behavior properties
+reward_value: 12.0
+
+# Subject
+subject_name: TestSubject
+
+# Panel properties
+panel: !!python/object/apply:pyoperant.panels.BasePanel {}
+
+# Stimulus conditions
+conditions:
+    - &NoGo !!python/object/apply:pyoperant.stimuli.StimulusConditionWav
+      kwds:
+        name: "No-Go"
+        file_path: "/path/to/nogo/stimuli"
+        response: false
+        is_rewarded: true
+        is_punished: false
+    - &Go !!python/object:pyoperant.stimuli.StimulusConditionWav
+      kwds:
+        name: "Go"
+        file_path: "/path/to/go/stimuli"
+        response: true
+        is_rewarded: false
+        is_punished: false
+
+
+# Blocks
+blocks:
+    # Block number 1
+    - !!python/object/apply:pyoperant.blocks.Block
+        kwds:
+          conditions:
+            # NoGo stimuli
+            - *NoGo
+            # Go stimuli
+            - *Go
+          queue: !!python/name:pyoperant.queues.random_queue
+          # Weights for random queue
+          weights:
+            - 0.2
+            - 0.8
+          reinforcement: !!python/object/apply:pyoperant.reinf.ContinuousReinforcement {}
+
+# Block Handler
+block_queue: !!python/name:pyoperant.queues.block_queue
+
+# Log handler setup
+# Possible values are stream, file, email
+log_handlers:
+    # stream's only option is level. Overrides "debug" parameter for logging
+    stream:
+        level: !!python/name:logging.INFO
+    # file takes options of
+    # filename: a file under experiment_path
+    # level: a python logging level, written as "!!python/name:logging.LEVEL"
+    file:
+        filename: "experiment.log"
+        level: !!python/name:logging.DEBUG
+...

@@ -7,6 +7,7 @@ import threading
 import traceback
 import shlex
 import os
+import fnmatch
 import string
 import random
 import datetime as dt
@@ -41,6 +42,37 @@ class NumpyAwareJSONEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
                 return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+def filter_files(directory, file_pattern="*", recursive=False):
+    """ Finds all files in directory that match a specific pattern.
+
+    Parameters
+    ----------
+    directory: string
+        File path to the directory to search
+    file_pattern: string
+        A glob to filter on using fnmatch.filter
+    recursive: bool
+        Whether or not to search subdirectories
+
+    Returns
+    -------
+    list of matching files
+    """
+
+    if not os.path.isdir(directory):
+        raise IOError("%s is not a directory" % directory)
+
+    files = list()
+    for rootdir, dirname, fnames in os.walk(directory):
+        matches = fnmatch.filter(fnames, file_pattern)
+        files.extend(os.path.join(rootdir, fname) for fname in matches)
+        if not recursive:
+            dirname[:] = list()
+
+    return files
+
 
 # consider importing this from python-neo
 class Event(object):
@@ -132,27 +164,27 @@ class Trial(Event):
         self.events = []
         self.stim_event = None
 
- 
+
 class Command(object):
     """
     Enables to run subprocess commands in a different thread with TIMEOUT option.
- 
+
     via https://gist.github.com/kirpit/1306188
-    
+
     Based on jcollado's solution:
     http://stackoverflow.com/questions/1191374/subprocess-with-timeout/4825933#4825933
-    
+
     """
     command = None
     process = None
     status = None
     output, error = '', ''
- 
+
     def __init__(self, command):
         if isinstance(command, basestring):
             command = shlex.split(command)
         self.command = command
- 
+
     def run(self, timeout=None, **kwargs):
         """ Run a command then return: (status, output, error). """
         def target(**kwargs):
@@ -249,6 +281,9 @@ def check_time(schedule,fmt="%H:%M"):
     """
     if schedule == 'sun':
         if is_day():
+            return True
+    elif schedule == "night":
+        if not is_day():
             return True
     else:
         for epoch in schedule:

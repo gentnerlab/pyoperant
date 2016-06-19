@@ -11,6 +11,7 @@ class BaseSchedule(object):
         should be consequated. Always returns True.
 
     """
+
     def __init__(self):
         super(BaseSchedule, self).__init__()
 
@@ -138,3 +139,10 @@ class PercentReinforcement(BaseSchedule):
 
     def __unicode__(self):
         return "PR%i" % self.prob
+
+SCHEDULE_DICT = dict(continuous=ContinuousReinforcement,
+                     fixed=FixedRatioSchedule,
+                     fixedratio=FixedRatioSchedule,
+                     variable=VariableRatioSchedule,
+                     variableratio=VariableRatioSchedule,
+                     percent=PercentReinforcement)

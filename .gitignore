@@ -31,3 +31,4 @@ MANIFEST
 fabfile.py
 
 .DS_Store
+.idea*

@@ -24,7 +24,7 @@ setup(
         'scripts/pyoperantctl',
         'scripts/allsummary.py',
         ],
-    license = "BSD",
+    license = "GNU Affero General Public License v3",
     classifiers = [
         "Development Status :: 4 - Beta",
         "Environment :: Console",

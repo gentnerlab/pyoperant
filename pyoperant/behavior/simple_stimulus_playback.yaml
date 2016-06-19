@@ -1,0 +1,36 @@
+---
+# Experiment description
+name: Simple Stimulus Playback
+description: >
+    Loops through a directory of stimuli and plays them back, with some intertrial interval
+experimenter:
+    name: First Last
+    email: &def_email "test@somewhere.com"
+debug: false
+num_sessions: 1
+experiment_path: "/path/to/data/directory"
+
+# Behavior properties
+intertrial_interval: [0.5, 1.5]
+# a directory or a list of dictionaries with name and directory keys
+stimulus_directory:
+  - name: Playback
+    directory: "/path/to/stimulus/directory"
+
+# Additional configuration
+subject_name: TestSubject
+panel: !!python/object/apply:pyoperant.panels.BasePanel {}
+
+# Log handler setup
+# Possible values are stream, file, email
+log_handlers:
+    # stream's only option is level. Overrides "debug" parameter for logging
+    stream:
+        level: !!python/name:logging.INFO
+    # file takes options of
+    # filename: a file under experiment_path
+    # level: a python logging level, written as "!!python/name:logging.LEVEL"
+    file:
+        filename: "experiment.log"
+        level: !!python/name:logging.INFO
+...

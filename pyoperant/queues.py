@@ -2,57 +2,69 @@ import random
 from pyoperant.utils import rand_from_log_shape_dist
 import cPickle as pickle
 import numpy as np
+import logging
 
-def random_queue(conditions,tr_max=100,weights=None):
-    """ generator which randomly samples conditions
+logger = logging.getLogger(__name__)
 
-    Args:
-       conditions (list):  The conditions to sample from. 
-       weights (list of ints): Weights of each condition
 
-    Kwargs:
-       tr_max (int): Maximum number of trial conditions to generate. (default: 100)
+def random_queue(items, weights=None, max_items=None):
+    """ Generator which randomly samples items, with replacement
 
-    Returns:
-        whatever the elements of 'conditions' are
+    Parameters
+    ----------
+    items: list
+        A list of items to be queued
+    weights: list
+        A list of weights, 1 for each item in items
+    max_items: int
+        Maximum number of items to generate. (default: None)
 
+    Yields
+    ------
+    A single item at each iteration
     """
-    if weights:
-        conditions_weighted = []
-        for cond,w in zip(conditions,weights):
-            for ww in range(w):
-                conditions_weighted += cond
-        conditions = conditions_weighted
+    if len(items) == 0:
+        raise ValueError("Cannot intialize a queue with 0 items")
 
-    tr_num = 0
-    while tr_num < tr_max:
-        yield random.choice(conditions)
-        tr_num += 1
+    if weights is None:
+        weights = [1.0 / len(items)] * len(items)
+    else:
+        weights = [float(ww) / sum(weights) for ww in weights]
 
-def block_queue(conditions,reps=1,shuffle=False):
-    """ generate trial conditions from a block
+    ii = 0
+    while True:
+        if (max_items is not None) and (ii >= max_items):
+            break
+        yield np.random.choice(items, p=weights)
+        ii += 1
 
-    Args:
-        conditions (list):  The conditions to sample from. 
 
-    Kwargs:
-        reps (int): number of times each item in conditions will be presented (default: 1)
-        shuffle (bool): Shuffles the queue (default: False)
+def block_queue(items, repetitions=1, shuffle=False):
+    """ Generator which samples items in blocks
 
-    Returns:
-        whatever the elements of 'conditions' are
+    Parameters
+    ----------
+    items: list
+        A list of items to be queued
+    repetitions: int
+        The number of times each item in items will be presented (default: 1)
+    shuffle: bool
+        Shuffles the queue (default: False)
 
+    Yields
+    ------
+    A single item at each iteration
     """
-    conditions_repeated = []
-    for rr in range(reps):
-        conditions_repeated += conditions
-    conditions = conditions_repeated
+    items_repeated = []
+    for rr in range(repetitions):
+        items_repeated += items
+    items = items_repeated
 
     if shuffle:
-        random.shuffle(conditions)
-    
-    for cond in conditions:
-        yield cond
+        random.shuffle(items)
+
+    for item in items:
+        yield item
 
 class AdaptiveBase(object):
     """docstring for AdaptiveBase
@@ -138,7 +150,7 @@ class KaernbachStaircase(AdaptiveBase):
     Returns:
         float
     """
-    def __init__(self, 
+    def __init__(self,
                  start_val=100,
                  stepsize_up=3,
                  stepsize_dn=1,
@@ -150,7 +162,7 @@ class KaernbachStaircase(AdaptiveBase):
         super(KaernbachStaircase, self).__init__()
         self.val = start_val
         self.stepsize_up = stepsize_up
-        self.stepsize_dn = stepsize_dn 
+        self.stepsize_dn = stepsize_dn
         self.min_val = min_val
         self.max_val = max_val
         self.crit = crit
@@ -160,7 +172,7 @@ class KaernbachStaircase(AdaptiveBase):
 
     def update(self, correct, no_resp):
         super(KaernbachStaircase, self).update(correct, no_resp)
-            
+
         self.val += -1*self.stepsize_dn if correct else self.stepsize_up
 
         if self.crit_method=='reversals':
@@ -183,7 +195,7 @@ class KaernbachStaircase(AdaptiveBase):
 
 class DoubleStaircase(AdaptiveBase):
     """
-    Generates conditions from a list of stims that monotonically vary from most 
+    Generates conditions from a list of stims that monotonically vary from most
     easily left to most easily right
     i.e. left is low and right is high
 
@@ -217,7 +229,7 @@ class DoubleStaircase(AdaptiveBase):
         super(DoubleStaircase, self).next()
         if self.high_idx - self.low_idx <= 1:
             raise StopIteration
-        
+
         delta = int(np.ceil((self.high_idx - self.low_idx) * self.rate_constant))
         if random.random() < .5: # probe low side
             self.trial['low'] = True
@@ -237,7 +249,7 @@ class DoubleStaircaseReinforced(AdaptiveBase):
     Generates conditions as with DoubleStaircase, but 1-probe_rate proportion of
     the trials easier/known trials to reduce frustration.
 
-    Easier trials are sampled from a log shaped distribution so that more trials 
+    Easier trials are sampled from a log shaped distribution so that more trials
     are sampled from the edges than near the indices
 
     stims: an array of stimuli names ordered from most easily left to most easily right
@@ -281,7 +293,7 @@ class DoubleStaircaseReinforced(AdaptiveBase):
                 return {'class': 'L',  'stim_name': self.stims[val]}
             else: # probe right
                 if self.sample_log:
-                    val = self.dblstaircase.high_idx + int(rand_from_log_shape_dist() * (len(self.stims) - self.dblstaircase.high_idx)) 
+                    val = self.dblstaircase.high_idx + int(rand_from_log_shape_dist() * (len(self.stims) - self.dblstaircase.high_idx))
                 else:
                     val = self.dblstaircase.high_idx + random.randrange(len(self.stims) - self.dblstaircase.high_idx)
                 return {'class': 'R',  'stim_name': self.stims[val]}
@@ -300,7 +312,7 @@ class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
     Generates conditions from multiple adaptive sub queues.
 
     Use the generator MixedAdaptiveQueue.load(filename, sub_queues)
-    to load a previously saved MixedAdaptiveQueue or generate a new one 
+    to load a previously saved MixedAdaptiveQueue or generate a new one
     if the pkl file doesn't exist.
 
     sub_queues: a list of adaptive queues
@@ -344,5 +356,44 @@ class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
                 pass
 
 
+class BaseHandler(object):
+    """ Base class for implementing an iterable queue handler
 
+    Parameters
+    ----------
+    queue: queue function or class
+        The queue that will be iterated over. All queues must accept an items
+        argument and implement generator, either through yielding values or a
+        Class.next() method.
+    items: list
+        A list of items to iterate over.
+    Additional key-value pairs are used to initialize the queue
 
+    Attributes
+    ----------
+    queue: queue generator or class instance
+        The queue that will be iterated over.
+    queue_parameters: dict
+        All additional parameters used to initialize the queue.        
+    """
+
+    def __init__(self, queue, items, **queue_parameters):
+
+        if not hasattr(queue, "__call__"):
+            raise TypeError("queue must be a callable function or class")
+        # Store these in case we need to reset
+        self._queue = queue
+        self._items = items
+
+        self.queue = queue(items=items, **queue_parameters)
+        self.queue_parameters = queue_parameters
+
+    def reset(self):
+        """ Reset the queue """
+
+        self.queue = self._queue(items=self._items, **self.queue_parameters)
+
+    def __iter__(self):
+
+        for item in self.queue:
+            yield item
