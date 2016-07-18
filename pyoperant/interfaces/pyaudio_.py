@@ -23,7 +23,6 @@ class PyAudioInterface(base_.BaseInterface):
         self.device_index = None
         self.stream = None
         self.wf = None
-        self.callback = None
         self.open()
 
     def open(self):
@@ -56,20 +55,13 @@ class PyAudioInterface(base_.BaseInterface):
         else:
             raise InterfaceError('there is something wrong with this wav file')
 
-    def _get_stream(self,start=False):
+    def _get_stream(self,start=False,callback=None):
         """
         """
-        def _callback(in_data, frame_count, time_info, status):
-            try:
-                cont = self.callback()         
-            except TypeError:
-                cont = True
-
-            if cont:
+        if callback is None:
+            def callback(in_data, frame_count, time_info, status):
                 data = self.wf.readframes(frame_count)
                 return (data, pyaudio.paContinue)
-            else:
-                return (0, pyaudio.paComplete)
 
         self.stream = self.pa.open(format=self.pa.get_format_from_width(self.wf.getsampwidth()),
                                    channels=self.wf.getnchannels(),
@@ -77,12 +69,12 @@ class PyAudioInterface(base_.BaseInterface):
                                    output=True,
                                    output_device_index=self.device_index,
                                    start=start,
-                                   stream_callback=_callback)
+                                   stream_callback=callback)
 
-    def _queue_wav(self,wav_file,start=False):
+    def _queue_wav(self,wav_file,start=False,callback=None):
         self.wf = wave.open(wav_file)
         self.validate()
-        self._get_stream(start=start)
+        self._get_stream(start=start,callback=callback)
 
     def _play_wav(self):
         self.stream.start_stream()
