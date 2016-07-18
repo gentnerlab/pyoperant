@@ -4,7 +4,7 @@ import datetime as dt
 from pyoperant import utils, components, local, hwio
 from pyoperant import ComponentError, InterfaceError
 from pyoperant.behavior import shape
-
+import random
 
 try:
     import simplejson as json
@@ -150,12 +150,18 @@ class BaseExp(object):
                                     error_callback=self.log_error_callback,
                                     idle=self._run_idle,
                                     sleep=self._run_sleep,
+                                    free_food_block=self._free_food,
                                     session=self._run_session)
 
     def _run_idle(self):
+        self.log.debug('Starting _run_idle')
         if self.check_light_schedule() == False:
             return 'sleep'
-        elif self.check_session_schedule():
+        if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
+        if self.check_session_schedule():
             return 'session'
         else:
             self.panel_reset()
@@ -196,6 +202,70 @@ class BaseExp(object):
         return 'idle'
 
     # session
+    def _wait_block(self, t_min, t_max, next_state):
+        def temp():
+            if t_min == t_max:
+                t = t_max
+            else:
+                t = random.randrange(t_min, t_max)
+            utils.wait(t)
+            return next_state
+
+        return temp
+
+    def free_food_pre(self):
+        self.log.debug('Buffet starting.')
+        return 'main'
+
+    def free_food_main(self):
+        """ reset expal parameters for the next day """
+        self.log.debug('Starting Free Food main.')
+        utils.run_state_machine(start_in='wait',
+                                error_state='wait',
+                                error_callback=self.log_error_callback,
+                                wait=self._wait_block(5, 5, 'food'),
+                                food=self.deliver_free_food(10, 'checker'),
+                                checker=self.food_checker('wait')
+                                )
+
+        if not utils.check_time(self.parameters['free_food_schedule']):
+            return 'post'
+        else:
+            return 'main'
+
+    def food_checker(self, next_state):
+        #should we still be giving free food?
+        def temp():
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return next_state
+            return None
+        return temp
+
+    def free_food_post(self):
+        self.log.debug('Free food over.')
+        return None
+
+    def _free_food(self):
+        self.log.debug('Starting _free_food')
+        utils.run_state_machine(start_in='pre',
+                                error_state='post',
+                                error_callback=self.log_error_callback,
+                                pre=self.free_food_pre,
+                                main=self.free_food_main,
+                                post=self.free_food_post)
+        return 'idle'
+
+    def deliver_free_food(self, value, next_state):
+        """ reward function with no frills
+        """
+
+        def temp():
+            self.log.debug('Doling out some free food.')
+            self.panel.reward(value=value)
+            return next_state
+
+        return temp
 
     def session_pre(self):
         return 'main'

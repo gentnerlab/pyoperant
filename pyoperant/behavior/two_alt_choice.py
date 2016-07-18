@@ -363,6 +363,9 @@ class TwoAltChoiceExp(base.BaseExp):
 
         if self.check_session_schedule()==False:
             raise EndSession
+        if 'free_food_schedule' in self.parameters:
+            if utils.check_time(self.parameters['free_food_schedule']):
+                raise EndSession
 
     def stimulus_pre(self):
         # wait for bird to peck
@@ -378,6 +381,14 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.panel.speaker.stop()
                 self.update_adaptive_queue(presented=False)
                 raise EndSession
+            elif 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    self.panel.center.off()
+                    self.panel.speaker.stop()
+                    self.update_adaptive_queue(presented=False)
+                    raise EndSession
+                else:
+                    trial_time = self.panel.center.poll(timeout=60.0)
             else:
                 trial_time = self.panel.center.poll(timeout=60.0)
 

@@ -45,7 +45,8 @@ class Shaper(object):
                                     block3=self.block3,
                                     block4=self.block4,
                                     block5=self.block5,
-                                    sleep_block=self._run_sleep)
+                                    sleep_block=self._run_sleep,
+                                    free_food_block=self._free_food)
         self.log.warning('Shaping procedure complete.  Remember to disable shaping in your config file')
 
     def _null_block(self, block_num):
@@ -63,6 +64,9 @@ class Shaper(object):
         def temp():
             self.recent_state = block_num
             self.log.warning('Starting %s'%(self.block_name(block_num)))
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
@@ -73,6 +77,13 @@ class Shaper(object):
                                         pre_reward=self._pre_reward('reward'),
                                         reward=self.reward(5, 'check2'),
                                         check2=self._check_block('wait', 1, float('inf')))
+
+
+            # check if its time for free food
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             return self.block_name(block_num + 1)
@@ -95,6 +106,10 @@ class Shaper(object):
                                         reward=self.reward(4, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -123,6 +138,14 @@ class Shaper(object):
                     return None
             if not utils.check_time(self.parameters['light_schedule']):
                 return None
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return None
+
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return None
+
             return next_state
         return temp
 
@@ -269,6 +292,63 @@ class Shaper(object):
                                 post=self.sleep_post)
         return self.block_name(self.recent_state)
 
+    def free_food_pre(self):
+        self.log.debug('Buffet starting.')
+        return 'main'
+
+    def free_food_main(self):
+        """ reset expal parameters for the next day """
+
+        utils.run_state_machine(start_in='wait',
+                                error_state='wait',
+                                error_callback=self.error_callback,
+                                wait=self._wait_block(5, 5, 'food'),
+                                food=self.deliver_free_food(10, 'checker'),
+                                checker=self.food_checker('wait')
+                                )
+
+
+        if not utils.check_time(self.parameters['free_food_schedule']):
+            return 'post'
+        else:
+            return 'main'
+
+    def food_checker(self, next_state):
+        # should we still be giving free food?
+        def temp():
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return next_state
+            return None
+
+        return temp
+
+
+    def free_food_post(self):
+        self.log.debug('Free food over.')
+        self.panel.house_light.on()
+        #        self.init_summary()
+        return None
+
+    def _free_food(self):
+        utils.run_state_machine(start_in='pre',
+                                error_state='post',
+                                error_callback=self.error_callback,
+                                pre=self.free_food_pre,
+                                main=self.free_food_main,
+                                post=self.free_food_post)
+        return self.block_name(self.recent_state)
+
+    def deliver_free_food(self, value, next_state):
+        """ reward function with no frills
+        """
+        def temp():
+            self.log.debug('Doling out some yum yums.')
+            self.panel.reward(value=value)
+            return next_state
+
+        return temp
+
     def block_name(self, block_num):
         if block_num >= 1 and block_num <= 5:
             return "block%d"%block_num
@@ -318,6 +398,10 @@ class Shaper2AC(Shaper):
                                         reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -345,6 +429,10 @@ class Shaper2AC(Shaper):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -443,6 +531,10 @@ class Shaper3AC(Shaper):
                                         reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -472,6 +564,10 @@ class Shaper3AC(Shaper):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -510,6 +606,10 @@ class Shaper3ACMatching(Shaper3AC):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
