@@ -86,7 +86,7 @@ class AdaptiveBase(object):
 
     def next(self):
         if not self.updated: #hasn't been updated since last trial
-            raise Exception(self.update_error_str)
+            raise Exception(self.update_error_msg()) #TODO: find what causes bug
         self.updated = False
 
     def no_response(self):
@@ -99,6 +99,9 @@ class AdaptiveBase(object):
             pass
         self.updated = True
         self.no_response()
+
+    def update_error_msg(self):
+        return self.update_error_str
 
 class PersistentBase(object):
     """
@@ -244,6 +247,11 @@ class DoubleStaircase(AdaptiveBase):
         super(DoubleStaircase, self).no_response()
         self.trial = {}
 
+    def update_error_msg(self):
+        sup = super(DoubleStaircase, self).update_error_msg()
+        state = "self.trial.low=%s    self.trial.value=%d    self.low_idx=%d    self.high_idx=%d" % (self.trial['low'], self.trial['value'], self.low_idx, self.high_idx)
+        return "\n".join([sup, state])
+
 class DoubleStaircaseReinforced(AdaptiveBase):
     """
     Generates conditions as with DoubleStaircase, but 1-probe_rate proportion of
@@ -266,10 +274,9 @@ class DoubleStaircaseReinforced(AdaptiveBase):
         self.update_error_str = "reinforced double staircase queue %s hasn't been updated since last trial" % (self.stims[0])
 
     def update(self, correct, no_resp):
-        super(DoubleStaircaseReinforced, self).update(correct, no_resp)
         if self.last_probe:
             self.dblstaircase.update(correct, no_resp)
-        self.last_probe = False
+        super(DoubleStaircaseReinforced, self).update(correct, no_resp)
 
     def next(self):
         super(DoubleStaircaseReinforced, self).next()
@@ -282,6 +289,7 @@ class DoubleStaircaseReinforced(AdaptiveBase):
             except StopIteration:
                 self.probe_rate = 0
                 self.last_probe = False
+                self.updated = True
                 return self.next()
         else:
             self.last_probe = False
@@ -289,7 +297,7 @@ class DoubleStaircaseReinforced(AdaptiveBase):
                 if self.sample_log:
                     val = int((1 - rand_from_log_shape_dist()) * self.dblstaircase.low_idx)
                 else:
-                    val = random.randrange(self.dblstaircase.low_idx)
+                    val = random.randrange(self.dblstaircase.low_idx + 1)
                 return {'class': 'L',  'stim_name': self.stims[val]}
             else: # probe right
                 if self.sample_log:
@@ -300,11 +308,16 @@ class DoubleStaircaseReinforced(AdaptiveBase):
 
     def no_response(self):
         super(DoubleStaircaseReinforced, self).no_response()
-        self.last_probe = False
 
     def on_load(self):
         super(DoubleStaircaseReinforced, self).on_load()
         self.dblstaircase.on_load()
+
+    def update_error_msg(self):
+        sup = super(DoubleStaircaseReinforced, self).update_error_msg()
+        state = "self.last_probe=%s" % (self.last_probe)
+        sub_state = "self.dbs.trial=%s    self.dbs.low_idx=%d    self.dbs.high_idx=%d" % (self.dblstaircase.trial, self.dblstaircase.low_idx, self.dblstaircase.high_idx)
+        return "\n".join([sup, state, sub_state])
 
 
 class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):

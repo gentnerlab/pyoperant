@@ -77,7 +77,6 @@ class PyAudioInterface(base_.AudioInterface):
         self.device_index = None
         self.stream = None
         self.wf = None
-        self.callback = None
         self.open()
 
     def open(self):
@@ -107,36 +106,32 @@ class PyAudioInterface(base_.AudioInterface):
             self.wf = None
         self.pa.terminate()
 
-    def _get_stream(self, start=False, event=None, **kwargs):
-        """
-        """
-        def _callback(in_data, frame_count, time_info, status):
-            try:
-                cont = self.callback()
-            except TypeError:
-                cont = True
+    def validate(self):
+        if self.wf is not None:
+            return True
+        else:
+            raise InterfaceError('there is something wrong with this wav file')
 
-            if cont:
+    def _get_stream(self,start=False,callback=None):
+        """
+        """
+        if callback is None:
+            def callback(in_data, frame_count, time_info, status):
                 data = self.wf.readframes(frame_count)
                 return (data, pyaudio.paContinue)
-            else:
-                return (0, pyaudio.paComplete)
 
         self.stream = self.pa.open(format=self.pa.get_format_from_width(self.wf.getsampwidth()),
                                    channels=self.wf.getnchannels(),
                                    rate=self.wf.getframerate(),
                                    output=True,
                                    output_device_index=self.device_index,
-                                   start=False,
-                                   stream_callback=_callback)
-        if start:
-            self._play_wav(event=event)
+                                   start=start,
+                                   stream_callback=callback)
 
-    def _queue_wav(self, wav_file, start=False, event=None, **kwargs):
-        logger.debug("Queueing wavfile %s" % wav_file)
+    def _queue_wav(self,wav_file,start=False,callback=None):
         self.wf = wave.open(wav_file)
         self.validate()
-        self._get_stream(start=start, event=event)
+        self._get_stream(start=start,callback=callback)
 
     def _play_wav(self, event=None, **kwargs):
         logger.debug("Playing wavfile")
