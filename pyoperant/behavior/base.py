@@ -262,7 +262,11 @@ class BaseExp(object):
 
         def temp():
             self.log.debug('Doling out some free food.')
-            self.panel.reward(value=value)
+            
+            try: 
+            	self.panel.reward(value=value)
+        	except components.HopperWontDropError as err:
+        		self.log.warning("Hopper did not drop on free food")
             return next_state
 
         return temp
