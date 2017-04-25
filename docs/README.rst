@@ -1,3 +1,5 @@
+NOTICE!! This package has been renamed to "opyrant" and development has moved to https://github.com/opyrant/opyrant
+
 pyoperant
 =========
 
