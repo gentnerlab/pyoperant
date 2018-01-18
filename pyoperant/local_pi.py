@@ -22,9 +22,20 @@ import time
     16: ('/dev/comedi1', 2, 76, 2, 88),
     }
 """
-INPUTS = [17]
+INPUTS = [5,  # Hopper IR
+          6,  # Left IR
+          13, # Center IR
+          26,  # Right IR
+          23, # IR 1
+          24, # IR 2
+          25, # IR 3
+          9,  # IR 4
+          11, # IR 5
+          10, # IR 6
+          ]
 
-OUTPUTS = [23]
+OUTPUTS = [16, # Hopper Trigger
+          ]
 class PiPanel(panels.BasePanel):
     """class for zog boxes """
     def __init__(self,id=None, *args, **kwargs):
@@ -32,7 +43,7 @@ class PiPanel(panels.BasePanel):
         self.id = id
 
         # define interfaces
-        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='MyPi')
+        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='GLOperant000')
 
 
 
@@ -52,14 +63,14 @@ class PiPanel(panels.BasePanel):
         #TODO: self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
 
         # assemble inputs into components
-        self.left = components.PeckPort(IR=self.inputs[0],LED=self.outputs[0],name='l')
-        #self.center = components.PeckPort(IR=self.inputs[1],LED=self.outputs[1],name='c')
-        #self.right = components.PeckPort(IR=self.inputs[2],LED=self.outputs[2],name='r')
+        self.left = components.PeckPort(IR=self.inputs[1],LED=self.outputs[0],name='l')
+        self.center = components.PeckPort(IR=self.inputs[2],LED=self.outputs[0],name='c')
+        self.right = components.PeckPort(IR=self.inputs[3],LED=self.outputs[0],name='r')
         #self.house_light = components.HouseLight(light=self.outputs[3])
-        #self.hopper = components.Hopper(IR=self.inputs[3],solenoid=self.outputs[4])
+        self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0])
 
         # define reward & punishment methods
-        #self.reward = self.hopper.reward
+        self.reward = self.hopper.reward
         #self.punish = self.house_light.punish
 
     def reset(self):

@@ -63,5 +63,5 @@ class RaspberryPiInterface(base_.BaseInterface):
             GPIO.output(channel, GPIO.LOW)
 
     def _poll(self, channel, timeout=None, suppress_longpress=True, **kwargs):
-        pass
-
+        time.sleep(timeout)
+        return datetime.datetime.now()
