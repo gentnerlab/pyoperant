@@ -36,6 +36,12 @@ INPUTS = [5,  # Hopper IR
 
 OUTPUTS = [16, # Hopper Trigger
           ]
+
+PWM_OUTPUTS = [1,  #Red
+               2,  #Green
+               3,  #Blue
+               4,  #White
+               ]
 class PiPanel(panels.BasePanel):
     """class for zog boxes """
     def __init__(self,id=None, *args, **kwargs):
@@ -60,6 +66,11 @@ class PiPanel(panels.BasePanel):
                                                            },
                                                    )
                                 )
+
+        for pwm_out_chan in PWM_OUTPUTS:
+            self.pwm_outputs.append(hwio.PWMOutput(interface=self.interfaces['raspi_gpio_'],
+                                                  params = {'channel': pwm_out_chan}))
+
         #TODO: self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
 
         # assemble inputs into components
@@ -69,6 +80,11 @@ class PiPanel(panels.BasePanel):
         #self.house_light = components.HouseLight(light=self.outputs[3])
         self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0])
 
+
+        self.house_light = components.LEDStripHouseLight(lights=[self.pwm_outputs[0],
+                                                                 self.pwm_outputs[1],
+                                                                 self.pwm_outputs[2],
+                                                                 self.pwm_outputs[3]])
         # define reward & punishment methods
         self.reward = self.hopper.reward
         #self.punish = self.house_light.punish

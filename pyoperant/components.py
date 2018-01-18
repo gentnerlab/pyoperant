@@ -423,7 +423,91 @@ class RGBLight(BaseComponent):
         self._blue.write(False)
         return True
 
+## House Light ##
+class LEDStripHouseLight(BaseComponent):
+    """ Class which holds information about the RGBW LED Strip PWM house light
 
+    Keywords
+    --------
+    light : hwio.PWMOutputs
+        [R, G, B, W]
+        output channels to turn the light on and off
+
+    Methods:
+    on() -- 
+    off() -- 
+    set_color() -- set the color
+    change_color -- sets color and turns on light
+    timeout(dur) -- turns off the house light for 'dur' seconds (default=10.0)
+    punish() -- calls timeout() for 'value' as 'dur'
+
+    """
+    def __init__(self,lights,color=[0,0,0,0.99],*args,**kwargs):
+        super(HouseLight, self).__init__(*args,**kwargs)
+        for light in lights:
+            if isinstance(light,hwio.PWMOutput):
+                self.lights.append(light)
+        else:
+            raise ValueError('%s is not an output channel' % light)
+        self.color = color
+
+    def off(self):
+        """Turns the house light off.
+
+        Returns
+        -------
+        bool
+            True if successful.
+
+        """
+        for light in self.lights:
+            light.write(0.0)
+        return True
+
+    def on(self):
+        """Turns the house light on.
+
+        Returns
+        -------
+        bool
+            True if successful.
+        """
+        for ind in range(4):
+            self.lights[ind].write(self.color[ind])
+        return True
+
+    def timeout(self,dur=10.0):
+        """Turn off the light for *dur* seconds 
+
+        Keywords
+        -------
+        dur : float, optional
+            The amount of time (in seconds) to turn off the light.
+
+        Returns
+        -------
+        (datetime, float)
+            Timestamp of the timeout and the timeout duration
+
+        """
+        timeout_time = datetime.datetime.now()
+        self.light.write(False)
+        utils.wait(dur)
+        timeout_duration = datetime.datetime.now() - timeout_time
+        self.light.write(True)
+        return (timeout_time,timeout_duration)
+
+    def punish(self,value=10.0):
+        """Calls `timeout(dur)` with *value* as *dur* """
+        return self.timeout(dur=value)
+
+    def set_color(self, color):
+        self.color = color
+
+    def change_color(self, color):
+        self.color = color
+        self.on()
+        
 # ## Perch ##
 
 # class Perch(BaseComponent):
