@@ -37,16 +37,20 @@ INPUTS = [5,  # Hopper IR
 OUTPUTS = [16, # Hopper Trigger
           ]
 
-PWM_OUTPUTS = [1,  #Red
-               2,  #Green
-               3,  #Blue
+
+PWM_OUTPUTS = [0,  #Red
+               1,  #Green
+               2,  #Blue
+               3,  #Whitek
                4,  #White
+               5
                ]
 class PiPanel(panels.BasePanel):
     """class for zog boxes """
     def __init__(self,id=None, *args, **kwargs):
         super(PiPanel, self).__init__(*args, **kwargs)
         self.id = id
+        self.pwm_outputs = []
 
         # define interfaces
         self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='GLOperant000')

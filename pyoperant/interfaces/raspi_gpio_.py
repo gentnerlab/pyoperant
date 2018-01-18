@@ -170,9 +170,9 @@ class RaspberryPiInterface(base_.BaseInterface):
         super(RaspberryPiInterface, self).__init__(*args, **kwargs)
 
         self.device_name = device_name
-        self.pi = pigpio.pi()
+        self.pi = pigpio.pi(port=7777)
 
-        if not pi.connected:
+        if not self.pi.connected:
             logger.debug("PIGPIO Not Connected...")
 
         self.open()
@@ -193,7 +193,7 @@ class RaspberryPiInterface(base_.BaseInterface):
         logger.debug("Opening device %s")
         #GPIO.setmode(GPIO.BCM)
         # Setup PWM
-        self.pwm = PWM(pi, address=PCA9685_ADDRESS)
+        self.pwm = PWM(self.pi, address=PCA9685_ADDRESS)
         self.pwm.set_frequency(240)
 
 
@@ -223,8 +223,8 @@ class RaspberryPiInterface(base_.BaseInterface):
         else:
             self.pi.write(channel, 0)
 
-    def _write_pwm(self, pwm_channel, value, **kwargs):
-        self.pwm.set_duty_cycle(pwm_channel, value)
+    def _write_pwm(self, channel, value, **kwargs):
+        self.pwm.set_duty_cycle(channel, value)
 
     def _poll(self, channel, timeout=None, suppress_longpress=True, **kwargs):
         time.sleep(timeout)

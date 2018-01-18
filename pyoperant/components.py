@@ -443,12 +443,13 @@ class LEDStripHouseLight(BaseComponent):
 
     """
     def __init__(self,lights,color=[0,0,0,0.99],*args,**kwargs):
-        super(HouseLight, self).__init__(*args,**kwargs)
+        super(LEDStripHouseLight, self).__init__(*args,**kwargs)
+        self.lights = []
         for light in lights:
             if isinstance(light,hwio.PWMOutput):
                 self.lights.append(light)
-        else:
-            raise ValueError('%s is not an output channel' % light)
+            else:
+                 raise ValueError('%s is not an output channel' % light)
         self.color = color
 
     def off(self):

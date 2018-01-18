@@ -141,9 +141,9 @@ class PWMOutput(BaseIO):
         """read status"""
         return self.last_value
 
-    def write(self,value=0.0):
+    def write(self,val=0.0):
         """write status"""
-        self.last_value = self.interface._write_pwm(value=value,**self.params)
+        self.last_value = self.interface._write_pwm(value=val, **self.params)
         return self.last_value
 
 
