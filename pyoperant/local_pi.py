@@ -1,5 +1,5 @@
 from pyoperant import hwio, components, panels, utils
-from pyoperant.interfaces import raspi_gpio_
+from pyoperant.interfaces import raspi_gpio_, pyaudio_
 from pyoperant import InterfaceError
 import time
 
@@ -54,6 +54,7 @@ class PiPanel(panels.BasePanel):
 
         # define interfaces
         self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='GLOperant000')
+        #self.interfaces['pyaudio'] =  PyAudioInterface(device_name= (dev_name_fmt % self.id))
 
 
 
@@ -110,7 +111,7 @@ class PiPanel(panels.BasePanel):
         self.reset()
         self.reward(value=dur)
         self.punish(value=dur)
-        self.speaker.queue('/usr/local/stimuli/test48k.wav')
+        self.speaker.queue('/home/pi/test.wav')
         self.speaker.play()
         time.sleep(1.0)
         self.speaker.stop()
