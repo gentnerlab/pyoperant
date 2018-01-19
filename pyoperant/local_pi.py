@@ -111,7 +111,7 @@ class PiPanel(panels.BasePanel):
         self.reset()
         self.reward(value=dur)
         self.punish(value=dur)
-        self.speaker.queue('/home/pi/bird_chirp.wav')
+        self.speaker.queue('/home/pi/test.wav')
         self.speaker.play()
         time.sleep(1.0)
         self.speaker.stop()
