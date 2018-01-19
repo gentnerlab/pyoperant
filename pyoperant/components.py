@@ -495,7 +495,7 @@ class LEDStripHouseLight(BaseComponent):
         self.off()
         utils.wait(dur)
         timeout_duration = datetime.datetime.now() - timeout_time
-        self.light.on()
+        self.on()
         return (timeout_time,timeout_duration)
 
     def punish(self,value=10.0):

@@ -1,5 +1,5 @@
 from pyoperant import hwio, components, panels, utils
-from pyoperant.interfaces import raspi_gpio_, pyaudio_
+from pyoperant.interfaces import raspi_gpio_, pyaudio_ 
 from pyoperant import InterfaceError
 import time
 
@@ -54,7 +54,7 @@ class PiPanel(panels.BasePanel):
 
         # define interfaces
         self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='GLOperant000')
-        #self.interfaces['pyaudio'] =  PyAudioInterface(device_name= (dev_name_fmt % self.id))
+        self.interfaces['pyaudio'] =  pyaudio_.PyAudioInterface()
 
 
 
@@ -76,7 +76,7 @@ class PiPanel(panels.BasePanel):
             self.pwm_outputs.append(hwio.PWMOutput(interface=self.interfaces['raspi_gpio_'],
                                                   params = {'channel': pwm_out_chan}))
 
-        #TODO: self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
+        self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
 
         # assemble inputs into components
         self.left = components.PeckPort(IR=self.inputs[1],LED=self.outputs[0],name='l')
@@ -92,7 +92,7 @@ class PiPanel(panels.BasePanel):
                                                                  self.pwm_outputs[3]])
         # define reward & punishment methods
         self.reward = self.hopper.reward
-        #self.punish = self.house_light.punish
+        self.punish = self.house_light.punish
 
     def reset(self):
         for output in self.outputs:
@@ -111,7 +111,7 @@ class PiPanel(panels.BasePanel):
         self.reset()
         self.reward(value=dur)
         self.punish(value=dur)
-        self.speaker.queue('/home/pi/test.wav')
+        self.speaker.queue('/home/pi/bird_chirp.wav')
         self.speaker.play()
         time.sleep(1.0)
         self.speaker.stop()
