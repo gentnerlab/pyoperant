@@ -120,7 +120,7 @@ class PiPanel(panels.BasePanel):
 
 
 class Pi1(PiPanel):
-    """Zog1 panel"""
+    """ Pi1panel"""
     def __init__(self):
         super(Pi1, self).__init__(id=1)
 
@@ -133,7 +133,7 @@ BEHAVIORS = ['pyoperant.behavior',
              'glab_behaviors'
             ]
 
-DATA_PATH = '/home/bird/opdat/'
+DATA_PATH = '/home/pi/opdat/'
 
 # SMTP_CONFIG
 

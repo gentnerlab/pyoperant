@@ -227,5 +227,19 @@ class RaspberryPiInterface(base_.BaseInterface):
         self.pwm.set_duty_cycle(channel, value)
 
     def _poll(self, channel, timeout=None, suppress_longpress=True, **kwargs):
-        time.sleep(timeout)
-        return datetime.datetime.now()
+        ''' runs a loop, querying for transitions '''
+        date_fmt = '%Y-%m-%d %H:%M:%S.%f'
+        cb1 = self.pi.callback(channel, pigpio.FALLING_EDGE)
+        if timeout is not None:
+            start = time.time()
+        while True:
+            if cb1.tally() > 0:
+                cb1.reset_tally()
+                cb1.cancel()
+                return datetime.datetime.now()
+            if timeout is not None:
+                if time.time() - start >= timeout:
+                    cb1.reset_tally()
+                    cb1.cancel()
+                    return None
+
