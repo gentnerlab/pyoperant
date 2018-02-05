@@ -79,9 +79,9 @@ class PiPanel(panels.BasePanel):
         self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
 
         # assemble inputs into components
-        self.left = components.PeckPort(IR=self.inputs[1],LED=self.outputs[0],name='l')
-        self.center = components.PeckPort(IR=self.inputs[2],LED=self.outputs[0],name='c')
-        self.right = components.PeckPort(IR=self.inputs[3],LED=self.outputs[0],name='r')
+        self.left = components.PeckPort(IR=self.inputs[1],LED=self.outputs[0],name='l', inverted=True)
+        self.center = components.PeckPort(IR=self.inputs[2],LED=self.outputs[0],name='c', inverted=True)
+        self.right = components.PeckPort(IR=self.inputs[3],LED=self.outputs[0],name='r', inverted=True)
         #self.house_light = components.HouseLight(light=self.outputs[3])
         self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0])
 
@@ -130,7 +130,7 @@ PANELS = {
           }
 
 BEHAVIORS = ['pyoperant.behavior',
-             'glab_behaviors'
+             #'glab_behaviors'
             ]
 
 DATA_PATH = '/home/pi/opdat/'

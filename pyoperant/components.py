@@ -197,7 +197,7 @@ class PeckPort(BaseComponent):
         input channel for the IR beam to check for a peck
 
     """
-    def __init__(self,IR,LED,*args,**kwargs):
+    def __init__(self,IR,LED, inverted=False,*args,**kwargs):
         super(PeckPort, self).__init__(*args,**kwargs)
         if isinstance(IR,hwio.BooleanInput):
             self.IR = IR
@@ -207,6 +207,10 @@ class PeckPort(BaseComponent):
             self.LED = LED
         else:
             raise ValueError('%s is not an output channel' % LED)
+        if inverted:
+            self.inverted=True
+        else:
+            self.inverted=False
 
     def status(self):
         """reads the status of the IR beam
@@ -216,6 +220,8 @@ class PeckPort(BaseComponent):
         bool
             True if beam is broken
         """
+        if self.inverted:
+            return not self.IR.read()
         return self.IR.read()
 
     def off(self):

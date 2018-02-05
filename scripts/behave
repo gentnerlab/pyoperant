@@ -18,7 +18,7 @@ except ImportError:
 try:
     from pyoperant.local import DATAPATH
 except ImportError:
-    DATAPATH = '/home/bird/opdat'
+    DATAPATH = '/home/pi/opdat'
 
 
 def parse_commandline(arg_str=sys.argv[1:]):
