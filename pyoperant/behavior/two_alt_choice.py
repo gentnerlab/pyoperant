@@ -363,7 +363,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
         if self.check_session_schedule()==False:
             raise EndSession
-        if _check_free_food_block: return 'free_food_block'
+        if self._check_free_food_block(): return 'free_food_block'
 
     def stimulus_pre(self):
         # wait for bird to peck

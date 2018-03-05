@@ -159,7 +159,7 @@ class BaseExp(object):
         if self.check_light_schedule() == False:
             return 'sleep'
         elif self.check_session_schedule():
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             return 'session'
         else:
             self.panel_reset()

@@ -73,7 +73,7 @@ class Shaper(object):
         def temp():
             self.recent_state = block_num
             self.log.warning('Starting %s'%(self.block_name(block_num)))
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
 
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
@@ -86,7 +86,7 @@ class Shaper(object):
                                         reward=self.reward(5, 'check2'),
                                         check2=self._check_block('wait', 1, float('inf')))
             # check if its time for free food
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             return self.block_name(block_num + 1)
@@ -109,7 +109,7 @@ class Shaper(object):
                                         reward=self.reward(4, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -138,7 +138,7 @@ class Shaper(object):
                     return None
             if not utils.check_time(self.parameters['light_schedule']):
                 return None
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             return next_state
         return temp
 
@@ -391,7 +391,7 @@ class Shaper2AC(Shaper):
                                         reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -419,7 +419,7 @@ class Shaper2AC(Shaper):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -518,7 +518,7 @@ class Shaper3AC(Shaper):
                                         reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -548,7 +548,7 @@ class Shaper3AC(Shaper):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -587,7 +587,7 @@ class Shaper3ACMatching(Shaper3AC):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if _check_free_food_block: return 'free_food_block'
+            if self._check_free_food_block(): return 'free_food_block'
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
