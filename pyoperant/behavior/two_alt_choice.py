@@ -22,10 +22,10 @@ class TwoAltChoiceExp(base.BaseExp):
     trials : list
         all of the trials that have run
     shaper : Shaper
-        the protocol for shaping 
-    parameters : dict 
+        the protocol for shaping
+    parameters : dict
         all additional parameters for the experiment
-    data_csv : string 
+    data_csv : string
         path to csv file to save data
     reinf_sched : object
         does logic on reinforcement
@@ -110,7 +110,7 @@ class TwoAltChoiceExp(base.BaseExp):
     def make_data_csv(self):
         """ Create the csv file to save trial data
 
-        This creates a new csv file at experiment.data_csv and writes a header row 
+        This creates a new csv file at experiment.data_csv and writes a header row
         with the fields in experiment.fields_to_save
         """
         with open(self.data_csv, 'wb') as data_fh:
@@ -132,8 +132,8 @@ class TwoAltChoiceExp(base.BaseExp):
         """ Runs before the session starts
 
         For each stimulus class, if there is a component associated with it, that
-        component is mapped onto `experiment.class_assoc[class]`. For example, 
-        if the `left` port is registered with the 'L' class, you can access the response 
+        component is mapped onto `experiment.class_assoc[class]`. For example,
+        if the `left` port is registered with the 'L' class, you can access the response
         port through `experiment.class_assoc['L']`.
 
         """
@@ -194,16 +194,16 @@ class TwoAltChoiceExp(base.BaseExp):
                 elif q_type=='mixedDblStaircase':
                     dbl_staircases = [queues.DoubleStaircaseReinforced(stims) for stims in blk['stim_lists']]
                     self.trial_q = queues.MixedAdaptiveQueue.load(os.path.join(self.parameters['experiment_path'], 'persistentQ.pkl'), dbl_staircases)
-                try: 
+                try:
                     run_trial_queue()
                 except EndSession:
                     return 'post'
 
             self.session_q = None
-        
+
         else:
             self.log.info('continuing last session')
-            try: 
+            try:
                 run_trial_queue()
             except EndSession:
                 return 'post'
@@ -276,7 +276,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
         Returns
         -------
-        stim, epochs : Event, list 
+        stim, epochs : Event, list
 
 
         """
@@ -363,6 +363,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
         if self.check_session_schedule()==False:
             raise EndSession
+        if _check_free_food_block: return 'free_food_block'
 
     def stimulus_pre(self):
         # wait for bird to peck
@@ -378,6 +379,14 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.panel.speaker.stop()
                 self.update_adaptive_queue(presented=False)
                 raise EndSession
+            elif 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    self.panel.center.off()
+                    self.panel.speaker.stop()
+                    self.update_adaptive_queue(presented=False)
+                    raise EndSession
+                else:
+                    trial_time = self.panel.center.poll(timeout=60.0)
             else:
                 trial_time = self.panel.center.poll(timeout=60.0)
 

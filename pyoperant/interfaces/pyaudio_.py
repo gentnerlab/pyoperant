@@ -1,5 +1,6 @@
 import pyaudio
 import wave
+import logging
 from pyoperant.interfaces import base_
 from pyoperant import InterfaceError
 
@@ -42,10 +43,12 @@ class PyAudioInterface(base_.BaseInterface):
             self.stream.close()
         except AttributeError:
             self.stream = None
-        try:    
+        try:
             self.wf.close()
         except AttributeError:
             self.wf = None
+        except IOError:
+            logging.getLogger().error("IOError on _stop_wav")
         self.pa.terminate()
 
     def validate(self):
@@ -83,7 +86,7 @@ class PyAudioInterface(base_.BaseInterface):
             self.stream.close()
         except AttributeError:
             self.stream = None
-        try:    
+        try:
             self.wf.close()
         except AttributeError:
             self.wf = None
