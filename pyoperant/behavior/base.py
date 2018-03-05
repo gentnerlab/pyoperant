@@ -217,7 +217,7 @@ class BaseExp(object):
         if 'free_food_schedule' in self.parameters:
             if utils.check_time(self.parameters['free_food_schedule']):
                 return True
-    return
+
     def free_food_pre(self):
         self.log.debug('Buffet starting.')
         return 'main'
