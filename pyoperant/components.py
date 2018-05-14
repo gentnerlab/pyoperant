@@ -52,7 +52,7 @@ class Hopper(BaseComponent):
         time in seconds to wait before checking to make sure the hopper is up
 
     """
-    def __init__(self,IR,solenoid,max_lag=0.3,*args,**kwargs):
+    def __init__(self,IR,solenoid,max_lag=0.3, inverted=False,*args,**kwargs):
         super(Hopper, self).__init__(*args,**kwargs)
         self.max_lag = max_lag
         if isinstance(IR,hwio.BooleanInput):
@@ -63,6 +63,10 @@ class Hopper(BaseComponent):
             self.solenoid = solenoid
         else:
             raise ValueError('%s is not an output channel' % solenoid)
+        if inverted:
+            self.inverted=True
+        else:
+            self.inverted=False
 
     def check(self):
         """reads the status of solenoid & IR beam, then throws an error if they don't match
@@ -81,6 +85,8 @@ class Hopper(BaseComponent):
 
         """
         IR_status = self.IR.read()
+        if self.inverted:
+            IR_status = not IR_status
         solenoid_status = self.solenoid.read()
         if IR_status != solenoid_status:
             if IR_status:

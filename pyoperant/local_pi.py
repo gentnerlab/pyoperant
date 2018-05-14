@@ -83,7 +83,7 @@ class PiPanel(panels.BasePanel):
         self.center = components.PeckPort(IR=self.inputs[2],LED=self.outputs[0],name='c', inverted=True)
         self.right = components.PeckPort(IR=self.inputs[3],LED=self.outputs[0],name='r', inverted=True)
         #self.house_light = components.HouseLight(light=self.outputs[3])
-        self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0])
+        self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0], inverted=True)
 
 
         self.house_light = components.LEDStripHouseLight(lights=[self.pwm_outputs[0],
