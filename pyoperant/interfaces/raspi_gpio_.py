@@ -225,15 +225,18 @@ class RaspberryPiInterface(base_.BaseInterface):
 
     def _write_pwm(self, channel, value, **kwargs):
         self.pwm.set_duty_cycle(channel, value)
+        return value
 
-    def _poll(self, channel, timeout=None, suppress_longpress=True, **kwargs):
+    def _poll2(self, channel, timeout=None, suppress_longpress=True, **kwargs):
         ''' runs a loop, querying for transitions '''
         date_fmt = '%Y-%m-%d %H:%M:%S.%f'
-        cb1 = self.pi.callback(channel, pigpio.FALLING_EDGE)
+        cb1 = self.pi.callback(channel, pigpio.RISING_EDGE)
         if timeout is not None:
             start = time.time()
+        print('Starting poll')
         while True:
             if cb1.tally() > 0:
+                print(cb1.tally())
                 cb1.reset_tally()
                 cb1.cancel()
                 return datetime.datetime.now()
@@ -242,4 +245,20 @@ class RaspberryPiInterface(base_.BaseInterface):
                     cb1.reset_tally()
                     cb1.cancel()
                     return None
+
+    def _poll(self, channel, timeout=None, suppress_longpress=True, **kwargs):
+        date_fmt = '%Y-%m-%d %H:%M:%S.%f'
+        if timeout is not None:
+            start = time.time()
+        if self.pi.wait_for_edge(channel, pigpio.RISING_EDGE, timeout):
+            return datetime.datetime.now()
+        else:
+            return None
+
+    def _callback(self, channel, func=None, **kwargs):
+        date_fmt = '%Y-%m-%d %H:%M:%S.%f'
+        if func:
+            return self.pi.callback(channel, pigpio.RISING_EDGE, func)
+        else:
+            return self.pi.callback(channel, pigpio.RISING_EDGE)
 

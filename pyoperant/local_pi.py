@@ -41,10 +41,21 @@ OUTPUTS = [16, # Hopper Trigger
 PWM_OUTPUTS = [0,  #Red
                1,  #Green
                2,  #Blue
-               3,  #Whitek
-               4,  #White
-               5
+               3,  #White
+               4,  #Left
+               5,  #Center
+               6,  #Right
+               7,  #LED 1
+               8,  #LED 2
+               9,  #LED 3
+               10, #LED 4
+               11, #LED 5
+               12, #LED 6
+               13, #RGB Cue R
+               14, #RGB Cue G
+               15  #RGB Cue B
                ]
+
 class PiPanel(panels.BasePanel):
     """class for zog boxes """
     def __init__(self,id=None, *args, **kwargs):
@@ -79,13 +90,16 @@ class PiPanel(panels.BasePanel):
         self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
 
         # assemble inputs into components
-        self.left = components.PeckPort(IR=self.inputs[1],LED=self.outputs[0],name='l', inverted=True)
-        self.center = components.PeckPort(IR=self.inputs[2],LED=self.outputs[0],name='c', inverted=True)
-        self.right = components.PeckPort(IR=self.inputs[3],LED=self.outputs[0],name='r', inverted=True)
-        #self.house_light = components.HouseLight(light=self.outputs[3])
+        # Standard Peckports
+        self.left = components.PeckPort(IR=self.inputs[1],LED=self.pwm_outputs[4],name='l', inverted=True)
+        self.center = components.PeckPort(IR=self.inputs[2],LED=self.pwm_outputs[5],name='c', inverted=True)
+        self.right = components.PeckPort(IR=self.inputs[3],LED=self.pwm_outputs[6],name='r', inverted=True)
+        
+        # Hopper
         self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0], inverted=True)
 
 
+        # House Light
         self.house_light = components.LEDStripHouseLight(lights=[self.pwm_outputs[0],
                                                                  self.pwm_outputs[1],
                                                                  self.pwm_outputs[2],
@@ -137,7 +151,7 @@ DATA_PATH = '/home/pi/opdat/'
 
 # SMTP_CONFIG
 
-DEFAULT_EMAIL = 'justin.kiggins@gmail.com'
+DEFAULT_EMAIL = 'bradtheilman@gmail.com'
 
 SMTP_CONFIG = {'mailhost': 'localhost',
                'toaddrs': [DEFAULT_EMAIL],

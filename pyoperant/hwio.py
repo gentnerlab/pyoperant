@@ -1,4 +1,5 @@
-
+import time
+import datetime
 # Classes of operant components
 class BaseIO(object):
     """any type of IO device. maintains info on interface for query IO device"""
@@ -24,7 +25,17 @@ class BooleanInput(BaseIO):
         assert hasattr(self.interface,'_read_bool')
         self.config()
 
+    def _clbk(self, gpio, level, tick):
+        self.last_time = datetime.datetime.now()
+        self.tally += 1
+
     def config(self):
+        self.tally = 0
+        try:
+            self.interface._callback(func=self._clbk, **self.params)
+        except:
+            print('callback error')
+            return False
         try:
             return self.interface._config_read(**self.params)
         except AttributeError:
@@ -36,7 +47,17 @@ class BooleanInput(BaseIO):
 
     def poll(self,timeout=None):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-        return self.interface._poll(timeout=timeout,**self.params)
+        orig = self.tally
+        if timeout is not None:
+            start = time.time()
+        while time.time() - start < timeout:
+            if self.tally - orig > 0:
+                return datetime.datetime.now()
+        return None
+        #return self.interface._poll(timeout=timeout,**self.params)
+
+    def callback(self, func):
+        return self.interface._callback(func=func, **self.params)
 
 class BooleanOutput(BaseIO):
     """Class which holds information about outputs and abstracts the methods of
@@ -135,6 +156,7 @@ class PWMOutput(BaseIO):
         self.config()
 
     def config(self):
+        self.write(0.0)
         return True
 
     def read(self):
@@ -145,5 +167,11 @@ class PWMOutput(BaseIO):
         """write status"""
         self.last_value = self.interface._write_pwm(value=val, **self.params)
         return self.last_value
+
+    def toggle(self):
+        """ flip value """
+        new_val = abs(100.0 - self.last_value)
+        self.write(new_val)
+        return new_val
 
 

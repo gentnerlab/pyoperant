@@ -211,6 +211,10 @@ class PeckPort(BaseComponent):
             raise ValueError('%s is not an input channel' % IR)
         if isinstance(LED,hwio.BooleanOutput):
             self.LED = LED
+            self.LEDtype = "boolean"
+        if isinstance(LED, hwio.PWMOutput):
+            self.LED = LED
+            self.LEDtype = "pwm"
         else:
             raise ValueError('%s is not an output channel' % LED)
         if inverted:
@@ -238,10 +242,13 @@ class PeckPort(BaseComponent):
         bool
             True if successful
         """
-        self.LED.write(False)
+        if self.LEDtype == "boolean":
+            self.LED.write(False)
+        else:
+            self.LED.write(0.0);
         return True
 
-    def on(self):
+    def on(self, val=100.0):
         """Turns the LED on 
 
         Returns
@@ -249,7 +256,10 @@ class PeckPort(BaseComponent):
         bool
             True if successful
         """
-        self.LED.write(True)
+        if self.LEDtype == "boolean":
+            self.LED.write(True)
+        else:
+            self.LED.write(val);
         return True
 
     def flash(self,dur=1.0,isi=0.1):
