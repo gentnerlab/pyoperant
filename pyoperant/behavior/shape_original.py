@@ -54,15 +54,6 @@ class Shaper(object):
             return self.block_name(block_num + 1)
         return temp
 
-
-    def _check_free_food_block(self):
-        """ Checks if it is currently a free food block
-        """
-        if 'free_food_schedule' in self.parameters:
-            if utils.check_time(self.parameters['free_food_schedule']):
-                return True
-        return
-
     def _hopper_block(self, block_num):
         """
         Block 1:  Hopper comes up on VI (stays up for 5 s) for the first day
@@ -73,8 +64,9 @@ class Shaper(object):
         def temp():
             self.recent_state = block_num
             self.log.warning('Starting %s'%(self.block_name(block_num)))
-            if self._check_free_food_block(): return 'free_food_block'
-
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
             utils.run_state_machine(    start_in='init',
                                         error_state='wait',
                                         error_callback=self.error_callback,
@@ -85,8 +77,13 @@ class Shaper(object):
                                         pre_reward=self._pre_reward('reward'),
                                         reward=self.reward(5, 'check2'),
                                         check2=self._check_block('wait', 1, float('inf')))
+
+
             # check if its time for free food
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
             return self.block_name(block_num + 1)
@@ -109,7 +106,10 @@ class Shaper(object):
                                         reward=self.reward(4, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -138,7 +138,14 @@ class Shaper(object):
                     return None
             if not utils.check_time(self.parameters['light_schedule']):
                 return None
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return None
+
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return None
+
             return next_state
         return temp
 
@@ -391,7 +398,10 @@ class Shaper2AC(Shaper):
                                         reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -419,7 +429,10 @@ class Shaper2AC(Shaper):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -518,7 +531,10 @@ class Shaper3AC(Shaper):
                                         reward=self.reward(3, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -548,7 +564,10 @@ class Shaper3AC(Shaper):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
@@ -587,7 +606,10 @@ class Shaper3ACMatching(Shaper3AC):
                                         reward=self.reward(2.5, 'check'))
             if not utils.check_time(self.parameters['light_schedule']):
                 return 'sleep_block'
-            if self._check_free_food_block(): return 'free_food_block'
+            if 'free_food_schedule' in self.parameters:
+                if utils.check_time(self.parameters['free_food_schedule']):
+                    return 'free_food_block'
+
             if self.responded_block:
                 return self.block_name(block_num + 1)
             else:
