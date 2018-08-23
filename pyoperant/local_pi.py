@@ -3,25 +3,6 @@ from pyoperant.interfaces import raspi_gpio_, pyaudio_
 from pyoperant import InterfaceError
 import time
 
-"""_ZOG_MAP = {
-    1: ('/dev/comedi0', 2, 0, 2, 8), # box_id:(subdevice,in_dev,in_chan,out_dev,out_chan)
-    2: ('/dev/comedi0', 2, 4, 2, 16),
-    3: ('/dev/comedi0', 2, 24, 2, 32),
-    4: ('/dev/comedi0', 2, 28, 2, 40),
-    5: ('/dev/comedi0', 2, 48, 2, 56),
-    6: ('/dev/comedi0', 2, 52, 2, 64),
-    7: ('/dev/comedi0', 2, 72, 2, 80),
-    8: ('/dev/comedi0', 2, 76, 2, 88),
-    9: ('/dev/comedi1', 2, 0, 2, 8),
-    10: ('/dev/comedi1', 2, 4, 2, 16),
-    11: ('/dev/comedi1', 2, 24, 2, 32),
-    12: ('/dev/comedi1', 2, 28, 2, 40),
-    13: ('/dev/comedi1', 2, 48, 2, 56),
-    14: ('/dev/comedi1', 2, 52, 2, 64),
-    15: ('/dev/comedi1', 2, 72, 2, 80),
-    16: ('/dev/comedi1', 2, 76, 2, 88),
-    }
-"""
 INPUTS = [5,  # Hopper IR
           6,  # Left IR
           13, # Center IR
@@ -64,24 +45,16 @@ class PiPanel(panels.BasePanel):
         self.pwm_outputs = []
 
         # define interfaces
-        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='GLOperant000')
+        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='zog0')
         self.interfaces['pyaudio'] =  pyaudio_.PyAudioInterface()
-
-
 
         # define inputs
         for in_chan in INPUTS:
             self.inputs.append(hwio.BooleanInput(interface=self.interfaces['raspi_gpio_'],
-                                                 params = {'channel': in_chan
-                                                           },
-                                                 )
-                               )
+                                                 params = {'channel': in_chan}))
         for out_chan in OUTPUTS:
             self.outputs.append(hwio.BooleanOutput(interface=self.interfaces['raspi_gpio_'],
-                                                 params = {'channel': out_chan
-                                                           },
-                                                   )
-                                )
+                                                 params = {'channel': out_chan}))
 
         for pwm_out_chan in PWM_OUTPUTS:
             self.pwm_outputs.append(hwio.PWMOutput(interface=self.interfaces['raspi_gpio_'],
@@ -91,9 +64,9 @@ class PiPanel(panels.BasePanel):
 
         # assemble inputs into components
         # Standard Peckports
-        self.left = components.PeckPort(IR=self.inputs[1],LED=self.pwm_outputs[4],name='l', inverted=True)
-        self.center = components.PeckPort(IR=self.inputs[2],LED=self.pwm_outputs[5],name='c', inverted=True)
-        self.right = components.PeckPort(IR=self.inputs[3],LED=self.pwm_outputs[6],name='r', inverted=True)
+        self.left = components.PeckPort(IR=self.inputs[1],LED=self.pwm_outputs[4],name='l', inverted=False)
+        self.center = components.PeckPort(IR=self.inputs[2],LED=self.pwm_outputs[5],name='c', inverted=False)
+        self.right = components.PeckPort(IR=self.inputs[3],LED=self.pwm_outputs[6],name='r', inverted=False)
         
         # Hopper
         self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0], inverted=True)

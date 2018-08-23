@@ -47,14 +47,14 @@ class BooleanInput(BaseIO):
 
     def poll(self,timeout=None):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-        orig = self.tally
-        if timeout is not None:
-            start = time.time()
-        while time.time() - start < timeout:
-            if self.tally - orig > 0:
-                return datetime.datetime.now()
-        return None
-        #return self.interface._poll(timeout=timeout,**self.params)
+        #orig = self.tally
+        #if timeout is not None:
+        #    start = time.time()
+        #while time.time() - start < timeout:
+        #    if self.tally - orig > 0:
+        #        return datetime.datetime.now()
+        #return None
+        return self.interface._poll(timeout=timeout,**self.params)
 
     def callback(self, func):
         return self.interface._callback(func=func, **self.params)

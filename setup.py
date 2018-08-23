@@ -4,11 +4,11 @@ import os
 # def read(fname):
 #     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
-comedi_poll = Extension('comedi_poll',
-                    # include_dirs = ['/usr/local/include'],
-                    libraries = ['comedi'],
-                    # library_dirs = ['/usr/local/lib'],
-                    sources = ['src/comedi_poll.c'])
+#comedi_poll = Extension('comedi_poll',
+#                    # include_dirs = ['/usr/local/include'],
+#                    libraries = ['comedi'],
+#                    # library_dirs = ['/usr/local/lib'],
+#                    sources = ['src/comedi_poll.c'])
 
 setup(
     name = 'pyoperant',

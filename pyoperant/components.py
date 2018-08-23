@@ -1,5 +1,8 @@
 import datetime
 from pyoperant import hwio, utils, ComponentError
+import logging
+
+logger = logging.getLogger()
 
 class BaseComponent(object):
     """Base class for physcal component"""
@@ -84,6 +87,7 @@ class Hopper(BaseComponent):
             The Hopper is down and it shouldn't be. (The IR beam is not tripped, but the solenoid is active.)
 
         """
+        return True
         IR_status = self.IR.read()
         if self.inverted:
             IR_status = not IR_status
@@ -116,7 +120,7 @@ class Hopper(BaseComponent):
         time_up = self.IR.poll(timeout=self.max_lag)
 
         if time_up is None: # poll timed out
-            self.solenoid.write(False)
+            #self.solenoid.write(False)
             raise HopperWontComeUpError
         else:
             return time_up
@@ -167,6 +171,7 @@ class Hopper(BaseComponent):
             The Hopper did not drop fater the feed.
 
         """
+        logger.debug("Feeding..")
         assert self.max_lag < dur, "max_lag (%ss) must be shorter than duration (%ss)" % (self.max_lag,dur)
         try:
             self.check()
