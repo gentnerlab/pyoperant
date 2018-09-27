@@ -18,7 +18,7 @@ except ImportError:
 try:
     from pyoperant.local import DATAPATH
 except ImportError:
-    DATAPATH = '/home/pi/opdat'
+    DATAPATH = '/home/bird/opdat'
 
 
 def parse_commandline(arg_str=sys.argv[1:]):
@@ -109,7 +109,7 @@ def main():
         parameters = {}
 
     BehaviorProtocol = find_protocol(cmd_line['protocol'])
-    print parameters
+    print(parameters)
 
     if ('debug' in parameters) and parameters['debug']:
         print parameters
