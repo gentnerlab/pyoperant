@@ -216,6 +216,40 @@ def time_in_range(start, end, x):
     else:
         return start <= x or x <= end
 
+def get_sunrise_sunset((latitude, longitude) = ('32.82', '-117.14')):
+    import ephem
+    obs = ephem.Observer()
+    obs.lat = latitude
+    obs.long = longitude
+    sun = ephem.Sun()
+    sun.compute()
+    sunrise = ephem.localtime(obs.previous_rising(sun))
+    sunset = ephem.localtime(obs.next_setting(sun))
+    return (sunrise, sunset)
+
+def dimming_factor(timediff, x):
+    '''
+    Compute solar dimming factor
+    timediff is a timedelta object
+    x is a timedelta object
+    '''
+    d = timediff.seconds
+    a = np.pi/(2*x.seconds)
+    return np.sin(a*d)
+    
+def get_light_level():
+    if not is_day():
+        return 0.0
+    else:
+        now = dt.datetime.time(dt.datetime.now())
+        sunrise, sunset = get_sunrise_sunset()
+        if time_in_range(sunrise + twilight, sunset - twilight, now):
+            return 1.0
+        if time_in_range(sunrise, sunrise+twilight, now):
+            return dimming_factor(now - sunrise, twilight)
+        if time_in_range(sunset-twilight, sunset, now):
+            return dimming_factor(sunset - now, twilight)
+
 def is_day((latitude, longitude) = ('32.82', '-117.14')):
     """Is it daytime?
 
