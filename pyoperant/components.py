@@ -469,7 +469,7 @@ class LEDStripHouseLight(BaseComponent):
     punish() -- calls timeout() for 'value' as 'dur'
 
     """
-    def __init__(self,lights,color=[0,0,0,100.0],*args,**kwargs):
+    def __init__(self,lights,color=[100.0,100.0,100.0,100.0],*args,**kwargs):
         super(LEDStripHouseLight, self).__init__(*args,**kwargs)
         self.lights = []
         for light in lights:
