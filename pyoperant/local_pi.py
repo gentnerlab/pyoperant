@@ -128,8 +128,8 @@ DEFAULT_EMAIL = 'bradtheilman@gmail.com'
 
 SMTP_CONFIG = {'mailhost': 'localhost',
                'toaddrs': [DEFAULT_EMAIL],
-               'fromaddr': 'Zog <bird@zog.ucsd.edu>',
-               'subject': '[pyoperant notice] on zog',
+               'fromaddr': 'bird@magpi.ucsd.edu',
+               'subject': '[pyoperant notice] on magpi',
                'credentials': None,
                'secure': None,
                }
