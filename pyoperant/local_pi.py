@@ -117,7 +117,7 @@ PANELS = {
           }
 
 BEHAVIORS = ['pyoperant.behavior',
-             #'glab_behaviors'
+             'glab_behaviors'
             ]
 
 DATA_PATH = '/home/pi/opdat/'
