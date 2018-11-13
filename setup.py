@@ -26,7 +26,6 @@ setup(
     scripts = [
         'scripts/behave',
         'scripts/pyoperantctl',
-        'scripts/allsummary.py',
         ],
     license = "BSD",
     classifiers = [
