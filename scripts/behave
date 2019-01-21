@@ -109,6 +109,7 @@ def main():
         parameters = {}
 
     BehaviorProtocol = find_protocol(cmd_line['protocol'])
+    print(parameters)
 
     if ('debug' in parameters) and parameters['debug']:
         print parameters

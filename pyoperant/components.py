@@ -1,5 +1,8 @@
 import datetime
 from pyoperant import hwio, utils, ComponentError
+import logging
+
+logger = logging.getLogger()
 
 class BaseComponent(object):
     """Base class for physcal component"""
@@ -52,7 +55,7 @@ class Hopper(BaseComponent):
         time in seconds to wait before checking to make sure the hopper is up
 
     """
-    def __init__(self,IR,solenoid,max_lag=0.3,*args,**kwargs):
+    def __init__(self,IR,solenoid,max_lag=0.3, inverted=False,*args,**kwargs):
         super(Hopper, self).__init__(*args,**kwargs)
         self.max_lag = max_lag
         if isinstance(IR,hwio.BooleanInput):
@@ -63,6 +66,10 @@ class Hopper(BaseComponent):
             self.solenoid = solenoid
         else:
             raise ValueError('%s is not an output channel' % solenoid)
+        if inverted:
+            self.inverted=True
+        else:
+            self.inverted=False
 
     def check(self):
         """reads the status of solenoid & IR beam, then throws an error if they don't match
@@ -80,7 +87,10 @@ class Hopper(BaseComponent):
             The Hopper is down and it shouldn't be. (The IR beam is not tripped, but the solenoid is active.)
 
         """
+        return True
         IR_status = self.IR.read()
+        if self.inverted:
+            IR_status = not IR_status
         solenoid_status = self.solenoid.read()
         if IR_status != solenoid_status:
             if IR_status:
@@ -110,7 +120,7 @@ class Hopper(BaseComponent):
         time_up = self.IR.poll(timeout=self.max_lag)
 
         if time_up is None: # poll timed out
-            self.solenoid.write(False)
+            #self.solenoid.write(False)
             raise HopperWontComeUpError
         else:
             return time_up
@@ -161,6 +171,7 @@ class Hopper(BaseComponent):
             The Hopper did not drop fater the feed.
 
         """
+        logger.debug("Feeding..")
         assert self.max_lag < dur, "max_lag (%ss) must be shorter than duration (%ss)" % (self.max_lag,dur)
         try:
             self.check()
@@ -197,7 +208,7 @@ class PeckPort(BaseComponent):
         input channel for the IR beam to check for a peck
 
     """
-    def __init__(self,IR,LED,*args,**kwargs):
+    def __init__(self,IR,LED, inverted=False,*args,**kwargs):
         super(PeckPort, self).__init__(*args,**kwargs)
         if isinstance(IR,hwio.BooleanInput):
             self.IR = IR
@@ -205,8 +216,16 @@ class PeckPort(BaseComponent):
             raise ValueError('%s is not an input channel' % IR)
         if isinstance(LED,hwio.BooleanOutput):
             self.LED = LED
+            self.LEDtype = "boolean"
+        if isinstance(LED, hwio.PWMOutput):
+            self.LED = LED
+            self.LEDtype = "pwm"
         else:
             raise ValueError('%s is not an output channel' % LED)
+        if inverted:
+            self.inverted=True
+        else:
+            self.inverted=False
 
     def status(self):
         """reads the status of the IR beam
@@ -216,6 +235,8 @@ class PeckPort(BaseComponent):
         bool
             True if beam is broken
         """
+        if self.inverted:
+            return not self.IR.read()
         return self.IR.read()
 
     def off(self):
@@ -226,10 +247,13 @@ class PeckPort(BaseComponent):
         bool
             True if successful
         """
-        self.LED.write(False)
+        if self.LEDtype == "boolean":
+            self.LED.write(False)
+        else:
+            self.LED.write(0.0);
         return True
 
-    def on(self):
+    def on(self, val=100.0):
         """Turns the LED on 
 
         Returns
@@ -237,7 +261,10 @@ class PeckPort(BaseComponent):
         bool
             True if successful
         """
-        self.LED.write(True)
+        if self.LEDtype == "boolean":
+            self.LED.write(True)
+        else:
+            self.LED.write(val);
         return True
 
     def flash(self,dur=1.0,isi=0.1):
@@ -423,7 +450,92 @@ class RGBLight(BaseComponent):
         self._blue.write(False)
         return True
 
+## House Light ##
+class LEDStripHouseLight(BaseComponent):
+    """ Class which holds information about the RGBW LED Strip PWM house light
 
+    Keywords
+    --------
+    light : hwio.PWMOutputs
+        [R, G, B, W]
+        output channels to turn the light on and off
+
+    Methods:
+    on() -- 
+    off() -- 
+    set_color() -- set the color
+    change_color -- sets color and turns on light
+    timeout(dur) -- turns off the house light for 'dur' seconds (default=10.0)
+    punish() -- calls timeout() for 'value' as 'dur'
+
+    """
+    def __init__(self,lights,color=[100.0,100.0,100.0,100.0],*args,**kwargs):
+        super(LEDStripHouseLight, self).__init__(*args,**kwargs)
+        self.lights = []
+        for light in lights:
+            if isinstance(light,hwio.PWMOutput):
+                self.lights.append(light)
+            else:
+                 raise ValueError('%s is not an output channel' % light)
+        self.color = color
+
+    def off(self):
+        """Turns the house light off.
+
+        Returns
+        -------
+        bool
+            True if successful.
+
+        """
+        for light in self.lights:
+            light.write(0.0)
+        return True
+
+    def on(self):
+        """Turns the house light on.
+
+        Returns
+        -------
+        bool
+            True if successful.
+        """
+        for ind in range(4):
+            self.lights[ind].write(self.color[ind])
+        return True
+
+    def timeout(self,dur=10.0):
+        """Turn off the light for *dur* seconds 
+
+        Keywords
+        -------
+        dur : float, optional
+            The amount of time (in seconds) to turn off the light.
+
+        Returns
+        -------
+        (datetime, float)
+            Timestamp of the timeout and the timeout duration
+
+        """
+        timeout_time = datetime.datetime.now()
+        self.off()
+        utils.wait(dur)
+        timeout_duration = datetime.datetime.now() - timeout_time
+        self.on()
+        return (timeout_time,timeout_duration)
+
+    def punish(self,value=10.0):
+        """Calls `timeout(dur)` with *value* as *dur* """
+        return self.timeout(dur=value)
+
+    def set_color(self, color):
+        self.color = color
+
+    def change_color(self, color):
+        self.color = color
+        self.on()
+        
 # ## Perch ##
 
 # class Perch(BaseComponent):

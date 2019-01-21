@@ -27,16 +27,16 @@ class PyAudioInterface(base_.BaseInterface):
 
     def open(self):
         self.pa = pyaudio.PyAudio()
-        for index in range(self.pa.get_device_count()):
-            if self.device_name == self.pa.get_device_info_by_index(index)['name']:
-                self.device_index = index
-                break
-            else:
-                self.device_index = None
-        if self.device_index == None:
-            raise InterfaceError('could not find pyaudio device %s' % (self.device_name))
+        #for index in range(self.pa.get_device_count()):
+        #    if self.device_name == self.pa.get_device_info_by_index(index)['name']:
+        #        self.device_index = index
+        #        break
+        #    else:
+        #        self.device_index = None
+        #if self.device_index == None:
+        #    raise InterfaceError('could not find pyaudio device %s' % (self.device_name))
 
-        self.device_info = self.pa.get_device_info_by_index(self.device_index)
+        #self.device_info = self.pa.get_device_info_by_index(self.device_index)
 
     def close(self):
         try:
@@ -69,7 +69,6 @@ class PyAudioInterface(base_.BaseInterface):
                                    channels=self.wf.getnchannels(),
                                    rate=self.wf.getframerate(),
                                    output=True,
-                                   output_device_index=self.device_index,
                                    start=start,
                                    stream_callback=callback)
 
