@@ -16,33 +16,33 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
             self.log.debug('Using reduced stimuli set only')
 
         self.shaper = shape.Shaper3ACMatching(self.panel, self.log, self.parameters, self.get_stimuli, self.log_error_callback)
-        self.num_stims = len(self.parameters['stims'].items())
+        self.num_stims = len(list(self.parameters['stims'].items()))
 
     def get_stimuli(self, trial_class):
         """ take trial class and return a tuple containing the stimulus event to play and a list of additional events
 
         """
         if not self.parameters['reduced_stims']:
-            mids = random.sample(xrange(self.num_stims), 3)
+            mids = random.sample(range(self.num_stims), 3)
         else:
-            mids = random.sample(xrange(2), 2) + random.sample(xrange(3), 1)
+            mids = random.sample(range(2), 2) + random.sample(range(3), 1)
 
         if trial_class == "L":
             mids[2] = mids[0]
         elif trial_class == "R":
             mids[2] = mids[1]
 
-        motif_names, motif_files = zip(*[self.parameters['stims'].items()[mid] for mid in mids])
+        motif_names, motif_files = list(zip(*[list(self.parameters['stims'].items())[mid] for mid in mids]))
 
         motif_isi = [max(random.gauss(self.parameters['isi_mean'], self.parameters['isi_stdev']), 0.0) for mot in motif_names]
         motif_isi[-1] = 0.0
 
-        input_files = zip(motif_files, motif_isi)
+        input_files = list(zip(motif_files, motif_isi))
         filename = os.path.join(self.parameters['stim_path'], ''.join(motif_names) + '.wav')
         stim, epochs = utils.concat_wav(input_files, filename)
 
         for ep in epochs:
-            for stim_name, f_name in self.parameters['stims'].items():
+            for stim_name, f_name in list(self.parameters['stims'].items()):
                 if ep.name in f_name:
                     ep.name = stim_name
 
@@ -125,8 +125,8 @@ if __name__ == "__main__":
 
 
     if parameters['debug']:
-        print parameters
-        print PANELS
+        print(parameters)
+        print(PANELS)
 
     panel = PANELS[parameters['panel_name']]()
 

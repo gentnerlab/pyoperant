@@ -10,9 +10,9 @@ class ConsoleInterface(base_.BaseInterface):
     def _read(self,prompt=''):
         """ read from keyboard input
         """
-        return raw_input(prompt)
+        return input(prompt)
 
     def _write(self,value):
         """Write to console
         """
-        print value
+        print(value)

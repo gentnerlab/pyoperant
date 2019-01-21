@@ -236,7 +236,7 @@ class RaspberryPiInterface(base_.BaseInterface):
         print('Starting poll')
         while True:
             if cb1.tally() > 0:
-                print(cb1.tally())
+                print((cb1.tally()))
                 cb1.reset_tally()
                 cb1.cancel()
                 return datetime.datetime.now()

@@ -43,8 +43,8 @@ class TargObjObj(two_alt_choice.TwoAltChoiceExp):
           if os.path.isfile(file_path):
               os.unlink(file_path)
           #elif os.path.isdir(file_path): shutil.rmtree(file_path)
-        except Exception, e:
-          print e
+        except Exception as e:
+          print(e)
       
     def get_conditions(self):
         """
@@ -52,7 +52,7 @@ class TargObjObj(two_alt_choice.TwoAltChoiceExp):
         """
         self.trial_types = np.matrix('0; 1'); #
         self.trials=[]    
-        for i in xrange(100):    
+        for i in range(100):    
             self.trials.append(random.randrange(0,2,1))    
         self.trial_output = [self.parameters["category_conditions"][i]["class"] for i in self.trials]
 
@@ -79,16 +79,16 @@ class TargObjObj(two_alt_choice.TwoAltChoiceExp):
           # if self.parameters["curblock"] == "pos2":
           #   thisstim.append((self.parameters["hightones"][int(np.random.uniform(0,12))], 0))
 
-          [thisstim.append((stims[str(first_motif)], 0)) for thing in xrange(repeats)]
+          [thisstim.append((stims[str(first_motif)], 0)) for thing in range(repeats)]
 
           if (i == 1 and self.parameters["curblock"] == "pos1") or (i == 0 and self.parameters["curblock"] == "pos2"):
             #if match and pos1 is target or nonmatch and pos2 is target
-            [thisstim.append((stims[str(first_motif)], 0)) for thing in xrange(repeats)]
-            [thisstim.append((stims[str(second_motif)], 0)) for thing in xrange(repeats)]
+            [thisstim.append((stims[str(first_motif)], 0)) for thing in range(repeats)]
+            [thisstim.append((stims[str(second_motif)], 0)) for thing in range(repeats)]
           elif (i == 1 and self.parameters["curblock"] == "pos2") or (i == 0 and self.parameters["curblock"] == "pos1"):
             #if match and pos2 is target or nonmatch and pos1 is target
-            [thisstim.append((stims[str(second_motif)], 0)) for thing in xrange(repeats)]
-            [thisstim.append((stims[str(first_motif)], 0)) for thing in xrange(repeats)]
+            [thisstim.append((stims[str(second_motif)], 0)) for thing in range(repeats)]
+            [thisstim.append((stims[str(first_motif)], 0)) for thing in range(repeats)]
 
           self.song_motifs.append(thisstim)
 

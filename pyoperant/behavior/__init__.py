@@ -1,2 +1,2 @@
-from two_alt_choice import *
-from lights import *
+from .two_alt_choice import *
+from .lights import *

@@ -14,7 +14,7 @@ from pyoperant.errors import EndSession, EndBlock
 import math
 import types
 import time
-import cPickle
+import pickle
 sys.path.append('/home/pi/')
 from sparray import *
 import sys
@@ -100,28 +100,28 @@ class text_markov(two_alt_choice.TwoAltChoiceExp):
             if np.random.binomial(1, self.parameters['prob_fixed_example']): # at some probability, make the model use a fixed example
                     # Choose which fixed example
                     if order == -1: # if this is a true sentence
-                        stim_dict[unicode("class", "utf-8")] =  self.parameters['reinforce_real_side']
+                        stim_dict[str("class", "utf-8")] =  self.parameters['reinforce_real_side']
                         seq = self.parameters['real_exemplars'][np.random.choice(self.parameters['n_exemplars'])] # chose a pregenerated real sequence
                     else:
-                        stim_dict[unicode("class", "utf-8")] = self.parameters['reinforce_markov_side']
+                        stim_dict[str("class", "utf-8")] = self.parameters['reinforce_markov_side']
                         seq = self.parameters['generated_exemplars'][np.random.choice(self.parameters['n_exemplars'])]  # choose a pregenerated fake sequence
             else:
                 if order == -1: # if this is a true sentence
-                    stim_dict[unicode("class", "utf-8")] =  self.parameters['reinforce_real_side'] # either L or R, this represents the reinforcement
+                    stim_dict[str("class", "utf-8")] =  self.parameters['reinforce_real_side'] # either L or R, this represents the reinforcement
                     seq = sentences[np.random.choice(len(sentences))]
                 else: # if this is a Markov generated sentence
-                    stim_dict[unicode("class", "utf-8")] = self.parameters['reinforce_markov_side']
+                    stim_dict[str("class", "utf-8")] = self.parameters['reinforce_markov_side']
                     sequence_length = sentence_lens[np.random.choice(len(sentence_lens))] # length of the sentence to be generated
                     seq = generate_MM_seq(sequence_length, MMs[:order+1], self.parameters['n_symbols'], use_tqdm=False)
             seq_str = '-'.join([str(i) for i in seq]) # create a string representing the sequence
-            stim_dict[unicode("stim_name", "utf-8")] = seq_str
-            stim_dict[unicode("seq", "utf-8")] = list(seq)
-            stim_dict[unicode("order", "utf-8")] = str(order)
+            stim_dict[str("stim_name", "utf-8")] = seq_str
+            stim_dict[str("seq", "utf-8")] = list(seq)
+            stim_dict[str("order", "utf-8")] = str(order)
             #self.sequences.append(seq)
             self.parameters["stims"][seq_str] = self.parameters["stim_path"] + str(trial_num) + '.wav'
             # generate the wav
 
-            stim_dict[unicode("syll_time_lens", "utf-8")] = self.build_wav(seq, self.parameters["stim_path"] + str(trial_num) + '.wav')
+            stim_dict[str("syll_time_lens", "utf-8")] = self.build_wav(seq, self.parameters["stim_path"] + str(trial_num) + '.wav')
 
 
             self.parameters["block_design"]["blocks"]["default"]["conditions"].append(stim_dict) # add to the list of stims
@@ -259,7 +259,7 @@ class text_markov(two_alt_choice.TwoAltChoiceExp):
                     #sys.stdout.write(self.parameters["num_to_char"][str(self.this_trial.sequence[cur_sym])])
                     #sys.stdout.flush()
                     cur_sym +=1"""
-                for class_, port in self.class_assoc.items():
+                for class_, port in list(self.class_assoc.items()):
                     port.on() # turns on lights
                 break
             time.sleep(.1)
@@ -293,7 +293,7 @@ class text_markov(two_alt_choice.TwoAltChoiceExp):
     def callback(self):
         # callback exists in self.panel.speaker.interface
 
-        for class_, port in self.class_assoc.items():
+        for class_, port in list(self.class_assoc.items()):
 
             if port.status():
 
@@ -377,7 +377,7 @@ def generate_MM_seq(sequence_length, MMs, n_elements, use_tqdm=True):
     #print('prepping seq list')
     sequence = np.zeros(sequence_length)
     #print('prepping iter')
-    seqlist = tqdm(range(sequence_length), leave=False) if use_tqdm else range(sequence_length)
+    seqlist = tqdm(list(range(sequence_length)), leave=False) if use_tqdm else list(range(sequence_length))
     for i in seqlist:
         prediction = MM_make_prediction(prev_seq = np.array(sequence)[:i],
                                                   MMs = MMs,
@@ -424,9 +424,9 @@ def clear_song_folder(folder= 'Generated_Songs/'):
 
 def load_MMs(loc):
     with open(loc, 'rb') as f:
-        return cPickle.load(f)
+        return pickle.load(f)
 
 
 def save_MMs(MMs, loc):
     with open(loc, "wb") as f:
-        cPickle.dump(MMs, f)
+        pickle.dump(MMs, f)
