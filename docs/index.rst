@@ -1,7 +1,7 @@
 Welcome to pyoperant's documentation!
 =====================================
 
-.. include:: ../README.rst
+.. include:: README.rst
 
 Contents
 ========
