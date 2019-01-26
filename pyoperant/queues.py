@@ -1,6 +1,6 @@
 import random
 from pyoperant.utils import rand_from_log_shape_dist
-import cPickle as pickle
+import pickle as pickle
 import numpy as np
 
 def random_queue(conditions,tr_max=100,weights=None):
@@ -72,7 +72,7 @@ class AdaptiveBase(object):
         if no_resp:
             self.no_response()
 
-    def next(self):
+    def __next__(self):
         if not self.updated: #hasn't been updated since last trial
             raise Exception(self.update_error_msg()) #TODO: find what causes bug
         self.updated = False
@@ -177,8 +177,8 @@ class KaernbachStaircase(AdaptiveBase):
         elif (self.min_val!=None) and (self.val < self.min_val):
             self.val = self.min_val
 
-    def next(self):
-        super(KaernbachStaircase, self).next()
+    def __next__(self):
+        next(super(KaernbachStaircase, self))
         if self.counter > self.crit:
             raise StopIteration
         self.counter += 1 if self.crit_method=='trials' else 0
@@ -216,8 +216,8 @@ class DoubleStaircase(AdaptiveBase):
                 self.high_idx = self.trial['value']
         self.trial = {}
 
-    def next(self):
-        super(DoubleStaircase, self).next()
+    def __next__(self):
+        next(super(DoubleStaircase, self))
         if self.high_idx - self.low_idx <= 1:
             raise StopIteration
         
@@ -266,19 +266,19 @@ class DoubleStaircaseReinforced(AdaptiveBase):
             self.dblstaircase.update(correct, no_resp)
         super(DoubleStaircaseReinforced, self).update(correct, no_resp)
 
-    def next(self):
-        super(DoubleStaircaseReinforced, self).next()
+    def __next__(self):
+        next(super(DoubleStaircaseReinforced, self))
 
         if random.random() < self.probe_rate:
             try:
-                ret = self.dblstaircase.next()
+                ret = next(self.dblstaircase)
                 self.last_probe = True
                 return ret
             except StopIteration:
                 self.probe_rate = 0
                 self.last_probe = False
                 self.updated = True
-                return self.next()
+                return next(self)
         else:
             self.last_probe = False
             if random.random() < .5: # probe left
@@ -335,12 +335,12 @@ class MixedAdaptiveQueue(PersistentBase, AdaptiveBase):
         self.sub_queues[self.sub_queue_idx].update(correct, no_resp)
         self.save()
 
-    def next(self):
-        super(MixedAdaptiveQueue, self).next()
+    def __next__(self):
+        next(super(MixedAdaptiveQueue, self))
         if self.probabilities is None:
             try:
                 self.sub_queue_idx = random.randrange(len(self.sub_queues))
-                return self.sub_queues[self.sub_queue_idx].next()
+                return next(self.sub_queues[self.sub_queue_idx])
             except StopIteration:
                 #TODO: deal with subqueue finished, and possibility of all subqueues finishing
                 raise NotImplementedError

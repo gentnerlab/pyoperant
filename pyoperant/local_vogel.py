@@ -62,10 +62,10 @@ class VogelPanel(panels.BasePanel):
         self.reset()
         dur = 2.0
         for output in self.outputs:
-            print ('output %s on' % output)
+            print(('output %s on' % output))
             output.write(True)
             utils.wait(dur)
-            print ('output %s off' % output)
+            print(('output %s off' % output))
             output.write(False)
         print ('reset')
         self.reset()

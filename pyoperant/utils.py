@@ -92,16 +92,16 @@ def run_state_machine(start_in='pre', error_state=None, error_callback=None, **s
     None
     """
     # make sure the start state has a function to run
-    assert (start_in in state_functions.keys())
+    assert (start_in in list(state_functions.keys()))
     # make sure all of the arguments passed in are callable
-    for func in state_functions.values():
+    for func in list(state_functions.values()):
         assert hasattr(func, '__call__')
 
     state = start_in
     while state is not None:
         try:
             state = state_functions[state]()
-        except Exception, e:
+        except Exception as e:
             if error_callback:
                 error_callback(e)
                 raise
@@ -149,7 +149,7 @@ class Command(object):
     output, error = '', ''
  
     def __init__(self, command):
-        if isinstance(command, basestring):
+        if isinstance(command, str):
             command = shlex.split(command)
         self.command = command
  
@@ -200,10 +200,10 @@ def check_cmdline_params(parameters, cmd_line):
     allchars=string.maketrans('','')
     nodigs=allchars.translate(allchars, string.digits)
     if not ('box' not in cmd_line or cmd_line['box'] == int(parameters['panel_name'].encode('ascii','ignore').translate(allchars, nodigs))):
-        print "box number doesn't match config and command line"
+        print("box number doesn't match config and command line")
         return False
     if not ('subj' not in cmd_line or int(cmd_line['subj'].encode('ascii','ignore').translate(allchars, nodigs)) == int(parameters['subject'].encode('ascii','ignore').translate(allchars, nodigs))):
-        print "subject number doesn't match config and command line"
+        print("subject number doesn't match config and command line")
         return False
     return True
 
@@ -216,7 +216,7 @@ def time_in_range(start, end, x):
     else:
         return start <= x or x <= end
 
-def is_day((latitude, longitude) = ('32.82', '-117.14')):
+def is_day(xxx_todo_changeme = ('32.82', '-117.14')):
     """Is it daytime?
 
     (lat,long) -- latitude and longitude of location to check (default is San Diego*)
@@ -225,6 +225,7 @@ def is_day((latitude, longitude) = ('32.82', '-117.14')):
     * Discovered by the Germans in 1904, they named it San Diego,
     which of course in German means a whale's vagina. (Burgundy, 2004)
     """
+    (latitude, longitude) = xxx_todo_changeme
     import ephem
     obs = ephem.Observer()
     obs.lat = latitude # San Diego, CA
@@ -392,9 +393,7 @@ def get_num_open_fds():
         [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
 
     nprocs = len(
-        filter(
-            lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
-            procs.split( '\n' ) )
+        [s for s in procs.split( '\n' ) if s and s[ 0 ] == 'f' and s[1: ].isdigit()]
         )
     return nprocs
 

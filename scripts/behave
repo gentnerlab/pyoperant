@@ -66,7 +66,7 @@ def list_protocols():
     l = []
     behav_modules = [importlib.import_module(pstr) for pstr in BEHAVIORS]
     for mod in behav_modules:
-        for name, obj in mod.__dict__.iteritems():
+        for name, obj in mod.__dict__.items():
             try:
                 if issubclass(obj,BaseExp):
                     l.append(name)
@@ -112,11 +112,11 @@ def main():
     print(parameters)
 
     if ('debug' in parameters) and parameters['debug']:
-        print parameters
-        print PANELS
+        print(parameters)
+        print(PANELS)
 
     for k in ['subject','panel_name','experiment_path']:
-        parameters.pop(k) if k in parameters.keys() else None
+        parameters.pop(k) if k in list(parameters.keys()) else None
 
     stimuli_path = parameters.pop('stim_path') if 'stim_path' in parameters else stimuli_path
 
