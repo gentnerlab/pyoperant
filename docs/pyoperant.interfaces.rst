@@ -6,11 +6,11 @@ Submodules
 
 .. toctree::
 
-   pyoperant.interfaces.base_
-   pyoperant.interfaces.comedi_
-   pyoperant.interfaces.console_
-   pyoperant.interfaces.pyaudio_
-   pyoperant.interfaces.spike2_
+   base <pyoperant.interfaces.base>
+   comedi <pyoperant.interfaces.comedi>
+   console <pyoperant.interfaces.console>
+   pyaudio <pyoperant.interfaces.pyaudio>
+   spike2 <pyoperant.interfaces.spike2>
 
 Module contents
 ---------------
