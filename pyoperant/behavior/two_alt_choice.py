@@ -456,7 +456,7 @@ class TwoAltChoiceExp(base.BaseExp):
                 self.this_trial.response = 'none'
                 self.log.info('no response')
                 return
-            for port_name, port in self.response_ports.items()
+            for port_name, port in self.response_ports.items():
                 if port.status():
                     self.this_trial.rt = (dt.datetime.now() - response_start).total_seconds()
                     self.panel.speaker.stop()
