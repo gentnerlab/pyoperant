@@ -300,7 +300,7 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['comedi','comedi_poll', 'numpy', 'ephem', 'scipy', 'pyaudio', 'special']
+MOCK_MODULES = ['comedi','comedi_poll', 'numpy', 'ephem', 'scipy', 'pyaudio', 'scipy.special']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
 
