@@ -1,5 +1,5 @@
 pyoperant.behavior package
-========================
+==========================
 
 Submodules
 ----------
