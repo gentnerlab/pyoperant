@@ -10,6 +10,9 @@ Contents
    :maxdepth: 4
 
    pyoperant
+   
+   The Interfaces Package <pyoperant.interfaces>
+   The Behavior Package <pyoperant.behavior>
 
 
 Indices and tables
