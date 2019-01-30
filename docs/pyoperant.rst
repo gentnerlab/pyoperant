@@ -14,16 +14,16 @@ Modules
 
 .. toctree::
 
-   components submodule <pyoperant.components>
-   errors submodule <pyoperant.errors>
-   hwio submodule <pyoperant.hwio>
-   local submodule <pyoperant.local>
-   local_vogel submodule <pyoperant.local_vogel>
-   local_zog submodule <pyoperant.local_zog>
-   panels submodule <pyoperant.panels>
-   queues submodule <pyoperant.queues>
-   reinf submodule <pyoperant.reinf>
-   utils submodule <pyoperant.utils>
+   components <pyoperant.components>
+   errors <pyoperant.errors>
+   hwio <pyoperant.hwio>
+   local <pyoperant.local>
+   local_vogel <pyoperant.local_vogel>
+   local_zog <pyoperant.local_zog>
+   panels <pyoperant.panels>
+   queues <pyoperant.queues>
+   reinf <pyoperant.reinf>
+   utils <pyoperant.utils>
 
 Module contents
 ---------------
