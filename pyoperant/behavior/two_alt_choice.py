@@ -442,7 +442,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     #response flow
     def response_pre(self):
-        for port_name, port in self.response_ports.items()
+        for port_name, port in self.response_ports.items():
             port.on()
         self.log.debug('waiting for response')
 
