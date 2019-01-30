@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+This submodule controls the light schedule in the animal's environment.
+It is documented in more detail main pyoperant module $pyoperant.components
+"""
+
 from pyoperant import utils, components
 from pyoperant.behavior import base
 
