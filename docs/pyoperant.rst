@@ -9,7 +9,7 @@ Subpackages
     The Interfaces Subpackage <pyoperant.interfaces>
     The Behavior Subpackage <pyoperant.behavior>
 
-Submodules
+Modules
 ----------
 
 .. toctree::
