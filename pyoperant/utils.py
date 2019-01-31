@@ -219,11 +219,9 @@ def time_in_range(start, end, x):
 def is_day((latitude, longitude) = ('32.82', '-117.14')):
     """Is it daytime?
 
-    (lat,long) -- latitude and longitude of location to check (default is San Diego*)
+    (lat,long) -- latitude and longitude of location to check (default is San Diego)
     Returns True if it is daytime
 
-    * Discovered by the Germans in 1904, they named it San Diego,
-    which of course in German means a whale's vagina. (Burgundy, 2004)
     """
     import ephem
     obs = ephem.Observer()
