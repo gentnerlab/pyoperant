@@ -216,7 +216,7 @@ def time_in_range(start, end, x):
     else:
         return start <= x or x <= end
 
-def is_day((latitude, longitude) = ('32.82', '-117.14')):
+def is_day(latitude = '32.82', longitude = '-117.14'):
     """Is it daytime?
 
     (lat,long) -- latitude and longitude of location to check (default is San Diego)
