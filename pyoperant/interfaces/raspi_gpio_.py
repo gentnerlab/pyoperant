@@ -86,7 +86,7 @@ class PWM:
       time.sleep(0.0005)
 
       self.set_duty_cycle(-1, 0)
-      self.set_frequency(200)
+      self.set_frequency(1000)
 
    def get_frequency(self):
 
@@ -194,7 +194,7 @@ class RaspberryPiInterface(base_.BaseInterface):
         #GPIO.setmode(GPIO.BCM)
         # Setup PWM
         self.pwm = PWM(self.pi, address=PCA9685_ADDRESS)
-        self.pwm.set_frequency(240)
+        self.pwm.set_frequency(1000) #used to be 240
 
 
     def close(self):
