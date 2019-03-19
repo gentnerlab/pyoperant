@@ -5,6 +5,8 @@ from pyoperant import utils, components, local, hwio
 from pyoperant import ComponentError, InterfaceError
 from pyoperant.behavior import shape
 import random
+import zmq
+from zmq.log.handlers import PUBHandler
 
 try:
     import simplejson as json
@@ -100,6 +102,15 @@ class BaseExp(object):
                             level=self.log_level,
                             format='"%(asctime)s","%(levelname)s","%(message)s"')
         self.log = logging.getLogger()
+
+        # setup ZMQ log handler
+        ctx = zmq.Context()
+        pub = ctx.socket(zmq.PUB)
+        pub.bind('tcp://*:31967')
+        self.pub_handler = PUBHandler(pub)
+        self.pub_handler.root_topic = socket.gethostname()
+        self.log.addHandler(self.pub_handler)
+
 
         if 'email' in self.parameters['log_handlers']:
             from pyoperant.local import SMTP_CONFIG
