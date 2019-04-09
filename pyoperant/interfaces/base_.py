@@ -1,5 +1,6 @@
 class BaseInterface(object):
     """docstring for BaseInterface"""
+
     def __init__(self, *args, **kwargs):
         super(BaseInterface, self).__init__()
         pass
@@ -12,4 +13,3 @@ class BaseInterface(object):
 
     def __del__(self):
         self.close()
-

@@ -1,11 +1,14 @@
 import time
 import datetime
+
 # Classes of operant components
 class BaseIO(object):
     """any type of IO device. maintains info on interface for query IO device"""
-    def __init__(self,interface=None,params={},*args,**kwargs):
+
+    def __init__(self, interface=None, params={}, *args, **kwargs):
         self.interface = interface
         self.params = params
+
 
 class BooleanInput(BaseIO):
     """Class which holds information about inputs and abstracts the methods of
@@ -19,10 +22,13 @@ class BooleanInput(BaseIO):
     read() -- reads value of the input. Returns a boolean
     poll() -- polls the input until value is True. Returns the time of the change
     """
-    def __init__(self,interface=None,params={},*args,**kwargs):
-        super(BooleanInput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
-        assert hasattr(self.interface,'_read_bool')
+    def __init__(self, interface=None, params={}, *args, **kwargs):
+        super(BooleanInput, self).__init__(
+            interface=interface, params=params, *args, **kwargs
+        )
+
+        assert hasattr(self.interface, "_read_bool")
         self.config()
 
     def _clbk(self, gpio, level, tick):
@@ -34,7 +40,7 @@ class BooleanInput(BaseIO):
         try:
             self.interface._callback(func=self._clbk, **self.params)
         except:
-            print('callback error')
+            print("callback error")
             return False
         try:
             return self.interface._config_read(**self.params)
@@ -45,19 +51,20 @@ class BooleanInput(BaseIO):
         """read status"""
         return self.interface._read_bool(**self.params)
 
-    def poll(self,timeout=None):
+    def poll(self, timeout=None):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-        #orig = self.tally
-        #if timeout is not None:
+        # orig = self.tally
+        # if timeout is not None:
         #    start = time.time()
-        #while time.time() - start < timeout:
+        # while time.time() - start < timeout:
         #    if self.tally - orig > 0:
         #        return datetime.datetime.now()
-        #return None
-        return self.interface._poll(timeout=timeout,**self.params)
+        # return None
+        return self.interface._poll(timeout=timeout, **self.params)
 
     def callback(self, func):
         return self.interface._callback(func=func, **self.params)
+
 
 class BooleanOutput(BaseIO):
     """Class which holds information about outputs and abstracts the methods of
@@ -74,10 +81,13 @@ class BooleanOutput(BaseIO):
         returns the last passed by write(value)
     toggle() -- flips the value from the current value
     """
-    def __init__(self,interface=None,params={},*args,**kwargs):
-        super(BooleanOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
-        assert hasattr(self.interface,'_write_bool')
+    def __init__(self, interface=None, params={}, *args, **kwargs):
+        super(BooleanOutput, self).__init__(
+            interface=interface, params=params, *args, **kwargs
+        )
+
+        assert hasattr(self.interface, "_write_bool")
         self.last_value = None
         self.config()
 
@@ -89,19 +99,20 @@ class BooleanOutput(BaseIO):
 
     def read(self):
         """read status"""
-        if hasattr(self.interface,'_read_bool'):
+        if hasattr(self.interface, "_read_bool"):
             return self.interface._read_bool(**self.params)
         else:
             return self.last_value
 
-    def write(self,value=False):
+    def write(self, value=False):
         """write status"""
-        self.last_value = self.interface._write_bool(value=value,**self.params)
+        self.last_value = self.interface._write_bool(value=value, **self.params)
         return self.last_value
 
     def toggle(self):
         value = not self.read()
         return self.write(value=value)
+
 
 class AudioOutput(BaseIO):
     """Class which holds information about audio outputs and abstracts the
@@ -119,14 +130,17 @@ class AudioOutput(BaseIO):
         returns the last passed by write(value)
     toggle() -- flips the value from the current value
     """
-    def __init__(self, interface=None,params={},*args,**kwargs):
-        super(AudioOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
-        assert hasattr(self.interface,'_queue_wav')
-        assert hasattr(self.interface,'_play_wav')
-        assert hasattr(self.interface,'_stop_wav')
+    def __init__(self, interface=None, params={}, *args, **kwargs):
+        super(AudioOutput, self).__init__(
+            interface=interface, params=params, *args, **kwargs
+        )
 
-    def queue(self,wav_filename):
+        assert hasattr(self.interface, "_queue_wav")
+        assert hasattr(self.interface, "_play_wav")
+        assert hasattr(self.interface, "_stop_wav")
+
+    def queue(self, wav_filename):
         return self.interface._queue_wav(wav_filename)
 
     def play(self):
@@ -134,6 +148,7 @@ class AudioOutput(BaseIO):
 
     def stop(self):
         return self.interface._stop_wav()
+
 
 class PWMOutput(BaseIO):
     """Class which abstracts the writing to PWM outputs
@@ -148,10 +163,13 @@ class PWMOutput(BaseIO):
         the current value of the output from the interface. Otherwise this
         returns the last passed by write(value)
     """
-    def __init__(self,interface=None,params={},*args,**kwargs):
-        super(PWMOutput, self).__init__(interface=interface,params=params,*args,**kwargs)
 
-        assert hasattr(self.interface,'_write_pwm')
+    def __init__(self, interface=None, params={}, *args, **kwargs):
+        super(PWMOutput, self).__init__(
+            interface=interface, params=params, *args, **kwargs
+        )
+
+        assert hasattr(self.interface, "_write_pwm")
         self.last_value = None
         self.config()
 
@@ -163,7 +181,7 @@ class PWMOutput(BaseIO):
         """read status"""
         return self.last_value
 
-    def write(self,val=0.0):
+    def write(self, val=0.0):
         """write status"""
         self.last_value = self.interface._write_pwm(value=val, **self.params)
         return self.last_value
@@ -173,5 +191,3 @@ class PWMOutput(BaseIO):
         new_val = abs(100.0 - self.last_value)
         self.write(new_val)
         return new_val
-
-

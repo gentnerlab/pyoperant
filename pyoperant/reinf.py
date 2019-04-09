@@ -1,5 +1,6 @@
 from numpy import random
 
+
 class BaseSchedule(object):
     """Maintains logic for deciding whether to consequate trials.
 
@@ -11,15 +12,17 @@ class BaseSchedule(object):
         should be consequated. Always returns True.
 
     """
+
     def __init__(self):
         super(BaseSchedule, self).__init__()
 
-    def consequate(self,trial):
-        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
+    def consequate(self, trial):
+        assert hasattr(trial, "correct") and isinstance(trial.correct, bool)
         if trial.correct:
             return True
         else:
             return True
+
 
 class ContinuousReinforcement(BaseSchedule):
     """Maintains logic for deciding whether to consequate trials.
@@ -32,15 +35,17 @@ class ContinuousReinforcement(BaseSchedule):
         should be consequated. Always returns True.
 
     """
+
     def __init__(self):
         super(ContinuousReinforcement, self).__init__()
 
-    def consequate(self,trial):
-        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
+    def consequate(self, trial):
+        assert hasattr(trial, "correct") and isinstance(trial.correct, bool)
         if trial.correct:
             return True
         else:
             return True
+
 
 class FixedRatioSchedule(BaseSchedule):
     """Maintains logic for deciding whether to consequate trials.
@@ -55,25 +60,26 @@ class FixedRatioSchedule(BaseSchedule):
         should be consequated.
 
     """
+
     def __init__(self, ratio=1):
         super(FixedRatioSchedule, self).__init__()
-        self.ratio = max(ratio,1)
+        self.ratio = max(ratio, 1)
         self._update()
 
     def _update(self):
         self.cumulative_correct = 0
         self.threshold = self.ratio
 
-    def consequate(self,trial):
-        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
-        if trial.correct==True:
+    def consequate(self, trial):
+        assert hasattr(trial, "correct") and isinstance(trial.correct, bool)
+        if trial.correct == True:
             self.cumulative_correct += 1
             if self.cumulative_correct >= self.threshold:
                 self._update()
                 return True
             else:
                 return False
-        elif trial.correct==False:
+        elif trial.correct == False:
             self.cumulative_correct = 0
             return True
         else:
@@ -81,6 +87,7 @@ class FixedRatioSchedule(BaseSchedule):
 
     def __unicode__(self):
         return "FR%i" % self.ratio
+
 
 class VariableRatioSchedule(FixedRatioSchedule):
     """Maintains logic for deciding whether to consequate trials.
@@ -101,16 +108,18 @@ class VariableRatioSchedule(FixedRatioSchedule):
 
 
     """
+
     def __init__(self, ratio=1):
         super(VariableRatioSchedule, self).__init__(ratio=ratio)
 
     def _update(self):
-        ''' update min correct by randomly sampling from interval [1:2*ratio)'''
+        """ update min correct by randomly sampling from interval [1:2*ratio)"""
         self.cumulative_correct = 0
-        self.threshold = random.randint(1, 2*self.ratio)
+        self.threshold = random.randint(1, 2 * self.ratio)
 
     def __unicode__(self):
         return "VR%i" % self.ratio
+
 
 class PercentReinforcement(BaseSchedule):
     """Maintains logic for deciding whether to consequate trials.
@@ -125,12 +134,13 @@ class PercentReinforcement(BaseSchedule):
         should be consequated.
 
     """
+
     def __init__(self, prob=1):
         super(PercentReinforcement, self).__init__()
         self.prob = prob
 
-    def consequate(self,trial):
-        assert hasattr(trial, 'correct') and isinstance(trial.correct, bool)
+    def consequate(self, trial):
+        assert hasattr(trial, "correct") and isinstance(trial.correct, bool)
         if trial.correct:
             return random.random() < self.prob
         else:

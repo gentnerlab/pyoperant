@@ -1,7 +1,9 @@
 from pyoperant.interfaces import base_
 
+
 class Spike2Interface(base_.BaseInterface):
     """docstring for Spike2Interface"""
+
     def __init__(self):
         super(Spike2Interface, self).__init__()
 
@@ -10,7 +12,7 @@ class Spike2Interface(base_.BaseInterface):
 
     def close(self):
         raise NotImplementedError
-        
+
     def _read_bool(self):
         raise NotImplementedError
 

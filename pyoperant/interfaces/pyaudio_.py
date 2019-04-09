@@ -4,6 +4,7 @@ import logging
 from pyoperant.interfaces import base_
 from pyoperant import InterfaceError
 
+
 class PyAudioInterface(base_.BaseInterface):
     """Class which holds information about an audio device
 
@@ -17,8 +18,9 @@ class PyAudioInterface(base_.BaseInterface):
     https://www.assembla.com/spaces/portaudio/wiki/Tips_Callbacks
 
     """
-    def __init__(self,device_name='default',*args,**kwargs):
-        super(PyAudioInterface, self).__init__(*args,**kwargs)
+
+    def __init__(self, device_name="default", *args, **kwargs):
+        super(PyAudioInterface, self).__init__(*args, **kwargs)
         self.device_name = device_name
         self.device_index = None
         self.stream = None
@@ -27,16 +29,16 @@ class PyAudioInterface(base_.BaseInterface):
 
     def open(self):
         self.pa = pyaudio.PyAudio()
-        #for index in range(self.pa.get_device_count()):
+        # for index in range(self.pa.get_device_count()):
         #    if self.device_name == self.pa.get_device_info_by_index(index)['name']:
         #        self.device_index = index
         #        break
         #    else:
         #        self.device_index = None
-        #if self.device_index == None:
+        # if self.device_index == None:
         #    raise InterfaceError('could not find pyaudio device %s' % (self.device_name))
 
-        #self.device_info = self.pa.get_device_info_by_index(self.device_index)
+        # self.device_info = self.pa.get_device_info_by_index(self.device_index)
 
     def close(self):
         try:
@@ -55,27 +57,30 @@ class PyAudioInterface(base_.BaseInterface):
         if self.wf is not None:
             return True
         else:
-            raise InterfaceError('there is something wrong with this wav file')
+            raise InterfaceError("there is something wrong with this wav file")
 
-    def _get_stream(self,start=False,callback=None):
+    def _get_stream(self, start=False, callback=None):
         """
         """
         if callback is None:
+
             def callback(in_data, frame_count, time_info, status):
                 data = self.wf.readframes(frame_count)
                 return (data, pyaudio.paContinue)
 
-        self.stream = self.pa.open(format=self.pa.get_format_from_width(self.wf.getsampwidth()),
-                                   channels=self.wf.getnchannels(),
-                                   rate=self.wf.getframerate(),
-                                   output=True,
-                                   start=start,
-                                   stream_callback=callback)
+        self.stream = self.pa.open(
+            format=self.pa.get_format_from_width(self.wf.getsampwidth()),
+            channels=self.wf.getnchannels(),
+            rate=self.wf.getframerate(),
+            output=True,
+            start=start,
+            stream_callback=callback,
+        )
 
-    def _queue_wav(self,wav_file,start=False,callback=None):
+    def _queue_wav(self, wav_file, start=False, callback=None):
         self.wf = wave.open(wav_file)
         self.validate()
-        self._get_stream(start=start,callback=callback)
+        self._get_stream(start=start, callback=callback)
 
     def _play_wav(self):
         self.stream.start_stream()
