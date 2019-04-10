@@ -1,12 +1,14 @@
 import logging, traceback
 import os, sys, socket
 import datetime as dt
-from pyoperant import utils, components, local, hwio
+from pyoperant import utils, components
 from pyoperant import ComponentError, InterfaceError
 from pyoperant.behavior import shape
 import random
 import zmq
 from zmq.log.handlers import PUBHandler
+from pyoperant.interfaces.open_ephys_ import OpenEphysEvents
+
 
 try:
     import simplejson as json
@@ -21,6 +23,9 @@ def _log_except_hook(*exc_info):
 
 class BaseExp(object):
     """Base class for an experiment.
+
+    Defines things like the the state machine between the behavior and sleep states, 
+    what a session is, etc. 
 
     Keyword arguments:
     name -- name of this experiment
@@ -93,6 +98,15 @@ class BaseExp(object):
         self.shaper = shape.Shaper(
             self.panel, self.log, self.parameters, self.log_error_callback
         )
+
+        # connect to open ephys
+        if "conn_open_ephys" in self.parameters.keys():
+            if self.parameters["conn_open_ephys"] == "True":
+                self.openephys = OpenEphysEvents(
+                    port=self.parameters["open_ephys_port"], 
+                    ip=self.parameters["open_ephys_address"]
+                    )
+                self.openephys.connect()
 
     def save(self):
         self.snapshot_f = os.path.join(
