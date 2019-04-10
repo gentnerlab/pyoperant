@@ -1,6 +1,6 @@
 import random
 from pyoperant.utils import rand_from_log_shape_dist
-import cPickle as pickle
+import _pickle as pickle
 import numpy as np
 
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -75,7 +75,7 @@ def list_protocols():
     l = []
     behav_modules = [importlib.import_module(pstr) for pstr in BEHAVIORS]
     for mod in behav_modules:
-        for name, obj in mod.__dict__.iteritems():
+        for name, obj in mod.__dict__.items():
             try:
                 if issubclass(obj, BaseExp):
                     l.append(name)
@@ -112,12 +112,10 @@ def main():
     experiment_path = os.path.join(DATAPATH, cmd_line["subject"])
     config_file = os.path.join(experiment_path, cmd_line["config_file"])
     stimuli_path = os.path.join(experiment_path, "Stimuli")
-
-    try:
-        with open(config_file, "rb") as config:
-            parameters = json.load(config)
-    except IOError:
-        parameters = {}
+    
+    with open(config_file, "r", encoding='utf-8') as config:
+        print(config)
+        parameters = json.load(config)
 
     BehaviorProtocol = find_protocol(cmd_line["protocol"])
 

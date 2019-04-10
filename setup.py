@@ -1,5 +1,5 @@
-from distutils.core import setup, Extension
-import os
+from setuptools import find_packages, setup, Extension
+#from distutils.core import setup, Extension
 import socket
 
 hnm = socket.gethostname()
@@ -16,16 +16,15 @@ if 'zog' in hnm:
 
 setup(
     name = 'pyoperant',
-    version = '0.1.2',
+    packages=find_packages(),
+    version = '0.2.0',
     author = 'Justin Kiggins',
     author_email = 'justin.kiggins@gmail.com',
     description = 'hardware interface and controls for operant conditioning',
     long_description = open('docs/README.rst', 'rt').read(),
-    packages = ['pyoperant'],
     requires = ['pyephem','numpy'],
     scripts = [
         'scripts/behave',
-        'scripts/pyoperantctl',
         ],
     license = "BSD",
     classifiers = [
@@ -35,7 +34,7 @@ setup(
         "License :: OSI Approved :: GNU Affero General Public License v3",
         "Natural Language :: English",
         "Operating System :: Unix",
-        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.6",
         "Topic :: Scientific/Engineering",
         ],
 #     ext_modules = [comedi_poll]

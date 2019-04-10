@@ -1,0 +1,115 @@
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround40
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround41
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround50
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround51
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround71
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{'1': <class 'pyoperant.local_pi.Pi1'>}
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround40
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround41
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround50
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround51
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround71
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{'1': <class 'pyoperant.local_pi.Pi1'>}
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround40
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround41
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround50
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround51
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround71
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{'1': <class 'pyoperant.local_pi.Pi1'>}
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround40
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround41
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround50
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround51
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround71
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{'1': <class 'pyoperant.local_pi.Pi1'>}
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround40
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround41
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround50
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround51
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround71
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib pcm.c:2495:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{u'panel_name': u'magpi01', u'stims': {u'a': u'NC_AB_000.wav', u'b': u'NC_AB_127.wav'}, u'name': u'Two Alt Choice task, version 1.0', u'response_win': 5.0, u'intertrial_min': 0.5, u'description': u'first version of discrimination task', u'shape': False, u'comments': u"json doesn't support comments", u'block_design': {u'blocks': {u'default': {u'queue': u'random', u'conditions': [{u'class': u'L', u'stim_name': u'a'}, {u'class': u'R', u'stim_name': u'b'}]}}, u'order': [u'default']}, u'forced_choice': False, u'classes': {u'R': {u'punish_value': 0.5, u'component': u'right', u'reward_value': 1.0}, u'L': {u'punish_value': 0.5, u'component': u'left', u'reward_value': 1.0}}, u'experimenter': {u'name': u'Your Name', u'email': u'youremail@website.com'}, u'log_handlers': [u''], u'experiment_path': u'/home/bird/opdat/B999', u'debug': True, u'correction_trials': False, u'light_schedule': u'sun', u'stim_path': u'/home/bird/opdat/B999/stimuli', u'subject': u'B999'}
+{'1': <class 'pyoperant.local_pi.Pi1'>}

@@ -98,7 +98,7 @@ class BaseExp(object):
         self.snapshot_f = os.path.join(
             self.parameters["experiment_path"], self.timestamp + ".json"
         )
-        with open(self.snapshot_f, "wb") as config_snap:
+        with open(self.snapshot_f, "w") as config_snap:
             json.dump(self.parameters, config_snap, sort_keys=True, indent=4)
 
     def log_config(self):
@@ -353,7 +353,7 @@ class BaseExp(object):
             self.parameters["experiment_path"],
             self.parameters["subject"][1:] + ".summaryDAT",
         )
-        with open(summary_file, "wb") as f:
+        with open(summary_file, "w") as f:
             f.write("Trials this session: %s\n" % self.summary["trials"])
             f.write("Last trial run @: %s\n" % self.summary["last_trial_time"])
             f.write("Feeder ops today: %i\n" % self.summary["feeds"])
