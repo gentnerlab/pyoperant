@@ -4,6 +4,7 @@ Execute this script on the directory of the config file you'd like to change
 """
 import argparse
 import json
+import collections
 
 
 parser = argparse.ArgumentParser()
@@ -18,7 +19,7 @@ def mutate():
     if args.config != '':
         config_path = '/home/bird/opdat/{}/config.json'.format(args.config)
         with open(config_path, 'r') as f:
-            config_dat = json.load(f)
+            config_dat = json.load(f, object_pairs_hook=collections.OrderedDict)
         if args.bird != '':
             config_dat["subject"] = args.bird
             config_dat["experiment_path"] = "/home/bird/opdat/{}".format(args.bird)
