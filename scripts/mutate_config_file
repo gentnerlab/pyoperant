@@ -32,7 +32,7 @@ def mutate():
             config_dat["experimenter"]["email"] = args.email
         
         with open(config_path, 'w') as f:
-            json.dump(config_dat, f)
+            json.dumps(config_dat, f)
 
 if __name__ == "__main__":
     mutate()
