@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+"""
+Execute this script on the directory of the config file you'd like to change
+"""
+import argparse
+import json
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', dest='config', type=str, default='')
+parser.add_argument('--bird', dest='bird', type=str, default='')
+parser.add_argument('--panel', dest='panel', type=str, default='')
+parser.add_argument('--person', dest='person', type=str, default='')
+parser.add_argument('--email', dest='email', type=str, default='')
+
+def mutate():
+    args = parser.parse_args()
+    if args.config != '':
+        config_path = '/home/bird/opdat/{}/config.json'.format(args.config)
+        with open(config_path, 'r') as f:
+            config_dat = json.load(f)
+        if args.bird != '':
+            config_dat["subject"] = args.bird
+            config_dat["experiment_path"] = "/home/bird/opdat/{}".format(args.bird)
+            config_dat["stim_path"] = "/home/bird/opdat/{}/stims".format(args.bird)
+
+        if args.panel != '':
+            config_dat["panel_name"] = args.panel
+        if args.person != '':
+            config_dat["experimenter"]["name"] = args.person
+        if args.email != '':
+            config_dat["experimenter"]["email"] = args.email
+        
+        with open(config_path, 'w') as f:
+            json.dump(config_dat, f)
+
+if __name__ == "__main__":
+    mutate()
+

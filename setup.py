@@ -26,6 +26,7 @@ setup(
     scripts = [
         'scripts/behave',
         'scripts/pyoperantctl',
+        'scripts/mutate_config_file',
         ],
     license = "BSD",
     classifiers = [
