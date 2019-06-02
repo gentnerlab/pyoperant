@@ -128,7 +128,12 @@ class Shaper(object):
 
     def _check_block(self, next_state, reps, revert_timeout):
         def temp():
-            if not self.responded_block:
+            if 'revert' in self.parameters.keys():
+                check_timeout = self.parameters['revert']
+            else:
+                check_timeout = True
+
+            if check_timeout and not self.responded_block:
                 elapsed_time = (dt.datetime.now() - self.block_start).total_seconds()
                 if elapsed_time > revert_timeout:
                     self.log.warning("No response in block %d, reverting to block %d.  Time: %s"%(self.recent_state, self.recent_state - 1, dt.datetime.now().isoformat(' ')))
