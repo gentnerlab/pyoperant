@@ -100,11 +100,11 @@ class BaseExp(object):
         )
 
         # connect to open ephys
-        if "conn_open_ephys" in self.parameters.keys():
-            if self.parameters["conn_open_ephys"] == "True":
+        if "open_ephys" in self.parameters.keys():
+            if self.parameters["open_ephys"]["connect"] == "True":
                 self.openephys = OpenEphysEvents(
-                    port=self.parameters["open_ephys_port"], 
-                    ip=self.parameters["open_ephys_address"]
+                    port=self.parameters["open_ephys"]["port"], 
+                    ip=self.parameters["open_ephys"]["address"]
                     )
                 self.openephys.connect()
 
@@ -135,14 +135,6 @@ class BaseExp(object):
         )
         self.log = logging.getLogger()
 
-        # setup ZMQ log handler
-        ctx = zmq.Context()
-        pub = ctx.socket(zmq.PUB)
-        pub.bind("tcp://*:31967")
-        self.pub_handler = PUBHandler(pub)
-        self.pub_handler.root_topic = socket.gethostname()
-        self.log.addHandler(self.pub_handler)
-
         if "email" in self.parameters["log_handlers"]:
             from pyoperant.local import SMTP_CONFIG
             from logging import handlers
@@ -159,7 +151,7 @@ class BaseExp(object):
             email_handler.setFormatter(formatter)
 
             self.log.addHandler(email_handler)
-
+    
     def check_light_schedule(self):
         """returns true if the lights should be on"""
         return utils.check_time(self.parameters["light_schedule"])

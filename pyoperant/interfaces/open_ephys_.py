@@ -47,11 +47,11 @@ class OpenEphysEvents:
         """sends a StartAcquisition command to open_ephys if not currently acquiring data
         """
         if self.query_status("Acquiring"):
-            self.log_event(type="info", message="Already acquiring")
+            self.log_event(type_="info", message="Already acquiring")
         else:
             self.send_command("StartAcquisition")
             if self.query_status("Acquiring"):
-                self.log_event(type="info", message="Acquisition Started")
+                self.log_event(type_="info", message="Acquisition Started")
             else:
                 self.log_event(
                     type="error", message="Something went wrong starting acquisition"
@@ -62,15 +62,15 @@ class OpenEphysEvents:
         """
         # if currently recording, don't try to stop acquisition
         if self.query_status("Recording"):
-            self.log_event(type="info", message="Cant stop acquistion while recording")
+            self.log_event(type_="info", message="Cant stop acquistion while recording")
         # if not acquiring, no need to stop
         elif not self.query_status("Acquiring"):
-            self.log_event(type="info", message="No acquisition running")
+            self.log_event(type_="info", message="No acquisition running")
         # try to stop acquisition, if it doesn't work, send an error message
         else:
             self.send_command("StopAcquisition")
             if not self.query_status("Acquiring"):
-                self.log_event(type="info", message="Acquistion stopped")
+                self.log_event(type_="info", message="Acquistion stopped")
             else:
                 self.log_event(
                     type="error", message="Something went wrong stopping acquisition"
@@ -99,18 +99,18 @@ class OpenEphysEvents:
         ok_started = False  # if the recording started properly
 
         if self.query_status("Recording"):
-            self.log_event(type="info", message="Already Recording")
+            self.log_event(type_="info", message="Already Recording")
 
         # if your not acquiring, start acquiring
         elif not self.query_status("Acquiring"):
-            self.log_event(type="info", message="Was not Acquiring")
+            self.log_event(type_="info", message="Was not Acquiring")
             self.start_acq()
             if self.query_status("Acquiring"):
                 ok_to_start = True
-                self.log_event(type="info", message="OK to start")
+                self.log_event(type_="info", message="OK to start")
         else:
             ok_to_start = True
-            self.log_event(type="info", message="OK to start")
+            self.log_event(type_="info", message="OK to start")
 
         # if its ok to start acquiring, do so
         if ok_to_start:
@@ -122,16 +122,16 @@ class OpenEphysEvents:
             self.send_command(" ".join(["StartRecord"] + rec_opt))
             if self.query_status("Recording"):
                 self.log_event(
-                    type="info",
+                    type_="info",
                     message="Recording path: {}".format(self.get_rec_path()),
                 )
                 ok_started = True
             else:
                 self.log_event(
-                    type="error", message="Something went wrong starting recording"
+                    type_="error", message="Something went wrong starting recording"
                 )
         else:
-            self.log_event(type="info", message="Did not start recording")
+            self.log_event(type_="info", message="Did not start recording")
         return ok_started
 
     def stop_rec(self):
@@ -140,20 +140,20 @@ class OpenEphysEvents:
         if self.query_status("Recording"):
             self.send_command("StopRecord")
             if not self.query_status("Recording"):
-                self.log_event(type="info", message="Recording stopped")
+                self.log_event(type_="info", message="Recording stopped")
             else:
                 self.log_event(
-                    type="error", message="Something went wrong stopping recording"
+                    type_="error", message="Something went wrong stopping recording"
                 )
         else:
-            self.log_event(type="info", message="Was not recording")
+            self.log_event(type_="info", message="Was not recording")
 
     def break_rec(self):
         """ Tries to stop and then restart a recording
         """
         ok_to_start = False
         ok_started = False
-        self.log_event(type="info", message="Breaking recording in progress")
+        self.log_event(type_="info", message="Breaking recording in progress")
         # if recording, try to stop recording
         if self.query_status("Recording"):
             self.send_command("StopRecord")
@@ -161,20 +161,20 @@ class OpenEphysEvents:
                 ok_to_start = True
             else:
                 self.log_event(
-                    type="error", message="Something went wrong stopping recording"
+                    type_="error", message="Something went wrong stopping recording"
                 )
         else:
-            self.log_event(type="info", message="Was not recording")
+            self.log_event(type_="info", message="Was not recording")
 
         # if recording was successfully stopped, start recording again
         if ok_to_start:
             self.send_command("StartRecord")
             if self.query_status("Recording"):
-                # self.log_event(type="info", message='Recording path: {}'.format(self.get_rec_path()))
+                # self.log_event(type_="info", message='Recording path: {}'.format(self.get_rec_path()))
                 ok_started = True
             else:
                 self.log_event(
-                    type="error", message="Something went wrong starting recording"
+                    type_="error", message="Something went wrong starting recording"
                 )
         return ok_started
 
@@ -247,4 +247,4 @@ class OpenEphysEvents:
                 self.log.critical(message)
 
         else:
-            self.log_event(type="info", message=message)
+            self.log_event(type_="info", message=message)

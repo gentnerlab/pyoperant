@@ -5,7 +5,7 @@ import datetime as dt
 from pyoperant.behavior import base, shape
 from pyoperant.errors import EndSession, EndBlock
 from pyoperant import components, utils, reinf, queues
-
+from pyoperant.interfaces import open_ephys_
 
 class TwoAltChoiceExp(base.BaseExp):
     """A two alternative choice experiment
@@ -173,6 +173,20 @@ class TwoAltChoiceExp(base.BaseExp):
         conditions and the selection of queues to generate trial conditions.
 
         """
+        # check if we should start recording
+        if self.hasattr(openephys):
+            # if set to start open ephys upon session
+            if self.parameters['open_ephys']['record_sessions_automatically']:
+                # start acquiring data
+                openephys.start_acq()
+                # start recording data 
+                openephys.start_rec(rec_par = {
+                    "CreateNewDir": "0",
+                    "RecDir": None,
+                    "PrependText": None,
+                    "AppendText": None,
+                })
+
 
         def run_trial_queue():
             for tr_cond in self.trial_q:
@@ -243,6 +257,20 @@ class TwoAltChoiceExp(base.BaseExp):
         """ Closes out the sessions
 
         """
+        # check if we should start recording
+        if self.hasattr(openephys):
+            # if set to start open ephys upon session
+            if self.parameters['open_ephys']['record_sessions_automatically']:
+                # start acquiring data
+                openephys.end_acq()
+                # start recording data 
+                openephys.end_rec(rec_par = {
+                    "CreateNewDir": "0",
+                    "RecDir": None,
+                    "PrependText": None,
+                    "AppendText": None,
+                })
+        
         self.log.info("ending session")
         return None
 

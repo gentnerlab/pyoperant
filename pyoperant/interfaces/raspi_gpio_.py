@@ -204,7 +204,7 @@ class RaspberryPiInterface(base_.BaseInterface):
         self.pwm.set_frequency(1000)  # used to be 240
 
     def close(self):
-        logger.debug("Closing %s")
+        #logger.debug("Closing %s")
         self.pi.stop()
 
     def _config_read(self, channel, **kwargs):
