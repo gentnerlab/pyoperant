@@ -5,7 +5,9 @@ import datetime as dt
 from pyoperant.behavior import base, shape
 from pyoperant.errors import EndSession, EndBlock
 from pyoperant import components, utils, reinf, queues
-from pyoperant.interfaces import open_ephys_
+
+# added for open ephys
+from pyoperant.interfaces.open_ephys_ import connect_to_open_ephys, close_open_ephys
 
 class TwoAltChoiceExp(base.BaseExp):
     """A two alternative choice experiment
@@ -78,6 +80,11 @@ class TwoAltChoiceExp(base.BaseExp):
         self.trial_q = None
         self.session_q = None
 
+        # check if open ephys is on
+        self.OPEN_EPHYS_ON = False
+        if "oe_conf" in self.parameters:
+            if self.parameters["oe_conf"]["on"]:
+                self.OPEN_EPHYS_ON = True
         self.data_csv = os.path.join(
             self.parameters["experiment_path"],
             self.parameters["subject"] + "_trialdata_" + self.timestamp + ".csv",
@@ -153,6 +160,9 @@ class TwoAltChoiceExp(base.BaseExp):
         port through `experiment.class_assoc['L']`.
 
         """
+        # open open_ephys connection
+        if self.OPEN_EPHYS_ON:
+                self.open_ephys = connect_to_open_ephys(self.parameters)
 
         self.response_ports = {}
         for class_, class_params in self.parameters["classes"].items():
@@ -173,20 +183,6 @@ class TwoAltChoiceExp(base.BaseExp):
         conditions and the selection of queues to generate trial conditions.
 
         """
-        # check if we should start recording
-        if self.hasattr(openephys):
-            # if set to start open ephys upon session
-            if self.parameters['open_ephys']['record_sessions_automatically']:
-                # start acquiring data
-                openephys.start_acq()
-                # start recording data 
-                openephys.start_rec(rec_par = {
-                    "CreateNewDir": "0",
-                    "RecDir": None,
-                    "PrependText": None,
-                    "AppendText": None,
-                })
-
 
         def run_trial_queue():
             for tr_cond in self.trial_q:
@@ -255,23 +251,12 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def session_post(self):
         """ Closes out the sessions
-
-        """
-        # check if we should start recording
-        if self.hasattr(openephys):
-            # if set to start open ephys upon session
-            if self.parameters['open_ephys']['record_sessions_automatically']:
-                # start acquiring data
-                openephys.end_acq()
-                # start recording data 
-                openephys.end_rec(rec_par = {
-                    "CreateNewDir": "0",
-                    "RecDir": None,
-                    "PrependText": None,
-                    "AppendText": None,
-                })
-        
+        """     
         self.log.info("ending session")
+        # open open_ephys connection
+        if self.OPEN_EPHYS_ON:
+            close_open_ephys(self.open_ephys, self.parameters)
+
         return None
 
     ## trial flow
@@ -370,6 +355,17 @@ class TwoAltChoiceExp(base.BaseExp):
             trialWriter.writerow(trial_dict)
 
     def run_trial(self):
+
+        # if this is an open_ephys trial, convert stimuli to sine wav
+        if self.OPEN_EPHYS_ON:
+            # create a temporary sine wav file
+            temp_wav = utils.add_sine_to_wav(
+                self.this_trial.stimulus_event.file_origin, 
+                padding = self.parameters['oe_conf']['sine_wav_padding']
+                )
+            # create a stim object
+            self.this_trial.stimulus_event = utils.auditory_stim_from_wav(temp_wav)
+
         self.trial_pre()
 
         self.stimulus_pre()
@@ -403,6 +399,10 @@ class TwoAltChoiceExp(base.BaseExp):
         self.this_trial.annotate(max_wait=max_wait)
         self.log.debug("created new trial")
         self.log.debug("min/max wait: %s/%s" % (min_wait, max_wait))
+
+        # send open ephys trial ID (as datetime)
+        if self.OPEN_EPHYS_ON:
+            self.open_ephys.send_command('trial ' + self.this_trial.time)
 
     def trial_post(self):
         """things to do at the end of a trial"""
@@ -495,15 +495,21 @@ class TwoAltChoiceExp(base.BaseExp):
             utils.wait(self.parameters["cuetostim_wait"])
 
         ## 2. play stimulus
+        # get starttime of stimulus
         stim_start = dt.datetime.now()
         self.this_trial.stimulus_event.time = (
             stim_start - self.this_trial.time
         ).total_seconds()
+        # send stimulus name to open ephys
+        if self.OPEN_EPHYS_ON:
+            self.open_ephys.send_command('stim ' + wf.as_posix())
+
         self.panel.speaker.play()  # already queued in stimulus_pre()
 
     def stimulus_post(self):
         self.log.debug("waiting %s secs..." % self.this_trial.annotations["min_wait"])
         utils.wait(self.this_trial.annotations["min_wait"])
+        self.panel.speaker.stop()
 
     # response flow
     def response_pre(self):
@@ -534,6 +540,9 @@ class TwoAltChoiceExp(base.BaseExp):
                     )
                     self.this_trial.events.append(response_event)
                     self.log.info("response: %s" % (self.this_trial.response))
+                    if self.OPEN_EPHYS_ON:
+                        self.open_ephys.send_command("response %s" % (self.this_trial.response))
+
                     return
             utils.wait(0.015)
 
@@ -601,6 +610,9 @@ class TwoAltChoiceExp(base.BaseExp):
         self.summary["feeds"] += 1
         try:
             value = self.parameters["classes"][self.this_trial.class_]["reward_value"]
+            # send hopper reward info
+            if self.OPEN_EPHYS_ON:
+                self.open_ephys.send_command("reward " + value)
             reward_event = self.panel.reward(value=value)
             self.this_trial.reward = True
 
@@ -626,12 +638,6 @@ class TwoAltChoiceExp(base.BaseExp):
             )
             self.panel.reset()
 
-        # except components.ResponseDuringFeedError as err:
-        #     trial['reward'] = 'Error'
-        #     self.summary['responses_during_reward'] += 1
-        #     self.log.error("response during reward on panel %s" % str(err))
-        #     utils.wait(self.reward_dur[trial['class']])
-        #     self.panel.reset()
 
         except components.HopperWontDropError as err:
             self.this_trial.reward = "error"
@@ -654,6 +660,8 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def punish_main(self):
         value = self.parameters["classes"][self.this_trial.class_]["punish_value"]
+        if self.OPEN_EPHYS_ON:
+                self.open_ephys.send_command("punish " + value)
         punish_event = self.panel.punish(value=value)
         self.this_trial.punish = True
 

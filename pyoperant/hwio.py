@@ -1,5 +1,6 @@
 import time
 import datetime
+from pyoperant import utils
 
 # Classes of operant components
 class BaseIO(object):
@@ -53,13 +54,6 @@ class BooleanInput(BaseIO):
 
     def poll(self, timeout=None):
         """ runs a loop, querying for pecks. returns peck time or "GoodNite" exception """
-        # orig = self.tally
-        # if timeout is not None:
-        #    start = time.time()
-        # while time.time() - start < timeout:
-        #    if self.tally - orig > 0:
-        #        return datetime.datetime.now()
-        # return None
         return self.interface._poll(timeout=timeout, **self.params)
 
     def callback(self, func):
@@ -131,11 +125,12 @@ class AudioOutput(BaseIO):
     toggle() -- flips the value from the current value
     """
 
-    def __init__(self, interface=None, params={}, *args, **kwargs):
+    def __init__(self, interface=None, params={}, GPIO_PIN=None, *args, **kwargs):
         super(AudioOutput, self).__init__(
             interface=interface, params=params, *args, **kwargs
         )
-
+        # create an object for boolean GPIO pin to indicate when audio is playing
+        self.GPIO_PIN = GPIO_PIN
         assert hasattr(self.interface, "_queue_wav")
         assert hasattr(self.interface, "_play_wav")
         assert hasattr(self.interface, "_stop_wav")
@@ -144,10 +139,34 @@ class AudioOutput(BaseIO):
         return self.interface._queue_wav(wav_filename)
 
     def play(self):
+        if self.GPIO_PIN is not None:
+              self.GPIO_PIN.write(True)
         return self.interface._play_wav()
 
     def stop(self):
+        if self.GPIO_PIN is not None:
+              self.GPIO_PIN.write(False)
         return self.interface._stop_wav()
+
+    def play_open_ephys(self, stim, WAV_PADDING):
+        """ plays stimuli and lifts pins if possible
+        """
+        # start wav playback
+        self.interface._play_wav()
+        if self.GPIO_PIN is not None:
+            # wait until WAV padding ends (0 padding to deal with capacitor)
+            utils.wait(WAV_PADDING)
+            # drop the pin
+            self.GPIO_PIN.write(True)
+            # wait for the main wav to finish playing
+            utils.wait(stim.duration - WAV_PADDING*2)
+            # lift the pin
+            self.GPIO_PIN.write(False)
+            # wait for the wav to end playing
+            utils.wait(WAV_PADDING)
+        # stop the wav
+        return self.interface._stop_wav()
+
 
 
 class PWMOutput(BaseIO):

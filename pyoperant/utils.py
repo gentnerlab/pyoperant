@@ -340,6 +340,20 @@ def wait(secs=1.0, final_countdown=0.0, waitfunc=None):
         except:
             pass
 
+import datetime
+def seconds_to_human_readable(seconds, _round=True):
+    """ Returns e.g. '14031 days, 18:00:14'
+    """
+    if _round:
+        seconds = round(seconds)
+    return str(datetime.timedelta(seconds=seconds))
+
+
+def get_audio_duration(wav):
+    with closing(wave.open(wav, "rb")) as wf:
+        (_, _, framerate, nframes, _, _) = wf.getparams()
+        duration = float(nframes) / framerate
+    return duration
 
 def auditory_stim_from_wav(wav):
     with closing(wave.open(wav, "rb")) as wf:
@@ -472,3 +486,30 @@ def rand_from_log_shape_dist(alpha=10):
     t = random.random()
     ret = ((beta * t - 1) / (sp.special.lambertw((beta * t - 1) / np.e)) - 1) / alpha
     return max(min(np.real(ret), 1), 0)
+
+import tempfile
+import scipy.io.wavfile as wavfile
+def add_sine_to_wav(wav_loc, padding = 0.25):
+    """ Create a temp file of the wav as a sine. Adds padding to wav 
+    file if desired to account for warping on waveform from capacitor. 
+    Attributes:
+        padding (float): the time in seconds to pad the wav file
+    """
+    # load data
+    fs, stim_dat = wavfile.read(wav_loc)
+    # make sine
+    nsamps = len(stim_dat)
+    padding_samps = int(padding*fs)
+    
+    # create sine data
+    t = np.arange(nsamps)
+    sine_dat = (16384*np.sin(2*np.pi*(1000./fs)*t)).astype('int16')
+    
+    # generate wav
+    output_data = np.zeros((nsamps+padding_samps*2, 2))
+    output_data[padding_samps:padding_samps+nsamps, 1] = sine_dat
+    output_data[padding_samps:padding_samps+nsamps, 0] = stim_dat
+    # write tempfile
+    tempWavFile = tempfile.mktemp('.wav')
+    wavfile.write(tempWavFile, fs, output_data.astype('int16')) 
+    return tempWavFile

@@ -16,7 +16,11 @@ INPUTS = [
     10,  # IR 6
 ]
 
-OUTPUTS = [16]  # Hopper Trigger
+OUTPUTS = [
+    16, # Hopper Trigger
+    22, # Audio (for open ephys)
+    14, # 8, #27, # Punishment (for open ephys)
+]  
 
 
 PWM_OUTPUTS = [
@@ -51,6 +55,7 @@ class PiPanel(panels.BasePanel):
         self.interfaces["raspi_gpio_"] = raspi_gpio_.RaspberryPiInterface(
             device_name="zog0"
         )
+        # pyaudio
         self.interfaces["pyaudio"] = pyaudio_.PyAudioInterface()
 
         # define inputs
@@ -77,7 +82,10 @@ class PiPanel(panels.BasePanel):
                 )
             )
 
-        self.speaker = hwio.AudioOutput(interface=self.interfaces["pyaudio"])
+        self.speaker = hwio.AudioOutput(
+            interface=self.interfaces["pyaudio"],
+            GPIO_PIN = self.outputs[1]
+            )
 
         # assemble inputs into components
         # Standard Peckports
@@ -103,7 +111,8 @@ class PiPanel(panels.BasePanel):
                 self.pwm_outputs[1],
                 self.pwm_outputs[2],
                 self.pwm_outputs[3],
-            ]
+            ],
+            GPIO_PIN = self.outputs[2]
         )
         # define reward & punishment methods
         self.reward = self.hopper.reward

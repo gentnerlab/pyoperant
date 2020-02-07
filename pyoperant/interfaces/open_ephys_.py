@@ -54,7 +54,7 @@ class OpenEphysEvents:
                 self.log_event(type_="info", message="Acquisition Started")
             else:
                 self.log_event(
-                    type="error", message="Something went wrong starting acquisition"
+                    type_="error", message="Something went wrong starting acquisition"
                 )
 
     def stop_acq(self,):
@@ -73,7 +73,7 @@ class OpenEphysEvents:
                 self.log_event(type_="info", message="Acquistion stopped")
             else:
                 self.log_event(
-                    type="error", message="Something went wrong stopping acquisition"
+                    type_="error", message="Something went wrong stopping acquisition"
                 )
 
     def start_rec(
@@ -248,3 +248,40 @@ class OpenEphysEvents:
 
         else:
             self.log_event(type_="info", message=message)
+
+
+def connect_to_open_ephys(parameters):
+    # if set to start open ephys upon session
+    if parameters['oe_conf']["on"]:
+        openephys = OpenEphysEvents(
+                port=parameters['oe_conf']["open_ephys_port"], 
+                ip=parameters['oe_conf']["open_ephys_address"]
+                )
+        openephys.connect()
+    else:
+        log.error("Open Ephys is off. Ending session.")
+        return "post"
+    if parameters['oe_conf']['record_sessions_automatically']:
+        # start acquiring data
+        openephys.start_acq()
+        # start recording data 
+        RecDir = parameters['oe_conf'][ 'recording_directory'] if 'recording_directory' in parameters['oe_conf'] else None
+        openephys.start_rec(rec_par = {
+            "CreateNewDir": 1,
+            "RecDir": RecDir,
+            "PrependText": None,
+            "AppendText": None,
+        })
+    return openephys
+
+def close_open_ephys(open_ephys, parameters):
+    # check if we should start recording
+    if "oe_conf" in parameters:   
+        # check if open ephys is on
+        if parameters['oe_conf']["on"]:
+            # if set to start open ephys upon session
+            if parameters['oe_conf']['record_sessions_automatically']:
+                # start recording data 
+                open_ephys.stop_rec()
+                #start acquiring data
+                open_ephys.stop_acq()

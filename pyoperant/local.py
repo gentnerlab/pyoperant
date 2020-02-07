@@ -8,3 +8,7 @@ elif "zog" in hostname:
     from pyoperant.local_zog import *
 elif "pi" in hostname:
     from pyoperant.local_pi import *
+elif "samamba" in hostname:
+    from pyoperant.local_pi import *
+elif "shoox" in hostname:
+    from pyoperant.local_pi import *

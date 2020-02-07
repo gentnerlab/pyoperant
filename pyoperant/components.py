@@ -500,9 +500,12 @@ class LEDStripHouseLight(BaseComponent):
 
     """
 
-    def __init__(self, lights, color=[100.0, 100.0, 100.0, 100.0], *args, **kwargs):
+    def __init__(self, lights, color=[100.0, 100.0, 100.0, 100.0], GPIO_PIN=None, *args, **kwargs):
         super(LEDStripHouseLight, self).__init__(*args, **kwargs)
         self.lights = []
+        # Create a GPIO pin for raspberry pi to indicate 
+        #    when e.g. punishment is occuring (for open ephys)
+        self.GPIO_PIN = GPIO_PIN
         for light in lights:
             if isinstance(light, hwio.PWMOutput):
                 self.lights.append(light)
@@ -550,10 +553,14 @@ class LEDStripHouseLight(BaseComponent):
 
         """
         timeout_time = datetime.datetime.now()
+        if self.GPIO_PIN is not None:
+            self.GPIO_PIN.write(True)
         self.off()
         utils.wait(dur)
         timeout_duration = datetime.datetime.now() - timeout_time
         self.on()
+        if self.GPIO_PIN is not None:
+            self.GPIO_PIN.write(False)
         return (timeout_time, timeout_duration)
 
     def punish(self, value=10.0):
