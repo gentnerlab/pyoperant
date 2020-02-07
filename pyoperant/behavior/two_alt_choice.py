@@ -400,10 +400,6 @@ class TwoAltChoiceExp(base.BaseExp):
         self.log.debug("created new trial")
         self.log.debug("min/max wait: %s/%s" % (min_wait, max_wait))
 
-        # send open ephys trial ID (as datetime)
-        if self.OPEN_EPHYS_ON:
-            self.open_ephys.send_command('trial ' + self.this_trial.time)
-
     def trial_post(self):
         """things to do at the end of a trial"""
         self.this_trial.duration = (
@@ -462,6 +458,11 @@ class TwoAltChoiceExp(base.BaseExp):
 
         self.this_trial.time = trial_time
 
+        # send open ephys trial ID (as datetime)
+        if self.OPEN_EPHYS_ON:
+            trialtime = getattr(self.this_trial, "time")
+            self.open_ephys.send_command('trial ' + str(trialtime))
+
         self.panel.center.off()
         self.this_trial.events.append(
             utils.Event(name="center", label="peck", time=0.0)
@@ -502,7 +503,7 @@ class TwoAltChoiceExp(base.BaseExp):
         ).total_seconds()
         # send stimulus name to open ephys
         if self.OPEN_EPHYS_ON:
-            self.open_ephys.send_command('stim ' + wf.as_posix())
+            self.open_ephys.send_command('stim ' + self.this_trial.stimulus)
 
         self.panel.speaker.play()  # already queued in stimulus_pre()
 
@@ -612,7 +613,7 @@ class TwoAltChoiceExp(base.BaseExp):
             value = self.parameters["classes"][self.this_trial.class_]["reward_value"]
             # send hopper reward info
             if self.OPEN_EPHYS_ON:
-                self.open_ephys.send_command("reward " + value)
+                self.open_ephys.send_command("reward " + str(value))
             reward_event = self.panel.reward(value=value)
             self.this_trial.reward = True
 
@@ -661,7 +662,7 @@ class TwoAltChoiceExp(base.BaseExp):
     def punish_main(self):
         value = self.parameters["classes"][self.this_trial.class_]["punish_value"]
         if self.OPEN_EPHYS_ON:
-                self.open_ephys.send_command("punish " + value)
+                self.open_ephys.send_command("punish " + str(value))
         punish_event = self.panel.punish(value=value)
         self.this_trial.punish = True
 
