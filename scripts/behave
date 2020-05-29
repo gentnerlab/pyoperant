@@ -112,8 +112,8 @@ def main():
     print(parameters)
 
     if ('debug' in parameters) and parameters['debug']:
-        print parameters
-        print PANELS
+        print(parameters)
+        print(PANELS)
 
     for k in ['subject','panel_name','experiment_path']:
         parameters.pop(k) if k in parameters.keys() else None

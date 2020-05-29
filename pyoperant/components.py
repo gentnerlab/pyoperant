@@ -55,7 +55,7 @@ class Hopper(BaseComponent):
         time in seconds to wait before checking to make sure the hopper is up
 
     """
-    def __init__(self,IR,solenoid,max_lag=0.3, inverted=False,*args,**kwargs):
+    def __init__(self,IR,solenoid,max_lag=0.75, inverted=False,*args,**kwargs):
         super(Hopper, self).__init__(*args,**kwargs)
         self.max_lag = max_lag
         if isinstance(IR,hwio.BooleanInput):
