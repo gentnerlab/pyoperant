@@ -270,7 +270,9 @@ class BaseExp(object):
         """ Checks if it is currently a passive playback block
         """
         if "oe_conf" in self.parameters:
+            self.log.debug("REMOVEME: oe_conf exists")
             if self.parameters["oe_conf"]["on"] is True:
+                self.log.debug("REMOVEME: oe_conf is on")
                 if "passive_playback" in self.parameters["oe_conf"]:
                     if self.parameters["oe_conf"]["passive_playback"] is True:
                         passive_playback_times = self.parameters["oe_conf"][
@@ -287,6 +289,10 @@ class BaseExp(object):
         self.panel.reset()
         # open openephys connection and start recording
         self.open_ephys = connect_to_open_ephys(self.parameters)
+
+        # turn house lights off if its night time
+        if self.check_light_schedule() == False:
+            self.panel.house_light.off()
 
         return "main"
 
@@ -361,7 +367,7 @@ class BaseExp(object):
                 # get list of stimuli
                 wav_files = []
                 for ext in ['.wav', '.WAV']:
-                    for stim_folder in self.parameters['oe_conf']['passive']['stims_folders']:
+                    for stim_folder in self.parameters['oe_conf']['passive']['stim_folders']:
                         wav_files.extend(
                             list(
                                 Path(
