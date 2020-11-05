@@ -436,7 +436,7 @@ class BaseExp(object):
                     self.log.debug("REMOVEME: Checking passive playback block.")
                     self.log.debug(self._check_passive_playback_block())
                     # if passive playback ends
-                    if self._check_passive_playback_block() == False:
+                    if self._check_passive_playback_block() == None:
                         self.log.debug("In passive playback block.")
                         return next_state
 
