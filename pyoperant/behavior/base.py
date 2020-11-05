@@ -199,13 +199,13 @@ class BaseExp(object):
 
     def _run_idle(self):
         self.log.debug("Starting _run_idle")
+        if self._check_passive_playback_block():
+                return "passive_playback_block"
         if self.check_light_schedule() == False:
             return "sleep"
         elif self.check_session_schedule():
             if self._check_free_food_block():
                 return "free_food_block"
-            if self._check_passive_playback_block():
-                return "passive_playback_block"
             return "session"
         else:
             self.panel_reset()
@@ -327,7 +327,7 @@ class BaseExp(object):
             self.panel.reset()
         close_open_ephys(self.open_ephys, self.parameters)
         self.log.info("ending session")
-        
+
         return None
 
     def _passive_playback(self):
