@@ -270,9 +270,7 @@ class BaseExp(object):
         """ Checks if it is currently a passive playback block
         """
         if "oe_conf" in self.parameters:
-            self.log.debug("REMOVEME: oe_conf exists")
             if self.parameters["oe_conf"]["on"] is True:
-                self.log.debug("REMOVEME: oe_conf is on")
                 if "passive_playback" in self.parameters["oe_conf"]:
                     if self.parameters["oe_conf"]["passive_playback"] is True:
                         passive_playback_times = self.parameters["oe_conf"][
@@ -435,6 +433,8 @@ class BaseExp(object):
                         self.log.debug("Daytime, lights on.")
                         self.panel.house_light.on()
 
+                    self.log.debug("REMOVEME: Checking passive playback block.")
+                    self.log.debug(self._check_passive_playback_block())
                     # if passive playback ends
                     if self._check_passive_playback_block() == False:
                         self.log.debug("In passive playback block.")
