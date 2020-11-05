@@ -199,8 +199,10 @@ class BaseExp(object):
 
     def _run_idle(self):
         self.log.debug("Starting _run_idle")
+        self.log.debug("Checking for passive playback block")
         if self._check_passive_playback_block():
-                return "passive_playback_block"
+            self.log.debug("In passive playback block.")
+            return "passive_playback_block"
         if self.check_light_schedule() == False:
             return "sleep"
         elif self.check_session_schedule():
@@ -223,6 +225,11 @@ class BaseExp(object):
         self.log.debug("sleeping...")
         self.panel.house_light.off()
         utils.wait(self.parameters["idle_poll_interval"])
+        # check if passive playback should be occuring
+        if self._check_passive_playback_block():
+            self.log.debug("In passive playback block.")
+            return "passive_playback_block"
+
         if self.check_light_schedule() == False:
             return "main"
         else:
@@ -242,6 +249,7 @@ class BaseExp(object):
             pre=self.sleep_pre,
             main=self.sleep_main,
             post=self.sleep_post,
+            passive_playback_block=self._passive_playback,
         )
         return "idle"
 
