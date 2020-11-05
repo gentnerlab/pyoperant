@@ -8,6 +8,11 @@ import random
 import zmq
 from zmq.log.handlers import PUBHandler
 from pyoperant.interfaces.open_ephys_ import OpenEphysEvents
+from pathlib import Path
+import numpy as np
+import random 
+import time
+from pyoperant.interfaces.open_ephys_ import connect_to_open_ephys, close_open_ephys
 
 
 try:
@@ -269,6 +274,12 @@ class BaseExp(object):
 
     def passive_playback_pre(self):
         self.log.debug("Passive playback starting.")
+
+        ### ensure all pins are down
+        self.panel.reset()
+        # open openephys connection and start recording
+        self.open_ephys = connect_to_open_ephys(self.parameters)
+
         return "main"
 
     def passive_playback_main(self):
@@ -310,6 +321,13 @@ class BaseExp(object):
 
     def passive_playback_post(self):
         self.log.debug("Passive playback over.")
+
+        # reset if panel can reset
+        if callable(getattr(self.panel, "reset", None)):
+            self.panel.reset()
+        close_open_ephys(self.open_ephys, self.parameters)
+        self.log.info("ending session")
+        
         return None
 
     def _passive_playback(self):
@@ -331,75 +349,75 @@ class BaseExp(object):
         """
         def temp():
             self.log.debug("Starting passive playback function.")
-                try:
-                    # get list of stimuli
-                    wav_files = []
-                    for ext in ['.wav', '.WAV']:
-                        for stim_folder in self.parameters['oe_conf']['passive']['stims_folders']:
-                            wav_files.extend(
-                                list(
-                                    Path(
-                                        stim_folder
-                                    ).glob('**/*'+ext)
-                                )
+            try:
+                # get list of stimuli
+                wav_files = []
+                for ext in ['.wav', '.WAV']:
+                    for stim_folder in self.parameters['oe_conf']['passive']['stims_folders']:
+                        wav_files.extend(
+                            list(
+                                Path(
+                                    stim_folder
+                                ).glob('**/*'+ext)
                             )
-                    # create a list of wav_files
-                    n_rep = self.parameters['oe_conf']['passive']['wav_repeats']
-                    wav_list = np.repeat(wav_files, n_rep)
-                    wav_list = np.random.permutation(wav_list)
+                        )
+                # create a list of wav_files
+                n_rep = self.parameters['oe_conf']['passive']['wav_repeats']
+                wav_list = np.repeat(wav_files, n_rep)
+                wav_list = np.random.permutation(wav_list)
 
-                    # total expected duration
-                    durations = [utils.get_audio_duration(wf.as_posix()) for wf in wav_list]
-                    duration_remaining = (
-                        np.sum(durations) + 
-                        self.parameters['oe_conf']['sine_wav_padding']*2*len(wav_list)
+                # total expected duration
+                durations = [utils.get_audio_duration(wf.as_posix()) for wf in wav_list]
+                duration_remaining = (
+                    np.sum(durations) + 
+                    self.parameters['oe_conf']['sine_wav_padding']*2*len(wav_list)
+                )
+                start_time = time.time()
+
+                # loop through stimuli
+                for wfi, wf in enumerate(wav_list):
+                    # get timing info
+                    current_time = time.time()
+                    duration_elapsed = current_time - start_time
+                    expected_time_remaining = (
+                        duration_remaining + 
+                        np.mean(self.parameters['oe_conf']["passive"]['isi_range'])*
+                        (len(wav_list) -wfi)
                     )
-                    start_time = time.time()
-
-                    # loop through stimuli
-                    for wfi, wf in enumerate(wav_list):
-                        # get timing info
-                        current_time = time.time()
-                        duration_elapsed = current_time - start_time
-                        expected_time_remaining = (
-                            duration_remaining + 
-                            np.mean(self.parameters['oe_conf']["passive"]['isi_range'])*
-                            (len(wav_list) -wfi)
+                    time_string = "{}/{}".format(
+                        utils.seconds_to_human_readable(duration_elapsed), 
+                        utils.seconds_to_human_readable(
+                            (expected_time_remaining+duration_elapsed)
                         )
-                        time_string = "{}/{}".format(
-                            utils.seconds_to_human_readable(duration_elapsed), 
-                            utils.seconds_to_human_readable(
-                                (expected_time_remaining+duration_elapsed)
-                            )
-                            )
-                        # Send Stimulus Name to OpenEphys
-                        stim_string = "{}/{}:  {}".format(wfi, len(wav_list), wf)
-                        self.log.info(stim_string)
-                        self.log.info(time_string)
-
-                        self.open_ephys.send_command('stim ' + wf.as_posix())
-                        # create a temporary wav with sine for OpenEphys
-                        temp_wav = utils.add_sine_to_wav(
-                            wf.as_posix(), 
-                            padding = self.parameters['oe_conf']['sine_wav_padding']
-                            )
-                        stim = utils.auditory_stim_from_wav(temp_wav)
-                        # play the wav
-                        self.panel.speaker.queue(stim.file_origin)
-                        self.panel.speaker.play()
-                        utils.wait(stim.duration)
-                        self.panel.speaker.stop()
-                        duration_remaining -= stim.duration
-
-                        # pause for isi time
-                        isi = random.uniform(
-                            self.parameters['oe_conf']["passive"]['isi_range'][0],
-                            self.parameters['oe_conf']["passive"]['isi_range'][1]
                         )
-                        utils.wait(isi)
+                    # Send Stimulus Name to OpenEphys
+                    stim_string = "{}/{}:  {}".format(wfi, len(wav_list), wf)
+                    self.log.info(stim_string)
+                    self.log.info(time_string)
 
-                except Exception as e:
-                    self.log.error('Error at %s', 'division', exc_info=e)
+                    self.open_ephys.send_command('stim ' + wf.as_posix())
+                    # create a temporary wav with sine for OpenEphys
+                    temp_wav = utils.add_sine_to_wav(
+                        wf.as_posix(), 
+                        padding = self.parameters['oe_conf']['sine_wav_padding']
+                        )
+                    stim = utils.auditory_stim_from_wav(temp_wav)
+                    # play the wav
+                    self.panel.speaker.queue(stim.file_origin)
+                    self.panel.speaker.play()
+                    utils.wait(stim.duration)
+                    self.panel.speaker.stop()
+                    duration_remaining -= stim.duration
+
+                    # pause for isi time
+                    isi = random.uniform(
+                        self.parameters['oe_conf']["passive"]['isi_range'][0],
+                        self.parameters['oe_conf']["passive"]['isi_range'][1]
+                    )
+                    utils.wait(isi)
+
+            except Exception as e:
+                self.log.error('Error at %s', 'division', exc_info=e)
             
             return next_state
         return temp
