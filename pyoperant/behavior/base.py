@@ -430,6 +430,16 @@ class BaseExp(object):
                     )
                     utils.wait(isi)
 
+                    # if the light changes, turn it off
+                    if self.check_light_schedule():
+                        self.log.debug("Daytime, lights on.")
+                        self.panel.house_light.on()
+
+                    # if passive playback ends
+                    if self._check_passive_playback_block() == False:
+                        self.log.debug("In passive playback block.")
+                        return next_state
+
             except Exception as e:
                 self.log.error('Error at %s', 'division', exc_info=e)
             
