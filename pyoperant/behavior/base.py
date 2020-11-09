@@ -352,7 +352,7 @@ class BaseExp(object):
             main=self.passive_playback_main,
             post=self.passive_playback_post,
         )
-        return "idle"
+        return None
 
 
     def perform_passive_playback(self, value, next_state):
