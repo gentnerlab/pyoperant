@@ -5,6 +5,7 @@ import datetime as dt
 from pyoperant.behavior import base, shape
 from pyoperant.errors import EndSession, EndBlock
 from pyoperant import components, utils, reinf, queues
+import zmq
 
 # added for open ephys
 from pyoperant.interfaces.open_ephys_ import connect_to_open_ephys, close_open_ephys
