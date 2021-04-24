@@ -9,7 +9,7 @@ For references see:
 
 import zmq
 import logging
-
+import time
 
 class OpenEphysEvents:
     def __init__(self, port="5556", ip="127.0.0.1", is_logging=True):
@@ -207,11 +207,18 @@ class OpenEphysEvents:
     def send_command(self, cmd):
         """ send a command over zmq socket
         """
-        self.socket.send_string(cmd)
-        self.last_cmd = cmd
-        self.last_rcv = self.socket.recv()
-        return self.last_rcv
-
+        for i in range(10):
+            try:
+                self.socket.send_string(cmd)
+                self.last_cmd = cmd
+                self.last_rcv = self.socket.recv()
+                return self.last_rcv
+            except zmq.error.Again as e:
+                self.log_event('command failed, retrying')
+                time.sleep(0.1)
+                if i == 9:
+                    raise e
+                
     def close(self):
         """
         Stop recording, acquiring, and kill connection over socket
