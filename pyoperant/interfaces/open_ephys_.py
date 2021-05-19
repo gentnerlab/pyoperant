@@ -42,14 +42,16 @@ class OpenEphysEvents:
         self._last_error_email = datetime.datetime.now() - datetime.timedelta(hours=1, minutes=0)
     def send_error_email(self, e):
         if (datetime.datetime.now() - self._last_error_email).seconds/60 > 30: 
-            message = "Subject: ZMQ Error in Magpi\n\n{}".format(e)
-            self._smtp_server.sendmail(
-                'starling@ucsd.edu', 
-                self.parameters['experimenter']['email'],
-                message
-            )
-            self._last_error_email = datetime.datetime.now()
-        
+            try:
+                message = "Subject: ZMQ Error in Magpi\n\n{}".format(e)
+                self._smtp_server.sendmail(
+                    'starling@ucsd.edu', 
+                    self.parameters['experimenter']['email'],
+                    message
+                )
+                self._last_error_email = datetime.datetime.now()
+            except Exception as e:
+                self.log_event('Could not send email:'.format(e))
 
     def connect(self):
         """Connect raspberry pi to open ephys via port
