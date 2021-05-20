@@ -226,19 +226,16 @@ class OpenEphysEvents:
     def send_command(self, cmd):
         """ send a command over zmq socket
         """
-        for i in range(5):
-            try:
-                self.socket.send_string(cmd)
-                self.last_cmd = cmd
-                self.last_rcv = self.socket.recv()
-                return self.last_rcv
-            except Exception as e:
-                #except zmq.error.Again as e:
-                #self.log_event('command failed, retrying: {}'.format(i))
-                time.sleep(0.1)
-                if i == 4:
-                    self.log_event("FAILED ZMQ Command :{}".format(e), type_="error")
-                    self.send_error_email(e)
+        try:
+            self.socket.send_string(cmd)
+            self.last_cmd = cmd
+            self.last_rcv = self.socket.recv()
+            return self.last_rcv
+        except Exception as e:
+            #self.log_event('command failed, retrying: {}'.format(i))
+            self.log_event("FAILED ZMQ Command :{}".format(e), type_="error")
+            self.send_error_email(e)
+            return 0
                 
     def close(self):
         """
