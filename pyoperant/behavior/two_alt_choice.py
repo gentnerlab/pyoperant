@@ -442,6 +442,8 @@ class TwoAltChoiceExp(base.BaseExp):
         self.log.debug("waiting for peck...")
         self.panel.center.on()
         trial_time = None
+        self.this_trial.annotations["self_initiated"]=True
+        pre_poll_datetime = dt.datetime.now()
         while trial_time is None:
             if self.check_session_schedule() == False:
                 self.panel.center.off()
@@ -454,13 +456,16 @@ class TwoAltChoiceExp(base.BaseExp):
                     self.panel.speaker.stop()
                     self.update_adaptive_queue(presented=False)
                     raise EndSession
-            else:
-                trial_time = self.panel.center.poll(timeout=30.0)
-                self.this_trial.self_initiated == True
+            #else:
+            trial_time = self.panel.center.poll(timeout=30.0)
 
             # if the poll period is over, start the trial anyway
-            trial_time = dt.datetime.now()
-            self.this_trial.self_initiated == False
+            if "self_initiate_trials" in self.parameters:
+                if self.parameters["self_initiate_trials"] == True:
+                    if (dt.datetime.now() - pre_poll_datetime).seconds > 20: 
+                        trial_time = dt.datetime.now()
+                        self.this_trial.annotations["self_initiated"] = False
+
 
         self.this_trial.time = trial_time
 
