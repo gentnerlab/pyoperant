@@ -457,12 +457,12 @@ class TwoAltChoiceExp(base.BaseExp):
                     self.update_adaptive_queue(presented=False)
                     raise EndSession
             #else:
-            trial_time = self.panel.center.poll(timeout=30.0)
+            trial_time = self.panel.center.poll(timeout=self.parameters["self_initiate_wait"])
 
             # if the poll period is over, start the trial anyway
             if "self_initiate_trials" in self.parameters:
                 if self.parameters["self_initiate_trials"] == True:
-                    if (dt.datetime.now() - pre_poll_datetime).seconds > 20: 
+                    if (dt.datetime.now() - pre_poll_datetime).seconds > self.parameters["self_initiate_wait"]: 
                         trial_time = dt.datetime.now()
                         self.this_trial.annotations["self_initiated"] = False
 
