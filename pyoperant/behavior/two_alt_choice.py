@@ -10,6 +10,7 @@ import zmq
 # added for open ephys
 from pyoperant.interfaces.open_ephys_ import connect_to_open_ephys, close_open_ephys
 
+
 class TwoAltChoiceExp(base.BaseExp):
     """A two alternative choice experiment
 
@@ -71,6 +72,7 @@ class TwoAltChoiceExp(base.BaseExp):
             "reward",
             "punish",
             "time",
+            "self_initiated",
         ]
 
         if "add_fields_to_save" in self.parameters.keys():
@@ -163,7 +165,7 @@ class TwoAltChoiceExp(base.BaseExp):
         """
         # open open_ephys connection
         if self.OPEN_EPHYS_ON:
-                self.open_ephys = connect_to_open_ephys(self.parameters)
+            self.open_ephys = connect_to_open_ephys(self.parameters)
 
         self.response_ports = {}
         for class_, class_params in self.parameters["classes"].items():
@@ -252,7 +254,7 @@ class TwoAltChoiceExp(base.BaseExp):
 
     def session_post(self):
         """ Closes out the sessions
-        """     
+        """
         self.log.info("ending session")
         # open open_ephys connection
         if self.OPEN_EPHYS_ON:
@@ -361,9 +363,9 @@ class TwoAltChoiceExp(base.BaseExp):
         if self.OPEN_EPHYS_ON:
             # create a temporary sine wav file
             temp_wav = utils.add_sine_to_wav(
-                self.this_trial.stimulus_event.file_origin, 
-                padding = self.parameters['oe_conf']['sine_wav_padding']
-                )
+                self.this_trial.stimulus_event.file_origin,
+                padding=self.parameters["oe_conf"]["sine_wav_padding"],
+            )
             # create a stim object
             self.this_trial.stimulus_event = utils.auditory_stim_from_wav(temp_wav)
 
@@ -452,17 +454,20 @@ class TwoAltChoiceExp(base.BaseExp):
                     self.panel.speaker.stop()
                     self.update_adaptive_queue(presented=False)
                     raise EndSession
-                else:
-                    trial_time = self.panel.center.poll(timeout=60.0)
             else:
-                trial_time = self.panel.center.poll(timeout=60.0)
+                trial_time = self.panel.center.poll(timeout=30.0)
+                self.this_trial.self_initiated == True
+
+            # if the poll period is over, start the trial anyway
+            trial_time = dt.datetime.now()
+            self.this_trial.self_initiated == False
 
         self.this_trial.time = trial_time
 
         # send open ephys trial ID (as datetime)
         if self.OPEN_EPHYS_ON:
             trialtime = getattr(self.this_trial, "time")
-            self.open_ephys.send_command('trial ' + str(trialtime))
+            self.open_ephys.send_command("trial " + str(trialtime))
 
         self.panel.center.off()
         self.this_trial.events.append(
@@ -504,7 +509,7 @@ class TwoAltChoiceExp(base.BaseExp):
         ).total_seconds()
         # send stimulus name to open ephys
         if self.OPEN_EPHYS_ON:
-            self.open_ephys.send_command('stim ' + self.this_trial.stimulus)
+            self.open_ephys.send_command("stim " + self.this_trial.stimulus)
 
         self.panel.speaker.play()  # already queued in stimulus_pre()
 
@@ -543,7 +548,9 @@ class TwoAltChoiceExp(base.BaseExp):
                     self.this_trial.events.append(response_event)
                     self.log.info("response: %s" % (self.this_trial.response))
                     if self.OPEN_EPHYS_ON:
-                        self.open_ephys.send_command("response %s" % (self.this_trial.response))
+                        self.open_ephys.send_command(
+                            "response %s" % (self.this_trial.response)
+                        )
 
                     return
             utils.wait(0.015)
@@ -640,7 +647,6 @@ class TwoAltChoiceExp(base.BaseExp):
             )
             self.panel.reset()
 
-
         except components.HopperWontDropError as err:
             self.this_trial.reward = "error"
             self.summary["hopper_wont_go_down"] += 1
@@ -663,7 +669,7 @@ class TwoAltChoiceExp(base.BaseExp):
     def punish_main(self):
         value = self.parameters["classes"][self.this_trial.class_]["punish_value"]
         if self.OPEN_EPHYS_ON:
-                self.open_ephys.send_command("punish " + str(value))
+            self.open_ephys.send_command("punish " + str(value))
         punish_event = self.panel.punish(value=value)
         self.this_trial.punish = True
 
