@@ -6,13 +6,14 @@ For references see:
         - https://github.com/theilmbh/glab_oe_rig_tools/blob/master/acute_rig_control_gui.py
         - https://github.com/zekearneodo/rigmq
 """
-
+import smtplib
 import zmq
 import logging
 import time
+import datetime
 
 class OpenEphysEvents:
-    def __init__(self, port="5556", ip="127.0.0.1", is_logging=True):
+    def __init__(self, port="5556", ip="127.0.0.1", parameters = None, is_logging=True):
         """creates an open ephys object to communicate with open ephys via ZeroMQ
         
         [description]
@@ -29,10 +30,28 @@ class OpenEphysEvents:
         self.timeout = 5.0
         self.last_cmd = None
         self.last_rcv = None
+        self.parameters = parameters
         # how to log errors, warnings, etc
         self.is_logging = is_logging
         if self.is_logging:
             self.log = logging.getLogger()
+    
+        # send emails when ZMQ has errors (because the smtp email handler isn't working)
+        self._smtp_server = smtplib.SMTP_SSL('smtp.ucsd.edu', 465)
+        self._smtp_server.login('starling@ucsd.edu', 'V0gel&Z0g')
+        self._last_error_email = datetime.datetime.now() - datetime.timedelta(hours=1, minutes=0)
+    def send_error_email(self, e):
+        if (datetime.datetime.now() - self._last_error_email).seconds/60 > 30: 
+            try:
+                message = "Subject: ZMQ Error in Magpi\n\n{}".format(e)
+                self._smtp_server.sendmail(
+                    'starling@ucsd.edu', 
+                    self.parameters['experimenter']['email'],
+                    message
+                )
+                self._last_error_email = datetime.datetime.now()
+            except Exception as e:
+                self.log_event('Could not send email:'.format(e))
 
     def connect(self):
         """Connect raspberry pi to open ephys via port
@@ -207,17 +226,16 @@ class OpenEphysEvents:
     def send_command(self, cmd):
         """ send a command over zmq socket
         """
-        for i in range(10):
-            try:
-                self.socket.send_string(cmd)
-                self.last_cmd = cmd
-                self.last_rcv = self.socket.recv()
-                return self.last_rcv
-            except zmq.error.Again as e:
-                self.log_event('command failed, retrying')
-                time.sleep(0.1)
-                if i == 9:
-                    raise e
+        try:
+            self.socket.send_string(cmd)
+            self.last_cmd = cmd
+            self.last_rcv = self.socket.recv()
+            return self.last_rcv
+        except Exception as e:
+            #self.log_event('command failed, retrying: {}'.format(i))
+            self.log_event("FAILED ZMQ Command :{}".format(e), type_="error")
+            self.send_error_email(e)
+            return 0
                 
     def close(self):
         """
@@ -262,7 +280,8 @@ def connect_to_open_ephys(parameters):
     if parameters['oe_conf']["on"]:
         openephys = OpenEphysEvents(
                 port=parameters['oe_conf']["open_ephys_port"], 
-                ip=parameters['oe_conf']["open_ephys_address"]
+                ip=parameters['oe_conf']["open_ephys_address"],
+                parameters=parameters
                 )
         openephys.connect()
     else:
