@@ -18,8 +18,8 @@ INPUTS = [
 
 OUTPUTS = [
     16, # Hopper Trigger
-    22, # Audio (for open ephys)
-    14, # 8, #27, # Punishment (for open ephys)
+    14, # 22 Audio (for open ephys)
+    22, #14 8, #27, # Punishment (for open ephys)
 ]  
 
 

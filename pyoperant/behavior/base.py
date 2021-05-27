@@ -8,6 +8,11 @@ import random
 import zmq
 from zmq.log.handlers import PUBHandler
 from pyoperant.interfaces.open_ephys_ import OpenEphysEvents
+from pathlib import Path
+import numpy as np
+import random 
+import time
+from pyoperant.interfaces.open_ephys_ import connect_to_open_ephys, close_open_ephys
 
 
 try:
@@ -103,9 +108,9 @@ class BaseExp(object):
         if "open_ephys" in self.parameters.keys():
             if self.parameters["open_ephys"]["connect"] == "True":
                 self.openephys = OpenEphysEvents(
-                    port=self.parameters["open_ephys"]["port"], 
-                    ip=self.parameters["open_ephys"]["address"]
-                    )
+                    port=self.parameters["open_ephys"]["port"],
+                    ip=self.parameters["open_ephys"]["address"],
+                )
                 self.openephys.connect()
 
     def save(self):
@@ -151,7 +156,7 @@ class BaseExp(object):
             email_handler.setFormatter(formatter)
 
             self.log.addHandler(email_handler)
-    
+
     def check_light_schedule(self):
         """returns true if the lights should be on"""
         return utils.check_time(self.parameters["light_schedule"])
@@ -189,10 +194,15 @@ class BaseExp(object):
                 sleep=self._run_sleep,
                 session=self._run_session,
                 free_food_block=self._free_food,
+                passive_playback_block=self._passive_playback,
             )
 
     def _run_idle(self):
         self.log.debug("Starting _run_idle")
+        self.log.debug("Checking for passive playback block")
+        if self._check_passive_playback_block():
+            self.log.debug("In passive playback block.")
+            return "passive_playback_block"
         if self.check_light_schedule() == False:
             return "sleep"
         elif self.check_session_schedule():
@@ -215,6 +225,11 @@ class BaseExp(object):
         self.log.debug("sleeping...")
         self.panel.house_light.off()
         utils.wait(self.parameters["idle_poll_interval"])
+        # check if passive playback should be occuring
+        if self._check_passive_playback_block():
+            self.log.debug("In passive playback block.")
+            return "passive_playback_block"
+
         if self.check_light_schedule() == False:
             return "main"
         else:
@@ -234,6 +249,7 @@ class BaseExp(object):
             pre=self.sleep_pre,
             main=self.sleep_main,
             post=self.sleep_post,
+            passive_playback_block=self._passive_playback,
         )
         return "idle"
 
@@ -247,6 +263,187 @@ class BaseExp(object):
             utils.wait(t)
             return next_state
 
+        return temp
+
+    ### passive playback code
+    def _check_passive_playback_block(self):
+        """ Checks if it is currently a passive playback block
+        """
+        if "oe_conf" in self.parameters:
+            if self.parameters["oe_conf"]["on"] is True:
+                if "passive_playback" in self.parameters["oe_conf"]:
+                    if self.parameters["oe_conf"]["passive_playback"] is True:
+                        passive_playback_times = self.parameters["oe_conf"][
+                            "passive_playback_times"
+                        ]
+                        # look through passive playback times (e.g. [["09:00","23:00"]])
+                        if utils.check_time(passive_playback_times):
+                            return True
+
+    def passive_playback_pre(self):
+        self.log.debug("Passive playback starting.")
+
+        ### ensure all pins are down
+        self.panel.reset()
+        # open openephys connection and start recording
+        self.open_ephys = connect_to_open_ephys(self.parameters)
+
+        # turn house lights off if its night time
+        if self.check_light_schedule() == False:
+            self.panel.house_light.off()
+
+        return "main"
+
+    def passive_playback_main(self):
+        """"""
+        self.log.debug("Starting passive playback main.")
+        utils.run_state_machine(
+            start_in="wait",
+            error_state="wait",
+            error_callback=self.log_error_callback,
+            # wait 5 seconds
+            wait=self._wait_block(5, 5, "passive_playback"),
+            # start passive playback
+            passive_playback=self.perform_passive_playback(10, "checker"),
+            # check if we should still be in passive playback mode
+            checker=self.passive_playback_checker("wait"),
+        )
+        passive_playback_times = self.parameters["oe_conf"]["passive_playback_times"]
+        if not utils.check_time(passive_playback_times):
+            return "post"
+        else:
+            return "main"
+
+    def passive_playback_checker(self, next_state):
+        # should we be doing a passive playback
+        def temp():
+            if "oe_conf" in self.parameters:
+                if self.parameters["oe_conf"]["on"] is True:
+                    if "passive_playback" in self.parameters["oe_conf"]:
+                        if self.parameters["oe_conf"]["passive_playback"] is True:
+                            passive_playback_times = self.parameters["oe_conf"][
+                                "passive_playback_times"
+                            ]
+                            # look through passive playback times (e.g. [["09:00","23:00"]])
+                            if utils.check_time(passive_playback_times):
+                                return next_state
+            return None
+
+        return temp
+
+    def passive_playback_post(self):
+        self.log.debug("Passive playback over.")
+
+        # reset if panel can reset
+        if callable(getattr(self.panel, "reset", None)):
+            self.panel.reset()
+        close_open_ephys(self.open_ephys, self.parameters)
+        self.log.info("ending session")
+
+        return None
+
+    def _passive_playback(self):
+        self.log.debug("Starting _passive_playback")
+        utils.run_state_machine(
+            start_in="pre",
+            error_state="post",
+            error_callback=self.log_error_callback,
+            pre=self.passive_playback_pre,
+            main=self.passive_playback_main,
+            post=self.passive_playback_post,
+        )
+        return None
+
+
+    def perform_passive_playback(self, value, next_state):
+        """
+        A function to run a passive playback block, embedded within normal behavior, in open ephys
+        """
+        def temp():
+            self.log.debug("Starting passive playback function.")
+            try:
+                # get list of stimuli
+                wav_files = []
+                for ext in ['.wav', '.WAV']:
+                    for stim_folder in self.parameters['oe_conf']['passive']['stim_folders']:
+                        wav_files.extend(
+                            list(
+                                Path(
+                                    stim_folder
+                                ).glob('**/*'+ext)
+                            )
+                        )
+                # create a list of wav_files
+                n_rep = self.parameters['oe_conf']['passive']['wav_repeats']
+                wav_list = np.repeat(wav_files, n_rep)
+                wav_list = np.random.permutation(wav_list)
+
+                # total expected duration
+                durations = [utils.get_audio_duration(wf.as_posix()) for wf in wav_list]
+                duration_remaining = (
+                    np.sum(durations) + 
+                    self.parameters['oe_conf']['sine_wav_padding']*2*len(wav_list)
+                )
+                start_time = time.time()
+
+                # loop through stimuli
+                for wfi, wf in enumerate(wav_list):
+                    # get timing info
+                    current_time = time.time()
+                    duration_elapsed = current_time - start_time
+                    expected_time_remaining = (
+                        duration_remaining + 
+                        np.mean(self.parameters['oe_conf']["passive"]['isi_range'])*
+                        (len(wav_list) -wfi)
+                    )
+                    time_string = "{}/{}".format(
+                        utils.seconds_to_human_readable(duration_elapsed), 
+                        utils.seconds_to_human_readable(
+                            (expected_time_remaining+duration_elapsed)
+                        )
+                        )
+                    # Send Stimulus Name to OpenEphys
+                    stim_string = "{}/{}:  {}".format(wfi, len(wav_list), wf)
+                    self.log.info(stim_string)
+                    self.log.info(time_string)
+
+                    self.open_ephys.send_command('stim ' + wf.as_posix())
+                    # create a temporary wav with sine for OpenEphys
+                    temp_wav = utils.add_sine_to_wav(
+                        wf.as_posix(), 
+                        padding = self.parameters['oe_conf']['sine_wav_padding']
+                        )
+                    stim = utils.auditory_stim_from_wav(temp_wav)
+                    # play the wav
+                    self.panel.speaker.queue(stim.file_origin)
+                    self.panel.speaker.play()
+                    utils.wait(stim.duration)
+                    self.panel.speaker.stop()
+                    duration_remaining -= stim.duration
+
+                    # pause for isi time
+                    isi = random.uniform(
+                        self.parameters['oe_conf']["passive"]['isi_range'][0],
+                        self.parameters['oe_conf']["passive"]['isi_range'][1]
+                    )
+                    utils.wait(isi)
+
+                    # if the light changes, turn it off
+                    if self.check_light_schedule():
+                        self.log.debug("Daytime, lights on.")
+                        self.panel.house_light.on()
+
+                    self.log.debug("REMOVEME: Checking passive playback block.")
+                    self.log.debug(self._check_passive_playback_block())
+                    # if passive playback ends
+                    if self._check_passive_playback_block() is not True:
+                        self.log.debug("In passive playback block.")
+                        return next_state
+
+            except Exception as e:
+                self.log.error('Error at %s', 'division', exc_info=e)
+            
+            return next_state
         return temp
 
     def _check_free_food_block(self):
