@@ -137,7 +137,7 @@ class TwoAltChoiceExp(base.BaseExp):
         port through `experiment.class_assoc['L']`.
 
         """
-        
+
         self.response_ports = {}
         for class_, class_params in self.parameters['classes'].items():
             try:
