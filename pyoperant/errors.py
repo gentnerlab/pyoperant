@@ -19,7 +19,7 @@ class Error(Exception):
 class InterfaceError(Exception):
     '''raised for errors with an interface.
 
-    this should indicate a software error, like difficulty 
+    this should indicate a software error, like difficulty
     connecting to an interface
     '''
     pass
@@ -27,10 +27,10 @@ class InterfaceError(Exception):
 class ComponentError(Exception):
     '''raised for errors with a component.
 
-    this should indicate a hardware error in the physical world, 
+    this should indicate a hardware error in the physical world,
     like a problem with a feeder.
 
-    this should be raised by components when doing any internal 
+    this should be raised by components when doing any internal
     validation that they are working properly
 
     '''

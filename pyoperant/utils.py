@@ -132,27 +132,43 @@ class Trial(Event):
         self.events = []
         self.stim_event = None
 
- 
+class Visit(Event):
+    """docstring for Visit, a variant of trial for place preference paradigm """
+    def __init__(self,
+                 class_=None,
+                 *args, **kwargs):
+        super(Visit, self).__init__(*args, **kwargs)
+        self.label = 'visit'
+        self.perch_strt = None
+        self.perch_end = None
+        self.perch_loc = None
+        self.perch_dur = None
+        self.valid = None
+        self.class_ = class_
+        self.stimuli = []
+        self.events = []
+
+
 class Command(object):
     """
     Enables to run subprocess commands in a different thread with TIMEOUT option.
- 
+
     via https://gist.github.com/kirpit/1306188
-    
+
     Based on jcollado's solution:
     http://stackoverflow.com/questions/1191374/subprocess-with-timeout/4825933#4825933
-    
+
     """
     command = None
     process = None
     status = None
     output, error = '', ''
- 
+
     def __init__(self, command):
         if isinstance(command, basestring):
             command = shlex.split(command)
         self.command = command
- 
+
     def run(self, timeout=None, **kwargs):
         """ Run a command then return: (status, output, error). """
         def target(**kwargs):
