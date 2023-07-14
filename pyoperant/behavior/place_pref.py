@@ -6,7 +6,7 @@ from pyoperant.behavior import base, shape
 from pyoperant.errors import EndSession, EndBlock
 from pyoperant import components, utils, reinf, queues
 
-import serial
+#import serial
 import random
 
 class PlacePrefExp(base.BaseExp):
