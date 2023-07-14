@@ -312,7 +312,7 @@ class PlacePrefExp(base.BaseExp):
             file_origin = stim.file_origin,
         )
 
-        self.log.debug("Queuing stimulus %s" % )
+        self.log.debug("Queuing stimulus %s" % stim.file_origin)
         self.panel.speaker.queue(self.stimulus_event.file_origin)
 
     def play_stimuli(self):
