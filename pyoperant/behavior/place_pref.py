@@ -153,7 +153,8 @@ class PlacePrefExp(base.BaseExp):
             try:
                 self.open_all_perches()
             except:
-                self.session_main()
+                self.log.debug("Max recursion error")
+                return
         else:
             self.log.debug("Perch valid at %s" % (self.current_perch))
 
@@ -371,9 +372,9 @@ class PlacePrefExp(base.BaseExp):
         Reset perches
         """
 
-        self.current_perch == {'IR': None, 'speaker': None}
-        self.stimulus_event == None
-        self.current_visit == None
+        self.current_perch = {'IR': None, 'speaker': None}
+        self.stimulus_event = None
+        self.current_visit = None
 
     def check_session_schedule(self):
         """
@@ -403,8 +404,9 @@ class PlacePrefExp(base.BaseExp):
             perch, and start stimuli shuffle. The program loops in stimulus_shuffle()
             until a valid deperching has been detected()
             '''
-            self.switch_speaker()
-            self.stimulus_shuffle()
+            if (self.current_perch['IR'].status() == True):
+                self.switch_speaker()
+                self.stimulus_shuffle()
 
             '''
             Once deperched, end visit and reset
