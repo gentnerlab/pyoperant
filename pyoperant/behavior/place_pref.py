@@ -293,8 +293,10 @@ class PlacePrefExp(base.BaseExp):
         depending on the perch and the perch_sequence, find the correct list
         """
         if self.current_perch_stim_class == "A":
+            self.log.debug("Perch stim class A")
             return self.parameters['stims_A']
         if self.current_perch_stim_class == "B":
+            self.log.debug("Perch stim class B")
             return self.parameters['stims_B']
 
     def prep_stimuli(self):
