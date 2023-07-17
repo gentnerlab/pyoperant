@@ -378,7 +378,7 @@ class PlacePrefExp(base.BaseExp):
         bool
             True, if sessions should be running
         """
-        return utils.check_time(self.parameters['session_schedule'])
+        return utils.check_time(self.parameters['light_schedule'])
 
     def session_main(self):
         """
