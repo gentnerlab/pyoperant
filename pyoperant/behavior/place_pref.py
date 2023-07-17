@@ -368,9 +368,9 @@ class PlacePrefExp(base.BaseExp):
             except AttributeError:
                 visit_dict[field] = visit.annotations[field] ## it might be in annotations for some reason
 
-            with open(self.data_csv, 'ab') as data_fh:
-                visitWriter = csv.DictWriter(data_fh, fieldnames = self.fields_to_save, extrasaction = 'ignore')
-                visitWriter.writerow(visit_dict)
+        with open(self.data_csv, 'ab') as data_fh:
+            visitWriter = csv.DictWriter(data_fh, fieldnames = self.fields_to_save, extrasaction = 'ignore')
+            visitWriter.writerow(visit_dict)
 
     def reset_perches(self):
         """
