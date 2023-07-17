@@ -150,7 +150,10 @@ class PlacePrefExp(base.BaseExp):
         if (self.validate_perching() == False):
             self.end_visit()
             self.reset_perches()
-            self.open_all_perches()
+            try:
+                self.open_all_perches()
+            except:
+                self.session_main()
         else:
             self.log.debug("Perch valid at %s" % (self.current_perch))
 
