@@ -146,7 +146,7 @@ class PlacePrefExp(base.BaseExp):
         self.log.debug("Beam-break sensed on %s" % (self.current_perch))
         self.current_visit = utils.Visit()
         self.current_visit.perch_strt = dt.datetime.now()
-        self.current_visit.perch_loc = self.current_perch['IR']
+        self.current_visit.perch_loc = self.current_perch['IRName']
         self.current_visit.class_ = self.current_perch_stim_class()
 
         ## if validate perching fails, reset perches and open
@@ -341,7 +341,8 @@ class PlacePrefExp(base.BaseExp):
         """
 
         self.panel.speaker.stop()
-        self.current_visit.stimuli.append(self.stimulus_event)
+        self.current.visit.stimuli.append(self.stimulus_event.file_origin)
+        self.current_visit.event.append(self.stimulus_event)
         self.stimulus_event = None
 
     def end_visit(self):
