@@ -86,7 +86,7 @@ class PlacePrefExp(base.BaseExp):
             day = self.parameters['experiment_start_day']
         )
 
-        self.current_perch = {'IR': None, 'speaker': None}
+        self.current_perch = {'IR': None, 'IRName': None, 'speaker': None}
         self.current_visit = None
         self.stimulus_event = None
 
@@ -128,14 +128,17 @@ class PlacePrefExp(base.BaseExp):
 
             if left_perched:
                 self.current_perch['IR'] = self.panel.left
+                self.current_perch['IRName'] = 'L'
                 self.current_perch['speaker'] = 0
                 break
             if center_perched:
                 self.current_perch['IR'] = self.panel.center
+                self.current_perch['IRName'] = 'C'
                 self.current_perch['speaker'] = 1
                 break
             if right_perched:
                 self.current_perch['IR'] = self.panel.right
+                self.current_perch['IRName'] = 'R'
                 self.current_perch['speaker'] = 2
                 break
 
@@ -373,7 +376,7 @@ class PlacePrefExp(base.BaseExp):
         Reset perches
         """
 
-        self.current_perch = {'IR': None, 'speaker': None}
+        self.current_perch = {'IR': None, 'IRName': None, 'speaker': None}
         self.stimulus_event = None
         self.current_visit = None
 
