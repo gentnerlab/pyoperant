@@ -305,6 +305,7 @@ class PlacePrefExp(base.BaseExp):
         """
         ## randomly shuffle from the current perch_playlist
         stim_file = random.sample(self.perch_playlist().items(), k = 1)[0]
+        print(stim_file)
         stim = utils.auditory_stim_from_wav(stim_file)
         self.log.debug(stim_file)
 
