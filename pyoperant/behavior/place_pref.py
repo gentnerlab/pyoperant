@@ -128,15 +128,15 @@ class PlacePrefExp(base.BaseExp):
 
             if left_perched:
                 self.current_perch['IR'] = self.panel.left
-                self.current_perch['speaker'] = 1
+                self.current_perch['speaker'] = 0
                 break
             if center_perched:
                 self.current_perch['IR'] = self.panel.center
-                self.current_perch['speaker'] = 2
+                self.current_perch['speaker'] = 1
                 break
             if right_perched:
                 self.current_perch['IR'] = self.panel.right
-                self.current_perch['speaker'] = 3
+                self.current_perch['speaker'] = 2
                 break
 
         ## Record time of break
@@ -257,7 +257,7 @@ class PlacePrefExp(base.BaseExp):
         Use serial communication with the connected Arduino to switch
         """
         self.log.debug("Switching speaker relay to %s" % self.current_perch['speaker'])
-        self.arduino.write(str(self.current_perch['speaker']).encode('utf-8'))
+        self.arduino.write(str(self.current_perch['speaker'] + 1).encode('utf-8'))
 
     def stimulus_shuffle(self):
         """
