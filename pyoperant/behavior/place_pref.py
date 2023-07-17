@@ -341,7 +341,7 @@ class PlacePrefExp(base.BaseExp):
         """
 
         self.panel.speaker.stop()
-        self.current.visit.stimuli.append(self.stimulus_event.file_origin)
+        self.current_visit.stimuli.append(self.stimulus_event.file_origin)
         self.current_visit.event.append(self.stimulus_event)
         self.stimulus_event = None
 
