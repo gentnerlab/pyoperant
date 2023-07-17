@@ -167,7 +167,7 @@ class PlacePrefExp(base.BaseExp):
         """
         Figure out what day of experiment we are on.
         """
-        return (dt.datetime.today() - self.exp_strt_date).days
+        return (dt.date.today() - self.exp_strt_date).days
 
 
     def validate_perching(self):
