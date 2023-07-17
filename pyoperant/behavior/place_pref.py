@@ -72,7 +72,7 @@ class PlacePrefExp(base.BaseExp):
             'perch_dur',
             'perch_loc',
             'valid',
-            'class_'
+            'class_',
             'stimuli',
             'events'
         ]
@@ -353,7 +353,6 @@ class PlacePrefExp(base.BaseExp):
 
         self.log.debug("Writing data to %s" % (self.data_csv))
         visit_dict = {}
-        self.log.debug(str(self.fields_to_save))
         for field in self.fields_to_save:
             try:
                 visit_dict[field] = getattr(visit,field)
