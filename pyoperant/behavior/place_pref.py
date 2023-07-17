@@ -77,8 +77,8 @@ class PlacePrefExp(base.BaseExp):
             'events'
         ]
 
-        #if 'add_fields_to_save' in self.parameters.keys():
-    #        self.fields_to_save += self.parameters['add_fields_to_save']
+        if 'add_fields_to_save' in self.parameters.keys():
+            self.fields_to_save += self.parameters['add_fields_to_save']
 
         self.exp_strt_date = dt.date(
             year = self.parameters['experiment_start_year'],
@@ -353,6 +353,7 @@ class PlacePrefExp(base.BaseExp):
 
         self.log.debug("Writing data to %s" % (self.data_csv))
         visit_dict = {}
+        self.log.debug(str(self.fields_to_save))
         for field in self.fields_to_save:
             try:
                 visit_dict[field] = getattr(visit,field)
