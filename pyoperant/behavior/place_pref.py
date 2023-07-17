@@ -161,7 +161,7 @@ class PlacePrefExp(base.BaseExp):
         Can be "S" for silence, "A" for category A, "B" for category B
         """
 
-        return self.parameters['perch_sequence'][self.experiment_day()][self.current_perch['speaker']]
+        return self.parameters['perch_sequence'][str(self.experiment_day())][self.current_perch['speaker']]
 
     def experiment_day(self):
         """
