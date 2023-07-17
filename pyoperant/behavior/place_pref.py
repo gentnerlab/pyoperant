@@ -153,9 +153,10 @@ class PlacePrefExp(base.BaseExp):
             try:
                 self.open_all_perches()
             except:
-                self.session_main()
+                return False
         else:
             self.log.debug("Perch valid at %s" % (self.current_perch))
+            return True
 
     def current_perch_stim_class(self):
         """
@@ -396,19 +397,21 @@ class PlacePrefExp(base.BaseExp):
             Try to open all perches. The program loops in open_all_perches
             until a valid perching has been detected.
             '''
-            self.open_all_perches()
+            if (self.open_all_perches()) == True:
 
-            '''
-            Once perching has been detected, switch speaker to the current
-            perch, and start stimuli shuffle. The program loops in stimulus_shuffle()
-            until a valid deperching has been detected()
-            '''
-            self.switch_speaker()
-            self.stimulus_shuffle()
+                '''
+                Once perching has been detected, switch speaker to the current
+                perch, and start stimuli shuffle. The program loops in stimulus_shuffle()
+                until a valid deperching has been detected()
+                '''
+                self.switch_speaker()
+                self.stimulus_shuffle()
 
-            '''
-            Once deperched, end visit and reset
-            '''
-            self.end_visit()
-            self.reset_perches()
-            ##
+            else:
+
+                '''
+                Once deperched, end visit and reset
+                '''
+                self.end_visit()
+                self.reset_perches()
+                ##
