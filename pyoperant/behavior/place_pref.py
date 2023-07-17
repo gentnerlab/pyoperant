@@ -267,7 +267,9 @@ class PlacePrefExp(base.BaseExp):
         ## if the current class is silence, don't do shit
         if self.current_visit.class_ == "S":
             self.log.debug("Silence Perching")
-            pass
+            while True:
+                if self.validate_deperching() == True:
+                    return
         ## if the current class is not silence, prep and play stimuli
         else:
             self.prep_stimuli()
@@ -275,7 +277,7 @@ class PlacePrefExp(base.BaseExp):
 
         while True:
             ## if deperching has been detected, quit this function
-            if self.validate_deperching == True:
+            if self.validate_deperching() == True:
                 self.stop_stimuli()
                 return
             ## else, play audio until its length runs out,
