@@ -86,7 +86,7 @@ class PlacePrefExp(base.BaseExp):
             day = self.parameters['experiment_start_day']
         )
 
-        self.current_perch = {'IR': None, 'speaker': None}
+        self.current_perch = {'IR': None, 'IRName': None, 'speaker': None}
         self.current_visit = None
         self.stimulus_event = None
 
@@ -128,14 +128,17 @@ class PlacePrefExp(base.BaseExp):
 
             if left_perched:
                 self.current_perch['IR'] = self.panel.left
+                self.current_perch['IRName'] = 'L'
                 self.current_perch['speaker'] = 0
                 break
             if center_perched:
                 self.current_perch['IR'] = self.panel.center
+                self.current_perch['IRName'] = 'C'
                 self.current_perch['speaker'] = 1
                 break
             if right_perched:
                 self.current_perch['IR'] = self.panel.right
+                self.current_perch['IRName'] = 'R'
                 self.current_perch['speaker'] = 2
                 break
 
@@ -143,7 +146,7 @@ class PlacePrefExp(base.BaseExp):
         self.log.debug("Beam-break sensed on %s" % (self.current_perch))
         self.current_visit = utils.Visit()
         self.current_visit.perch_strt = dt.datetime.now()
-        self.current_visit.perch_loc = self.current_perch['IR']
+        self.current_visit.perch_loc = self.current_perch['IRName']
         self.current_visit.class_ = self.current_perch_stim_class()
 
         ## if validate perching fails, reset perches and open
@@ -338,7 +341,8 @@ class PlacePrefExp(base.BaseExp):
         """
 
         self.panel.speaker.stop()
-        self.current_visit.stimuli.append(self.stimulus_event)
+        self.current.visit.stimuli.append(self.stimulus_event.file_origin)
+        self.current_visit.event.append(self.stimulus_event)
         self.stimulus_event = None
 
     def end_visit(self):
@@ -373,7 +377,7 @@ class PlacePrefExp(base.BaseExp):
         Reset perches
         """
 
-        self.current_perch = {'IR': None, 'speaker': None}
+        self.current_perch = {'IR': None, 'IRName': None, 'speaker': None}
         self.stimulus_event = None
         self.current_visit = None
 
