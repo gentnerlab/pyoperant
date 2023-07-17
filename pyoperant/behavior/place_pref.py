@@ -256,8 +256,8 @@ class PlacePrefExp(base.BaseExp):
         """
         Use serial communication with the connected Arduino to switch
         """
-        self.log.debug("Switching speaker relay to %s" % str(self.current_perch['speaker']))
-        self.arduino.write(str(self.current_perch['speaker']).encode('utf-8'))
+        self.log.debug("Switching speaker relay to %s" % self.current_perch['speaker'])
+        self.arduino.write(str(int(self.current_perch['speaker'])).encode('utf-8'))
 
     def stimulus_shuffle(self):
         """
