@@ -344,9 +344,9 @@ class PlacePrefExp(base.BaseExp):
         self.current_visit.perch_end = dt.datetime.now()
         self.current_visit.perch_dur = (self.current_visit.perch_end - self.current_visit.perch_strt).total_seconds()
         self.current_visit.valid = (self.current_visit.perch_dur >= self.parameters['min_perch_time'])
-        self.save_visit()
+        self.save_visit(self.current_visit)
 
-    def save_visit(self):
+    def save_visit(self, visit):
         """
         write visit results to CSV
         """
@@ -355,7 +355,7 @@ class PlacePrefExp(base.BaseExp):
         visit_dict = {}
         for field in self.fields_to_save:
             try:
-                visit_dict[field] = getattr(trial,field)
+                visit_dict[field] = getattr(visit,field)
             except AttributeError:
                 visit_dict[field] = visit.annotations[field] ## it might be in annotations for some reason
 
