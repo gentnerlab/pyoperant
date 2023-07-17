@@ -304,7 +304,7 @@ class PlacePrefExp(base.BaseExp):
         Prep stimuli and generate a stimulus event
         """
         ## randomly shuffle from the current perch_playlist
-        stim_file = random.sample(self.perch_playlist().items(), k = 1)[1]
+        stim_file = random.sample(self.perch_playlist().items(), k = 1)[0]
         stim = utils.auditory_stim_from_wav(stim_file)
         self.log.debug(stim_file)
 
