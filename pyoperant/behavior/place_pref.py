@@ -77,8 +77,8 @@ class PlacePrefExp(base.BaseExp):
             'events'
         ]
 
-        if 'add_fields_to_save' in self.parameters.keys():
-            self.fields_to_save += self.parameters['add_fields_to_save']
+        #if 'add_fields_to_save' in self.parameters.keys():
+    #        self.fields_to_save += self.parameters['add_fields_to_save']
 
         self.exp_strt_date = dt.date(
             year = self.parameters['experiment_start_year'],
