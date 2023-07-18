@@ -117,9 +117,9 @@ class PlacePrefExp(base.BaseExp):
         ## If one of them is broken, return true
         while self.current_perch['IR'] == None:
 
-            ## check if time of day is appropriate for a trial to commence
+            ## check if time of day is appropriate for a visit
             if self.check_session_schedule() == False:
-                raise EndSession
+                return
 
             ## for each iteration, check for perching behavior.
             left_perched = self.panel.left.status()
@@ -279,8 +279,8 @@ class PlacePrefExp(base.BaseExp):
             self.play_stimuli()
 
         while True:
-            ## if deperching has been detected, quit this function
-            if self.validate_deperching() == True:
+            ## if deperching has been detected, or light schedule expires, quit this function
+            if (self.validate_deperching() == True or self.check_session_schedule() == False):
                 self.stop_stimuli()
                 return
             ## else, play audio until its length runs out,
@@ -398,11 +398,16 @@ class PlacePrefExp(base.BaseExp):
         """
 
         while True:
+
             '''
             Try to open all perches. The program loops in open_all_perches
             until a valid perching has been detected.
             '''
             self.open_all_perches()
+
+            ## check if time of day is appropriate for a trial to commence
+            if self.check_session_schedule() == False:
+                raise EndSession
 
             '''
             Once perching has been detected, switch speaker to the current
@@ -419,4 +424,8 @@ class PlacePrefExp(base.BaseExp):
             '''
             self.end_visit()
             self.reset_perches()
+
+            ## check if time of day is appropriate for a trial to commence
+            if self.check_session_schedule() == False:
+                raise EndSession
             ##
