@@ -297,6 +297,7 @@ class PlacePrefExp(base.BaseExp):
                         self.log.debug("Stimuli finished and inter_stim_interval has passed. ")
                         self.stop_stimuli()
                         self.stimulus_shuffle()
+                        return
 
     def perch_playlist(self):
         """
