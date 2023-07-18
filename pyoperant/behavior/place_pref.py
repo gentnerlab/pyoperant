@@ -294,6 +294,7 @@ class PlacePrefExp(base.BaseExp):
                         continue
                     ## when inter_stim_interval runs out, stop stimuli and go back to the stimulus_shuffle
                     else:
+                        self.log.debug("Stimuli finished and inter_stim_interval has passed. ")
                         self.stop_stimuli()
                         self.stimulus_shuffle()
 
@@ -339,7 +340,7 @@ class PlacePrefExp(base.BaseExp):
         """
         Stop stimuli, record event, and clear out event
         """
-
+        self.log.debug("Stop stimuli and flush stimulus event.")
         self.panel.speaker.stop()
         self.current_visit.stimuli.append(self.stimulus_event.file_origin)
         self.current_visit.events.append(self.stimulus_event)
