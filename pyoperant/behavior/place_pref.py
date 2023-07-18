@@ -296,8 +296,9 @@ class PlacePrefExp(base.BaseExp):
                     else:
                         self.log.debug("Stimuli finished and inter_stim_interval has passed. ")
                         self.stop_stimuli()
-                        self.stimulus_shuffle()
-                        return
+                        ## find another clip to play
+                        self.prep_stimuli()
+                        self.play_stimuli()
 
     def perch_playlist(self):
         """
