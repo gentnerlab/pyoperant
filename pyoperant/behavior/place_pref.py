@@ -407,7 +407,7 @@ class PlacePrefExp(base.BaseExp):
 
             ## check if time of day is appropriate for a trial to commence
             if self.check_session_schedule() == False:
-                raise EndSession
+                return "post"
 
             '''
             Once perching has been detected, switch speaker to the current
@@ -427,5 +427,9 @@ class PlacePrefExp(base.BaseExp):
 
             ## check if time of day is appropriate for a trial to commence
             if self.check_session_schedule() == False:
-                raise EndSession
+                return "post"
             ##
+
+    def session_post(self):
+        self.log.info('Paradigm is closed. Proceed to Sleep. ')
+        return None
