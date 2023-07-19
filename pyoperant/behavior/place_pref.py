@@ -199,20 +199,18 @@ class PlacePrefExp(base.BaseExp):
                 ## if time is not up, continue the loop
                 else:
                     continue
-            ## if current perch is no longer broken, give a grace period
+            ## if current perch is no longer broken, record perch end time, give a grace period
             else:
+                self.current_visit.perch_end = dt.datetime.now()
                 ## if there is no grace_tokens left, immediately terminate visit
                 if grace_tokens <= 0:
                     self.log.debug("Perching not valid. Out of grace tokens.")
                     return False
 
-                ## set a time marker for the grace period.
-                grace_onset = dt.datetime.now()
-
                 ## while the current perch is unperched,
                 while (self.current_perch["IR"].status() == False):
                     ## if the grace period has ended
-                    grace_period = (dt.datetime.now() - grace_onset).total_seconds
+                    grace_period = (dt.datetime.now() - self.current_visit.perch_end).total_seconds
                     if grace_period > self.parameters['perch_grace_period']:
                         self.log.debug("Perching not valid. Exceed grace period.")
                         return False
@@ -232,22 +230,20 @@ class PlacePrefExp(base.BaseExp):
             if (self.current_perch['IR'].status() == True):
                 ## if the IR is still broken, no deperch
                 return False
-            ## if the current perch is no longer broken, give a grace period
+            ## if the current perch is no longer broken, record perch_end time, and give a grace period
             else:
+                self.current_visit.perch_end = dt.datetime.now()
                 ## if there is no grace_tokens left, immediately terminate visit
                 if grace_tokens <= 0:
                     self.log.debug("Perching Unstable. Out of grace tokens.")
                     return True
 
-                ## set a time marker for the grace period.
-                grace_onset = dt.datetime.now()
-
                 ## while the current perch is unperched,
                 while (self.current_perch['IR'].status() == False):
                     ## if the grace period has ended, bird has deperched
-                    grace_period = (dt.datetime.now() - grace_onset).total_seconds
+                    grace_period = (dt.datetime.now() - self.current_visit.perch_end).total_seconds
                     if grace_period > self.parameters['perch_grace_period']:
-                        self.log.debug("Perching not valid. Exceed grace period.")
+                        self.log.debug("Subject Deperched. Exceed grace period.")
                         return True
                     else:
                         grace_tokens = grace_tokens - 1
@@ -353,7 +349,6 @@ class PlacePrefExp(base.BaseExp):
         End visit and write data of current visit to csv
         """
         self.log.debug("Ending visit and record end time.")
-        self.current_visit.perch_end = dt.datetime.now()
         self.current_visit.perch_dur = (self.current_visit.perch_end - self.current_visit.perch_strt).total_seconds()
         self.current_visit.valid = (self.current_visit.perch_dur >= self.parameters['min_perch_time'])
         self.save_visit(self.current_visit)
