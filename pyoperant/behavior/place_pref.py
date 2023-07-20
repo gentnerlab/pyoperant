@@ -210,7 +210,7 @@ class PlacePrefExp(base.BaseExp):
                 ## while the current perch is unperched,
                 while (self.current_perch["IR"].status() == False):
                     ## if the grace period has ended
-                    grace_period = (dt.datetime.now() - self.current_visit.perch_end).total_seconds
+                    grace_period = (dt.datetime.now() - self.current_visit.perch_end).total_seconds()
                     if grace_period > self.parameters['perch_grace_period']:
                         self.log.debug("Perching not valid. Exceed grace period.")
                         return False
@@ -241,7 +241,7 @@ class PlacePrefExp(base.BaseExp):
                 ## while the current perch is unperched,
                 while (self.current_perch['IR'].status() == False):
                     ## if the grace period has ended, bird has deperched
-                    grace_period = (dt.datetime.now() - self.current_visit.perch_end).total_seconds
+                    grace_period = (dt.datetime.now() - self.current_visit.perch_end).total_seconds()
                     if grace_period > self.parameters['perch_grace_period']:
                         self.log.debug("Subject Deperched. Exceed grace period.")
                         return True
