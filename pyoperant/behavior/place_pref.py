@@ -277,6 +277,8 @@ class PlacePrefExp(base.BaseExp):
         while True:
             ## if deperching has been detected, or light schedule expires, quit this function
             if (self.validate_deperching() == True or self.check_session_schedule() == False):
+                if self.check_session_schedule() == False:
+                    self.current_visit.perch_end = dt.datetime.now()
                 self.stop_stimuli()
                 return
             ## else, play audio until its length runs out,
