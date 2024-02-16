@@ -263,11 +263,14 @@ class PlacePrefExp(base.BaseExp):
         While perched, shuffle stimuli from a library
         """
 
-        ## if the current class is silence, don't do shit
+        ## if the current class is silence, don't do shit except checking for light schedule
         if self.current_visit.class_ == "S":
             self.log.debug("Silence Perching")
             while True:
-                if self.validate_deperching() == True:
+                if (self.validate_deperching() == True or self.check_session_schedule() == False):
+                    if self.check_session_schedule() == False:
+                        self.current_visit.perch_end = dt.datetime.now()
+                    self.stop_stimuli()
                     return
         ## if the current class is not silence, prep and play stimuli
         else:
@@ -351,7 +354,10 @@ class PlacePrefExp(base.BaseExp):
         End visit and write data of current visit to csv
         """
         self.log.debug("Ending visit and record end time.")
-        self.current_visit.perch_dur = (self.current_visit.perch_end - self.current_visit.perch_strt).total_seconds()
+        try:
+            self.current_visit.perch_dur = (self.current_visit.perch_end - self.current_visit.perch_strt).total_seconds()
+        except:
+            self.current_visit.perch_dur = 0
         self.current_visit.valid = (self.current_visit.perch_dur >= self.parameters['min_perch_time'])
         self.save_visit(self.current_visit)
 
