@@ -270,7 +270,6 @@ class PlacePrefExp(base.BaseExp):
                 if (self.validate_deperching() == True or self.check_session_schedule() == False):
                     if self.check_session_schedule() == False:
                         self.current_visit.perch_end = dt.datetime.now()
-                    self.stop_stimuli()
                     return
         ## if the current class is not silence, prep and play stimuli
         else:
