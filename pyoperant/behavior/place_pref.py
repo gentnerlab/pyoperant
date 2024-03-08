@@ -275,9 +275,9 @@ class PlacePrefExp(base.BaseExp):
 
         if self.reinforcement_counter == None:
             ## start new reinforcement_counter
-            self.log.info("Reinforcement empty. Calling in reinforcement at ratio %s." %s str(self.current_variable_ratio()))
+            self.log.info("Reinforcement empty. Calling in reinforcement at ratio %s." % str(self.current_variable_ratio()))
             self.reinforcement_counter = random.randint(1, 2*self.current_variable_ratio()) - 1
-            self.log.info("Reinforcement inbound in %s visits." %s self.reinforcement_counter)
+            self.log.info("Reinforcement inbound in %s visits." % str(self.reinforcement_counter))
 
         ## If there are reinforcement counter is 0, reinforce
         if self.reinforcement_counter == 0:
@@ -285,7 +285,7 @@ class PlacePrefExp(base.BaseExp):
             self.reinforcement_counter = None ## wipe reinforcement
             return True
         else:
-            self.log.info("Reinforcement not available, inbound in %s visits. " %s self.reinforcement_counter)
+            self.log.info("Reinforcement not available, inbound in %s visits. " % str(self.reinforcement_counter))
             self.reinforcement_counter = self.reinforcement_counter - 1
             return False
 
