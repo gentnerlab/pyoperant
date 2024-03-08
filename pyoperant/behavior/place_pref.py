@@ -74,7 +74,9 @@ class PlacePrefExp(base.BaseExp):
             'valid',
             'class_',
             'stimuli',
-            'events'
+            'events',
+            'vr',
+            'reinforcement'
         ]
 
         if 'add_fields_to_save' in self.parameters.keys():
@@ -89,6 +91,8 @@ class PlacePrefExp(base.BaseExp):
         self.current_perch = {'IR': None, 'IRName': None, 'speaker': None}
         self.current_visit = None
         self.stimulus_event = None
+
+        self.reinforcement_counter = None
 
         self.arduino = serial.Serial(self.parameters['arduino_address'], self.parameters['arduino_baud_rate'], timeout = 1)
         self.arduino.reset_input_buffer()
@@ -170,6 +174,13 @@ class PlacePrefExp(base.BaseExp):
 
         return self.parameters['perch_sequence'][str(self.experiment_day())][self.current_perch['speaker']]
 
+    def current_variable_ratio(self):
+        """
+        Look in self.parameters for current reinforcement ratio of the day
+        """
+
+        return self.parameters['perch_sequence'][str(self.experiment_day())][3] ## index 3 is always the variable ratio
+
     def experiment_day(self):
         """
         Figure out what day of experiment we are on.
@@ -249,8 +260,6 @@ class PlacePrefExp(base.BaseExp):
                         grace_tokens = grace_tokens - 1
                         continue
 
-
-
     def switch_speaker(self):
         """
         Use serial communication with the connected Arduino to switch
@@ -258,13 +267,39 @@ class PlacePrefExp(base.BaseExp):
         self.log.debug("Switching speaker relay to %s" % self.current_perch['speaker'])
         self.arduino.write(str(self.current_perch['speaker'] + 1).encode('utf-8'))
 
+    def reinforcement_logic(self):
+        """
+        Figure out if current trial should be reinforced based on
+        reinforcement schedule of the day and previous reinforcement
+        """
+
+        if self.reinforcement_counter == None:
+            ## start new reinforcement_counter
+            self.log.info("Reinforcement empty. Calling in reinforcement at ratio %s." %s self.current_variable_ratio())
+            self.reinforcement_counter = random.randint(1, 2*self.current_variable_ratio()) - 1
+            self.log.info("Reinforcement inbound in %s visits." %s self.reinforcement_counter)
+
+        ## If there are reinforcement counter is 0, reinforce
+        if self.reinforcement_counter == 0:
+            self.log.info("Reinforcement available. Reinforcing...")
+            self.reinforcement_counter = None ## wipe reinforcement
+            return True
+        else:
+            self.log.info("Reinforcement not available, inbound in %s visits. " %s self.reinforcement_counter)
+            self.reinforcement_counter = self.reinforcement_counter - 1
+            return False
+
     def stimulus_shuffle(self):
         """
         While perched, shuffle stimuli from a library
         """
 
-        ## if the current class is silence, don't do shit except checking for light schedule
-        if self.current_visit.class_ == "S":
+        ## decide if reinforcement should be given
+        self.current_visit.reinforcement = self.reinforcement_logic()
+        self.current_visit.vr = self.current_variable_ratio()
+
+        ## if the current class is silence, or if reinforcement is not given, don't do shit except checking for light schedule
+        if (self.current_visit.class_ == "S" or self.current_visit.reinforcement == False):
             self.log.debug("Silence Perching")
             while True:
                 if (self.validate_deperching() == True or self.check_session_schedule() == False):
@@ -436,5 +471,7 @@ class PlacePrefExp(base.BaseExp):
             ##
 
     def session_post(self):
+        self.reinforcement_counter = None ## flush reinforcement
+        self.log.info('Flushing reinforcement counter. ')
         self.log.info('Paradigm is closed. Proceed to Sleep. ')
         return None
