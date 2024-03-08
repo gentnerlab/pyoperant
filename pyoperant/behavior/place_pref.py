@@ -153,6 +153,10 @@ class PlacePrefExp(base.BaseExp):
         self.current_visit.perch_loc = self.current_perch['IRName']
         self.current_visit.class_ = self.current_perch_stim_class()
 
+        ## pre populate
+        self.current_visit.reinforcement = False
+        self.current_visit.vr = self.current_variable_ratio()
+
         ## if validate perching fails, reset perches and open
         if (self.validate_perching() == False):
             self.end_visit()
@@ -296,7 +300,6 @@ class PlacePrefExp(base.BaseExp):
 
         ## decide if reinforcement should be given
         self.current_visit.reinforcement = self.reinforcement_logic()
-        self.current_visit.vr = self.current_variable_ratio()
 
         ## if the current class is silence, or if reinforcement is not given, don't do shit except checking for light schedule
         if (self.current_visit.class_ == "S" or self.current_visit.reinforcement == False):
