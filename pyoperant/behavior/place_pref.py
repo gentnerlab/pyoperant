@@ -92,7 +92,7 @@ class PlacePrefExp(base.BaseExp):
         self.current_visit = None
         self.stimulus_event = None
 
-        self.reinforcement_counter = None
+        self.reinforcement_counter = {'L': None, 'R': None, 'C': None} ## set up separate reinforcement counters for all perches
 
         self.arduino = serial.Serial(self.parameters['arduino_address'], self.parameters['arduino_baud_rate'], timeout = 1)
         self.arduino.reset_input_buffer()
@@ -277,20 +277,20 @@ class PlacePrefExp(base.BaseExp):
         reinforcement schedule of the day and previous reinforcement
         """
 
-        if self.reinforcement_counter == None:
+        if self.reinforcement_counter[self.current_visit.perch_loc] == None:
             ## start new reinforcement_counter
-            self.log.info("Reinforcement empty. Calling in reinforcement at ratio %s." % str(self.current_variable_ratio()))
-            self.reinforcement_counter = random.randint(1, 2*self.current_variable_ratio() - 1) - 1
-            self.log.info("Reinforcement inbound in %s visits." % str(self.reinforcement_counter))
+            self.log.info("Reinforcement empty at current perch. Calling in reinforcement at ratio %s." % str(self.current_variable_ratio()))
+            self.reinforcement_counter[self.current_visit.perch_loc] = random.randint(1, 2*self.current_variable_ratio() - 1) - 1
+            self.log.info("Reinforcement inbound in %s visits." % str(self.reinforcement_counter[self.current_visit.perch_loc]))
 
         ## If there are reinforcement counter is 0, reinforce
-        if self.reinforcement_counter == 0:
-            self.log.info("Reinforcement available. Reinforcing...")
-            self.reinforcement_counter = None ## wipe reinforcement
+        if self.reinforcement_counter[self.current_visit.perch_loc] == 0:
+            self.log.info("Reinforcement available at current perch. Reinforcing...")
+            self.reinforcement_counter[self.current_visit.perch_loc] = None ## wipe reinforcement
             return True
         else:
-            self.log.info("Reinforcement not available, inbound in %s visits. " % str(self.reinforcement_counter))
-            self.reinforcement_counter = self.reinforcement_counter - 1
+            self.log.info("Reinforcement not available at current perch, inbound in %s visits. " % str(self.reinforcement_counter[self.current_visit.perch_loc]))
+            self.reinforcement_counter[self.current_visit.perch_loc] = self.reinforcement_counter[self.current_visit.perch_loc] - 1
             return False
 
     def stimulus_shuffle(self):
