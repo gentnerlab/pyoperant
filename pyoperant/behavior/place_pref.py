@@ -154,7 +154,7 @@ class PlacePrefExp(base.BaseExp):
         self.current_visit.class_ = self.current_perch_stim_class()
 
         ## pre populate
-        self.current_visit.reinforcement = False
+        self.current_visit.reinforcement = False ## default do nothing
         self.current_visit.vr = self.current_variable_ratio()
 
         ## if validate perching fails, reset perches and open
