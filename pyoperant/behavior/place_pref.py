@@ -474,7 +474,7 @@ class PlacePrefExp(base.BaseExp):
             ##
 
     def session_post(self):
-        self.reinforcement_counter = None ## flush reinforcement
+        self.reinforcement_counter = {'L': None, 'R': None, 'C': None} ## flush reinforcement
         self.log.info('Flushing reinforcement counter. ')
         self.log.info('Paradigm is closed. Proceed to Sleep. ')
         return None
