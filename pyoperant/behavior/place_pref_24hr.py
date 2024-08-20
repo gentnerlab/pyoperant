@@ -453,6 +453,30 @@ class PlacePrefExp24hr(base.BaseExp):
         '''
         return self.daylight != self.check_light_schedule()
 
+    def run(self):
+
+        for attr in self.req_panel_attr:
+            assert hasattr(self.panel,attr)
+        self.panel_reset()
+        self.save()
+        self.init_summary()
+
+        self.log.info('%s: running %s with parameters in %s' % (self.name,
+                                                                self.__class__.__name__,
+                                                                self.snapshot_f,
+                                                                )
+                      )
+
+        while True: # modify to start in pre instead of idle (this script deprecates idle)
+            utils.run_state_machine(
+                start_in='pre',
+                error_state='post',
+                error_callback=self.log_error_callback,
+                pre=self.session_pre,
+                main=self.session_main,
+                post=self.session_post
+                )
+
     def session_pre(self):
         """
         Check if session should start in daylight or night.
