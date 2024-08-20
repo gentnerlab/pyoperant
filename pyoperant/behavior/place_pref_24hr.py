@@ -284,6 +284,10 @@ class PlacePrefExp24hr(base.BaseExp):
         reinforcement schedule of the day and previous reinforcement
         """
 
+        if not self.daylight:
+            self.log.info("No reinforcement at night.")
+            return False
+
         if self.reinforcement_counter[self.current_visit.perch_loc] == None:
             ## start new reinforcement_counter
             self.log.info("Reinforcement empty at current perch. Calling in reinforcement at ratio %s." % str(self.current_variable_ratio()))
