@@ -436,12 +436,22 @@ class PlacePrefExp24hr(base.BaseExp):
         self.stimulus_event = None
         self.current_visit = None
 
+    def check_session_schedule(self):
+        """
+        Check if perches should be open
+
+        returns
+        -------
+        bool
+            True, if sessions should be running
+        """
+        return utils.check_time(self.parameters['light_schedule'])
     
     def light_switch(self):
         '''
         This checks if paradigm daylight is incongruent with system time
         '''
-        return self.daylight != utils.check_time(self.parameters['light_schedule'])
+        return self.daylight != self.check_light_schedule()
 
     def session_pre(self):
         """
@@ -451,7 +461,7 @@ class PlacePrefExp24hr(base.BaseExp):
 
         self.log.info('Entering session_pre for daylight logic.')
         ## assign light schedule to
-        self.daylight = utils.check_time(self.parameters['light_schedule'])
+        self.daylight = self.check_light_schedule()
         self.reinforcement_counter = {'L': None, 'R': None, 'C': None} ## flush reinforcement
         self.log.info('Set paradigm to be congruent to system light. Flushing reinforcement counter. ')
 
