@@ -132,23 +132,6 @@ class Trial(Event):
         self.events = []
         self.stim_event = None
 
-class Visit(Event):
-    """docstring for Visit, a variant of trial for place preference paradigm """
-    def __init__(self,
-                 class_=None,
-                 *args, **kwargs):
-        super(Visit, self).__init__(*args, **kwargs)
-        self.label = 'visit'
-        self.perch_strt = None
-        self.perch_end = None
-        self.perch_loc = None
-        self.perch_dur = None
-        self.valid = None
-        self.class_ = class_
-        self.stimuli = []
-        self.events = []
-
-
 class Command(object):
     """
     Enables to run subprocess commands in a different thread with TIMEOUT option.
