@@ -9,6 +9,22 @@ from pyoperant import components, utils, reinf, queues
 import serial
 import random
 
+class Visit(utils.Event):
+    """docstring for Visit, a variant of trial for place preference paradigm """
+    def __init__(self,
+                 class_=None,
+                 *args, **kwargs):
+        super(Visit, self).__init__(*args, **kwargs)
+        self.label = 'visit'
+        self.perch_strt = None
+        self.perch_end = None
+        self.perch_loc = None
+        self.perch_dur = None
+        self.valid = None
+        self.class_ = class_
+        self.stimuli = []
+        self.events = []
+
 class PlacePrefExp24hr(base.BaseExp):
     '''
     A place preference experiment. This version is identical to PlacePrefExp,
