@@ -39,7 +39,7 @@ PyOperant abstracts behavioral protocol logic from hardware interactions through
 
 Behavioral protocols can be modifed and extended through object inheritance. The modular architecture of PyOperant also allows experimenters to integrate their behavioral protocols with other Python packages for online data analysis or experimental control.
 
-PyOperant’s hardware support currently includes PortAudio & Comedi. Future support will include NiDAQmx and Cambridge Electronic Designs.
+PyOperant’s hardware support was originally writte for PortAudio & Comedi. Subsequent renditions added NiDAQmx and Cambridge Electronic Designs hardware. Currently the gentnerlab run all PyOperant experiements on their custom MagPi hardware (deprecated: https://github.com/theilmbh/RPiOperant <2026 respin link>), which uses a RaspberryPi (3b+) for GPIO, I2C controlled PCA9685's for PWM lights and servos, and HiFiBerry for DAC. 
 
 http://pyoperant.readthedocs.org/en/dev/index.html
 
