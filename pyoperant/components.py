@@ -34,158 +34,183 @@ class HopperWontDropError(HopperActiveError):
     pass
 
 class Hopper(BaseComponent):
-    """ Class which holds information about a hopper
+    """Controls a food hopper driven by either a solenoid or a servo motor.
+
+    Exactly one of `solenoid` or `servo` must be provided. Use `solenoid` for
+    older Magpi boards with a BooleanOutput-driven hopper. Use `servo` with
+    `up_angle` and `down_angle` for Rev D boards with a PWMOutput-driven servo.
 
     Parameters
     ----------
-    solenoid : `hwio.BooleanOutput`
-        output channel to activate the solenoid & raise the hopper
-    IR : :class:`hwio.BooleanInput` 
-       input channel for the IR beam to check if the hopper is up
-    max_lag : float, optional 
-        time in seconds to wait before checking to make sure the hopper is up (default=0.3)
+    IR : hwio.BooleanInput
+        Input channel for the IR beam that confirms hopper position.
+    solenoid : hwio.BooleanOutput, optional
+        Output channel for a solenoid-driven hopper. Mutually exclusive with
+        `servo`.
+    servo : hwio.PWMOutput, optional
+        PWM output channel for a servo-driven hopper (pass servo=True in
+        params). Mutually exclusive with `solenoid`.
+    up_angle : float, optional
+        PWM duty cycle (%) to move the servo to the raised position. Required
+        when using `servo`. Must be tuned per-panel in local_pi.py.
+    down_angle : float, optional
+        PWM duty cycle (%) to move the servo to the lowered position. Required
+        when using `servo`. Must be tuned per-panel in local_pi.py.
+    max_lag : float, optional
+        Seconds to wait for the IR beam to confirm position (default=0.3).
+    inverted : bool, optional
+        Set True if the IR beam logic is active-low (default=False).
 
-    Attributes
-    ----------
-    solenoid : hwio.BooleanOutput 
-        output channel to activate the solenoid & raise the hopper
-    IR : hwio.BooleanInput 
-       input channel for the IR beam to check if the hopper is up
-    max_lag : float 
-        time in seconds to wait before checking to make sure the hopper is up
+    Examples
+    --------
+    Solenoid hopper (older Magpi boards)::
 
+        hopper = Hopper(IR=ir_input, solenoid=bool_output, inverted=True)
+
+    Servo hopper (Rev D Magpi boards)::
+
+        hopper = Hopper(IR=ir_input, servo=pwm_output,
+                        up_angle=7.5, down_angle=2.5, inverted=True)
     """
-    def __init__(self,IR,solenoid,max_lag=0.3, inverted=False,*args,**kwargs):
-        super(Hopper, self).__init__(*args,**kwargs)
-        self.max_lag = max_lag
-        if isinstance(IR,hwio.BooleanInput):
-            self.IR = IR
-        else:
+    def __init__(self, IR, solenoid=None, servo=None, up_angle=None,
+                 down_angle=None, max_lag=0.3, inverted=False, *args, **kwargs):
+        super(Hopper, self).__init__(*args, **kwargs)
+
+        # validate: exactly one actuator must be supplied
+        if solenoid is None and servo is None:
+            raise ValueError('Hopper requires either a solenoid or a servo argument')
+        if solenoid is not None and servo is not None:
+            raise ValueError('Hopper takes either a solenoid or a servo, not both')
+
+        if not isinstance(IR, hwio.BooleanInput):
             raise ValueError('%s is not an input channel' % IR)
-        if isinstance(solenoid,hwio.BooleanOutput):
+        self.IR = IR
+        self.inverted = bool(inverted)
+        self.max_lag = max_lag
+
+        if solenoid is not None:
+            if not isinstance(solenoid, hwio.BooleanOutput):
+                raise ValueError('%s is not a BooleanOutput channel' % solenoid)
             self.solenoid = solenoid
+            self._actuator = 'solenoid'
+
         else:
-            raise ValueError('%s is not an output channel' % solenoid)
-        if inverted:
-            self.inverted=True
+            if not isinstance(servo, hwio.PWMOutput):
+                raise ValueError('%s is not a PWMOutput channel' % servo)
+            if up_angle is None or down_angle is None:
+                raise ValueError('up_angle and down_angle are required when using a servo')
+            self.servo = servo
+            self.up_angle = up_angle
+            self.down_angle = down_angle
+            self._actuator = 'servo'
+            # move to down position on init so the hopper starts in a known state
+            self.servo.write(self.down_angle)
+
+    def _actuate_up(self):
+        """Send the raise command to whichever actuator is fitted."""
+        if self._actuator == 'servo':
+            self.servo.write(self.up_angle)
         else:
-            self.inverted=False
+            self.solenoid.write(True)
+
+    def _actuate_down(self):
+        """Send the lower command to whichever actuator is fitted."""
+        if self._actuator == 'servo':
+            self.servo.write(self.down_angle)
+        else:
+            self.solenoid.write(False)
 
     def check(self):
-        """reads the status of solenoid & IR beam, then throws an error if they don't match
+        """Read the IR beam and return whether the hopper is currently up.
 
         Returns
         -------
         bool
-            True if the hopper is up.
-
-        Raises
-        ------
-        HopperActiveError
-            The Hopper is up and it shouldn't be. (The IR beam is tripped, but the solenoid is not active.)
-        HopperInactiveError
-            The Hopper is down and it shouldn't be. (The IR beam is not tripped, but the solenoid is active.)
-
+            True if the hopper is up (IR beam tripped).
         """
-        return True
         IR_status = self.IR.read()
         if self.inverted:
             IR_status = not IR_status
-        solenoid_status = self.solenoid.read()
-        if IR_status != solenoid_status:
-            if IR_status:
-                raise HopperActiveError
-            elif solenoid_status:
-                raise HopperInactiveError
-            else:
-                raise ComponentError("the IR & solenoid don't match: IR:%s,solenoid:%s" % (IR_status,solenoid_status))
-        else:
-            return IR_status
+        return IR_status
 
     def up(self):
-        """Raises the hopper up.
+        """Raise the hopper.
 
         Returns
         -------
-        bool
-            True if the hopper comes up.
+        datetime
+            Timestamp of when the IR beam was tripped (hopper confirmed up).
 
         Raises
         ------
         HopperWontComeUpError
-            The Hopper did not raise.
+            The hopper did not raise within max_lag seconds.
         """
-
-        self.solenoid.write(True)
+        self._actuate_up()
         time_up = self.IR.poll(timeout=self.max_lag)
 
-        if time_up is None: # poll timed out
-            #self.solenoid.write(False)
+        if time_up is None:  # poll timed out — beam never tripped
+            self._actuate_down()  # safety: return to down position
             raise HopperWontComeUpError
         else:
             return time_up
 
     def down(self):
-        """Lowers the hopper.
+        """Lower the hopper.
 
         Returns
         -------
-        bool
-            True if the hopper drops.
+        datetime
+            Timestamp of when the down command was confirmed.
 
         Raises
         ------
         HopperWontDropError
-            The Hopper did not drop.
+            The hopper did not lower within max_lag seconds.
         """
-        self.solenoid.write(False)
-        time_down = datetime.datetime.now()
+        self._actuate_down()
         utils.wait(self.max_lag)
-        try:
-            self.check()
-        except HopperActiveError as e:
-            raise HopperWontDropError(e)
+        time_down = datetime.datetime.now()
+        if self.check():  # IR beam still tripped after waiting
+            raise HopperWontDropError
         return time_down
 
-    def feed(self,dur=2.0,error_check=True):
-        """Performs a feed
+    def feed(self, dur=2.0, error_check=True):
+        """Perform a feed cycle: raise the hopper, wait dur seconds, lower it.
 
         Parameters
-        ---------
-        dur : float, optional 
-            duration of feed in seconds
+        ----------
+        dur : float, optional
+            Duration of feed in seconds (default=2.0).
 
         Returns
         -------
-        (datetime, float)
-            Timestamp of the feed and the feed duration
-
+        (datetime, datetime.timedelta)
+            Timestamp of the feed and its duration.
 
         Raises
         ------
         HopperAlreadyUpError
-            The Hopper was already up at the beginning of the feed.
+            The hopper was already up at the start of the feed.
         HopperWontComeUpError
-            The Hopper did not raise for the feed.
+            The hopper did not raise for the feed.
         HopperWontDropError
-            The Hopper did not drop fater the feed.
-
+            The hopper did not drop after the feed.
         """
         logger.debug("Feeding..")
-        assert self.max_lag < dur, "max_lag (%ss) must be shorter than duration (%ss)" % (self.max_lag,dur)
-        try:
-            self.check()
-        except HopperActiveError as e:
-            self.solenoid.write(False)
-            raise HopperAlreadyUpError(e)
+        assert self.max_lag < dur, \
+            "max_lag (%ss) must be shorter than duration (%ss)" % (self.max_lag, dur)
+        if self.check():
+            self._actuate_down()
+            raise HopperAlreadyUpError
         feed_time = self.up()
         utils.wait(dur)
         feed_over = self.down()
         feed_duration = feed_over - feed_time
-        return (feed_time,feed_duration)
+        return (feed_time, feed_duration)
 
-    def reward(self,value=2.0):
-        """wrapper for `feed`, passes *value* into *dur* """
+    def reward(self, value=2.0):
+        """Wrapper for `feed`, passes *value* as *dur*."""
         return self.feed(dur=value)
 
 ## Peck Port ##

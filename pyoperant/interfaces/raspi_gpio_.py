@@ -19,27 +19,22 @@ import time
 import pigpio
 
 PCA9685_ADDRESS = 0x55
+PCA9685_SERVO_ADDRESS = 0x4A
 
 class PWM:
 
    """
    This class provides an interface to the I2C PCA9685 PWM chip.
-
    The chip provides 16 PWM channels.
-
    All channels use the same frequency which may be set in the
    range 24 to 1526 Hz.
-
    If used to drive servos the frequency should normally be set
-   in the range 50 to 60 Hz.
-
-   The duty cycle for each channel may be independently set
-   between 0 and 100%.
-
+   in the range 50 to 60 Hz.  For lights, the frequency should
+   be 1000 Hz. The duty cycle for each channel may be 
+   independently set between 0 and 100%.
    It is also possible to specify the desired pulse width in
    microseconds rather than the duty cycle.  This may be more
    convenient when the chip is used to drive servos.
-
    The chip has 12 bit resolution, i.e. there are 4096 steps
    between off and full on.
    """
@@ -192,9 +187,12 @@ class RaspberryPiInterface(base_.BaseInterface):
     def open(self):
         logger.debug("Opening device %s")
         #GPIO.setmode(GPIO.BCM)
-        # Setup PWM
+        # Setup lights PWM chip (PCB schematic U1, address 0x55) at 1000 Hz
         self.pwm = PWM(self.pi, address=PCA9685_ADDRESS)
-        self.pwm.set_frequency(1000) #used to be 240
+        self.pwm.set_frequency(1000)
+        # Setup servo PWM chip (PCB schematic U7, address 0x4A) at 50 Hz
+        self.pwm_servo = PWM(self.pi, address=PCA9685_SERVO_ADDRESS)
+        self.pwm_servo.set_frequency(50)
 
 
     def close(self):
@@ -223,8 +221,11 @@ class RaspberryPiInterface(base_.BaseInterface):
         else:
             self.pi.write(channel, 0)
 
-    def _write_pwm(self, channel, value, **kwargs):
-        self.pwm.set_duty_cycle(channel, value)
+    def _write_pwm(self, channel, value, servo=False, **kwargs):
+        if servo:
+            self.pwm_servo.set_duty_cycle(channel, value)
+        else:
+            self.pwm.set_duty_cycle(channel, value)
         return value
 
     def _poll2(self, channel, timeout=None, suppress_longpress=True, **kwargs):
