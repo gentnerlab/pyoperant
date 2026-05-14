@@ -18,9 +18,6 @@ import time
 
 import pigpio
 
-PCA9685_ADDRESS = 0x55
-PCA9685_SERVO_ADDRESS = 0x4A
-
 class PWM:
 
    """
@@ -62,7 +59,9 @@ class PWM:
    _OCH    = 1<<3
    _OUTDRV = 1<<2
 
-   def __init__(self, pi, bus=1, address=0x40):
+   def __init__(self, pi, bus=1, address=None):
+      if address is None:
+         raise InterfaceError("PWM address must be specified explicitly")
 
       self.pi = pi
       self.bus = bus
@@ -161,10 +160,19 @@ class PWM:
 class RaspberryPiInterface(base_.BaseInterface):
     """ Opens Raspberry Pi GPIO ports for operant interface """
 
-    def __init__(self, device_name, inputs=None, outputs=None,  *args, **kwargs):
+    def __init__(self, device_name, inputs=None, outputs=None,
+                 lights_address=None,
+                 servo_address=None,
+                 *args, **kwargs):
         super(RaspberryPiInterface, self).__init__(*args, **kwargs)
 
         self.device_name = device_name
+
+        if lights_address is None:
+            raise InterfaceError("lights_address must be specified explicitly (e.g. LIGHTS_PCA9685_ADDRESS in local_pi_revd.py)")
+
+        self.lights_address = lights_address
+        self.servo_address = servo_address  # None on Rev C — faults if servo PWM is attempted
         self.pi = pigpio.pi(port=7777)
 
         if not self.pi.connected:
@@ -186,13 +194,15 @@ class RaspberryPiInterface(base_.BaseInterface):
 
     def open(self):
         logger.debug("Opening device %s")
-        #GPIO.setmode(GPIO.BCM)
-        # Setup lights PWM chip (PCB schematic U1, address 0x55) at 1000 Hz
-        self.pwm = PWM(self.pi, address=PCA9685_ADDRESS)
+        # Setup lights PWM chip (PCB schematic U1) at 1000 Hz
+        self.pwm = PWM(self.pi, address=self.lights_address)
         self.pwm.set_frequency(1000)
-        # Setup servo PWM chip (PCB schematic U7, address 0x4A) at 50 Hz
-        self.pwm_servo = PWM(self.pi, address=PCA9685_SERVO_ADDRESS)
-        self.pwm_servo.set_frequency(50)
+        # Setup servo PWM chip (PCB schematic U7) at 50 Hz — Rev D only
+        if self.servo_address is not None:
+            self.pwm_servo = PWM(self.pi, address=self.servo_address)
+            self.pwm_servo.set_frequency(50)
+        else:
+            self.pwm_servo = None
 
 
     def close(self):
@@ -211,7 +221,7 @@ class RaspberryPiInterface(base_.BaseInterface):
                 v = self.pi.read(channel)
                 break
             except:
-                RaspberryPiException("Could not read GPIO")
+                raise InterfaceError("Could not read GPIO channel %s" % channel)
 
         return v == 1
 
@@ -223,6 +233,8 @@ class RaspberryPiInterface(base_.BaseInterface):
 
     def _write_pwm(self, channel, value, servo=False, **kwargs):
         if servo:
+            if self.pwm_servo is None:
+                raise InterfaceError("servo PWM requested but no servo_address was provided — is this a Rev C board?")
             self.pwm_servo.set_duty_cycle(channel, value)
         else:
             self.pwm.set_duty_cycle(channel, value)

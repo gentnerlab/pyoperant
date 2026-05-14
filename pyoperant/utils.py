@@ -104,10 +104,9 @@ def run_state_machine(start_in='pre', error_state=None, error_callback=None, **s
         except Exception, e:
             if error_callback:
                 error_callback(e)
-                raise
+                state = error_state
             else:
                 raise
-            state = error_state
 
 
 class Trial(Event):
@@ -249,7 +248,7 @@ def check_time(schedule,fmt="%H:%M"):
             return True
     else:
         for epoch in schedule:
-            assert len(epoch) is 2
+            assert len(epoch) == 2
             now = dt.datetime.time(dt.datetime.now())
             start = dt.datetime.time(dt.datetime.strptime(epoch[0],fmt))
             end = dt.datetime.time(dt.datetime.strptime(epoch[1],fmt))

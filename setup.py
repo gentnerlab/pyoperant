@@ -27,6 +27,7 @@ setup(
         'scripts/behave',
         'scripts/pyoperantctl',
         'scripts/mutate_config_file',
+        'scripts/tune_servo.py',
         ],
     license = "BSD",
     classifiers = [

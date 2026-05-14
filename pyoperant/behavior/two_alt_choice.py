@@ -246,11 +246,11 @@ class TwoAltChoiceExp(base.BaseExp):
                                 index=index,
                                 class_=self.trials[-1].class_)
             for ev in self.trials[-1].events:
-                if ev.label is 'wav':
+                if ev.label == 'wav':
                     trial.events.append(copy.copy(ev))
                     trial.stimulus_event = trial.events[-1]
                     trial.stimulus = trial.stimulus_event.name
-                elif ev.label is 'motif':
+                elif ev.label == 'motif':
                     trial.events.append(copy.copy(ev))
             self.log.debug("correction trial: class is %s" % trial.class_)
         else:
@@ -484,7 +484,7 @@ class TwoAltChoiceExp(base.BaseExp):
         if self.this_trial.response==self.parameters['classes'][self.this_trial.class_]['component']:
             self.this_trial.correct = True
 
-            if self.parameters['reinforcement']['secondary']:
+            if self.parameters.get('reinforcement', {}).get('secondary', False):
                 secondary_reinf_event = self.secondary_reinforcement()
                 # self.this_trial.events.append(secondary_reinf_event)
 
@@ -541,7 +541,7 @@ class TwoAltChoiceExp(base.BaseExp):
             self.summary['hopper_already_up'] += 1
             self.log.warning("hopper already up on panel %s" % str(err))
             utils.wait(self.parameters['classes'][self.this_trial.class_]['reward_value'])
-            #self.panel.reset()
+            self.panel.reset()
 
         except components.HopperWontComeUpError as err:
             self.this_trial.reward = 'error'
@@ -561,7 +561,7 @@ class TwoAltChoiceExp(base.BaseExp):
             self.this_trial.reward = 'error'
             self.summary['hopper_wont_go_down'] += 1
             self.log.warning("hopper didn't go down on panel %s" % str(err))
-            #self.panel.reset()
+            self.panel.reset()
 
         finally:
             self.panel.house_light.on()

@@ -1,7 +1,7 @@
 """
 local_pi_revd.py -- Panel configuration for Magpi client Rev D boards.
 
-Rev D boards use a servo-driven hopper on PCA9685 U7 (I2C address 0x4A).
+Rev D boards use a servo-driven hopper on PCA9685 U7 (I2C address 0x45).
 The hopper servo channel is defined by HOPPER_SERVO_CHANNEL (channel 0,
 HOPPER_CTL). The second PCA9685 runs at 50 Hz. The lights PCA9685 (U1) is
 at address 0x55 and runs at 1000 Hz as before.
@@ -16,6 +16,10 @@ from pyoperant import hwio, components, panels, utils
 from pyoperant.interfaces import raspi_gpio_, pyaudio_
 from pyoperant import InterfaceError
 import time
+
+# PCA9685 I2C addresses — must match hardware address pin wiring on the board
+LIGHTS_PCA9685_ADDRESS = 0x55  # U1: A0, A2, A4 pulled high
+SERVO_PCA9685_ADDRESS  = 0x45  # U7: A0, A2 pulled high
 
 INPUTS = [5,   # Hopper IR
           6,   # Left IR
@@ -69,8 +73,11 @@ class PiPanel(panels.BasePanel):
         # define interfaces
         # RaspberryPiInterface initialises both PCA9685 chips on Rev D:
         #   self.pwm       — U1 at 0x55, 1000 Hz (lights)
-        #   self.pwm_servo — U7 at 0x4A, 50 Hz  (servo)
-        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='pi')
+        #   self.pwm_servo — U7 at 0x45, 50 Hz  (servo)
+        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(
+            device_name='pi',
+            lights_address=LIGHTS_PCA9685_ADDRESS,
+            servo_address=SERVO_PCA9685_ADDRESS)
         self.interfaces['pyaudio'] = pyaudio_.PyAudioInterface()
 
         # define inputs
@@ -83,7 +90,7 @@ class PiPanel(panels.BasePanel):
             self.pwm_outputs.append(hwio.PWMOutput(interface=self.interfaces['raspi_gpio_'],
                                                    params={'channel': pwm_out_chan}))
 
-        # Servo output — hopper on HOPPER_SERVO_CHANNEL, routed to U7 at 0x4A via servo=True
+        # Servo output — hopper on HOPPER_SERVO_CHANNEL, routed to U7 at 0x45 via servo=True
         self.hopper_servo = hwio.PWMOutput(interface=self.interfaces['raspi_gpio_'],
                                            params={'channel': HOPPER_SERVO_CHANNEL, 'servo': True})
 
@@ -100,7 +107,6 @@ class PiPanel(panels.BasePanel):
         #                      4=LFT_LED, 5=CTR_LED, 6=RGT_LED,
         #                      7=AUX_LED_1, 8=AUX_LED_2, 9=AUX_LED_3, 10=AUX_LED_4,
         #                      11=RGB_CUE_R, 12=RGB_CUE_G, 13=RGB_CUE_B
-        self.left   = components.PeckPort(IR=self.inputs[1], LED=self.pwm_outputs[4],
                                           name='l', inverted=True)
         self.center = components.PeckPort(IR=self.inputs[2], LED=self.pwm_outputs[5],
                                           name='c', inverted=True)
@@ -121,7 +127,7 @@ class PiPanel(panels.BasePanel):
                     self.pwm_outputs[2],
                     self.pwm_outputs[3]])
 
-        # RGB cue light (PWM channels 13/14/15 = indices 11/12/13)
+        # RGB cue light (pwm_outputs[11]=RGB_CUE_R, [12]=RGB_CUE_G, [13]=RGB_CUE_B — PCA9685 channels 13/14/15)
         self.cue = components.RGBLight(red=self.pwm_outputs[11],
                                        green=self.pwm_outputs[12],
                                        blue=self.pwm_outputs[13],

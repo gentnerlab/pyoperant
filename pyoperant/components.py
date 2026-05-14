@@ -242,7 +242,7 @@ class PeckPort(BaseComponent):
         if isinstance(LED,hwio.BooleanOutput):
             self.LED = LED
             self.LEDtype = "boolean"
-        if isinstance(LED, hwio.PWMOutput):
+        elif isinstance(LED, hwio.PWMOutput):
             self.LED = LED
             self.LEDtype = "pwm"
         else:
@@ -416,15 +416,15 @@ class RGBLight(BaseComponent):
     """
     def __init__(self,red,green,blue,*args,**kwargs):
         super(RGBLight, self).__init__(*args,**kwargs)
-        if isinstance(red,hwio.BooleanOutput):
+        if isinstance(red, (hwio.BooleanOutput, hwio.PWMOutput)):
             self._red = red
         else:
             raise ValueError('%s is not an output channel' % red)
-        if isinstance(green,hwio.BooleanOutput):
+        if isinstance(green, (hwio.BooleanOutput, hwio.PWMOutput)):
             self._green = green
         else:
             raise ValueError('%s is not an output channel' % green)
-        if isinstance(blue,hwio.BooleanOutput):
+        if isinstance(blue, (hwio.BooleanOutput, hwio.PWMOutput)):
             self._blue = blue
         else:
             raise ValueError('%s is not an output channel' % blue)

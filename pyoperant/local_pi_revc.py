@@ -12,6 +12,10 @@ from pyoperant.interfaces import raspi_gpio_, pyaudio_
 from pyoperant import InterfaceError
 import time
 
+# PCA9685 I2C address — must match hardware address pin wiring on the board.
+# Rev C has one PCA9685 (lights only). No servo chip.
+LIGHTS_PCA9685_ADDRESS = 0x55  # U1: A0, A2, A4 pulled high
+
 INPUTS = [5,   # Hopper IR
           6,   # Left IR
           13,  # Center IR
@@ -54,7 +58,10 @@ class PiPanel(panels.BasePanel):
         self.pwm_outputs = []
 
         # define interfaces
-        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='pi')
+        self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(
+            device_name='pi',
+            lights_address=LIGHTS_PCA9685_ADDRESS)
+        # servo_address not passed — Rev C has no servo chip
         self.interfaces['pyaudio'] = pyaudio_.PyAudioInterface()
 
         # define inputs

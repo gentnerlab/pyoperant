@@ -45,7 +45,7 @@ class BaseExp(object):
                  stim_path='',
                  subject='',
                  panel=None,
-                 log_handlers=[],
+                 log_handlers=None,
                  *args, **kwargs):
         super(BaseExp,  self).__init__()
 
@@ -66,14 +66,15 @@ class BaseExp(object):
         self.parameters['subject'] = subject
 
         # configure logging
-        self.parameters['log_handlers'] = log_handlers
+        self.parameters['log_handlers'] = log_handlers if log_handlers is not None else []
         self.log_config()
 
         self.req_panel_attr= ['house_light',
                               'reset',
                               ]
         self.panel = panel
-        self.log.debug('panel %s initialized' % self.parameters['panel_name'])
+        if 'panel_name' in self.parameters:
+            self.log.debug('panel %s initialized' % self.parameters['panel_name'])
 
         if 'shape' not in self.parameters or self.parameters['shape'] not in ['block1', 'block2', 'block3', 'block4', 'block5']:
             self.parameters['shape'] = None

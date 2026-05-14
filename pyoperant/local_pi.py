@@ -15,7 +15,7 @@ INPUTS = [5,  # Hopper IR
           10, # IR 6
           ]
 
-OUTPUTS = [16, # Hopper Trigger
+OUTPUTS = [
           ]
 
 
@@ -60,6 +60,10 @@ class PiPanel(panels.BasePanel):
             self.pwm_outputs.append(hwio.PWMOutput(interface=self.interfaces['raspi_gpio_'],
                                                   params = {'channel': pwm_out_chan}))
 
+        # Servo output for hopper (channel 0 on servo PCA9685, U7 at 0x4A)
+        self.hopper_servo = hwio.PWMOutput(interface=self.interfaces['raspi_gpio_'],
+                                           params = {'channel': 0, 'servo': True})
+
         self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
 
         # assemble inputs into components
@@ -68,8 +72,9 @@ class PiPanel(panels.BasePanel):
         self.center = components.PeckPort(IR=self.inputs[2],LED=self.pwm_outputs[5],name='c', inverted=False)
         self.right = components.PeckPort(IR=self.inputs[3],LED=self.pwm_outputs[6],name='r', inverted=False)
         
-        # Hopper
-        self.hopper = components.Hopper(IR=self.inputs[0],solenoid=self.outputs[0], inverted=True)
+        # Hopper — up_angle and down_angle must be tuned per panel
+        self.hopper = components.Hopper(IR=self.inputs[0], servo=self.hopper_servo,
+                                        up_angle=7.5, down_angle=2.5, inverted=True)
 
 
         # House Light
@@ -82,10 +87,8 @@ class PiPanel(panels.BasePanel):
         self.punish = self.house_light.punish
 
     def reset(self):
-        for output in self.outputs:
-            output.write(False)
-        self.house_light.on()
         self.hopper.down()
+        self.house_light.on()
         # self.speaker.stop()
 
     def test(self):
@@ -120,7 +123,7 @@ BEHAVIORS = ['pyoperant.behavior',
              'glab_behaviors'
             ]
 
-DATA_PATH = '/home/pi/opdat/'
+DATAPATH = '/home/pi/opdat/'
 
 # SMTP_CONFIG
 
