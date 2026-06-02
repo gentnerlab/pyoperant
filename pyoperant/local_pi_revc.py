@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 local_pi_revc.py -- Panel configuration for Magpi client Rev C boards.
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from pyoperant import hwio, components, panels, utils
 from pyoperant.interfaces import raspi_gpio_, pyaudio_ 
 from pyoperant import InterfaceError

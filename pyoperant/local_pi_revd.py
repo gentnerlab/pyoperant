@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 local_pi_revd.py -- Panel configuration for Magpi client Rev D boards.
 
@@ -107,6 +108,7 @@ class PiPanel(panels.BasePanel):
         #                      4=LFT_LED, 5=CTR_LED, 6=RGT_LED,
         #                      7=AUX_LED_1, 8=AUX_LED_2, 9=AUX_LED_3, 10=AUX_LED_4,
         #                      11=RGB_CUE_R, 12=RGB_CUE_G, 13=RGB_CUE_B
+        self.left = components.PeckPort(IR=self.inputs[1], LED=self.pwm_outputs[4],
                                           name='l', inverted=True)
         self.center = components.PeckPort(IR=self.inputs[2], LED=self.pwm_outputs[5],
                                           name='c', inverted=True)
@@ -144,14 +146,74 @@ class PiPanel(panels.BasePanel):
     def test(self):
         self.reset()
         dur = 2.0
-        self.reset()
-        self.reward(value=dur)
-        self.punish(value=dur)
-        self.speaker.queue('/home/pi/test.wav')
-        self.speaker.play()
-        time.sleep(1.0)
-        self.speaker.stop()
-        return True
+        results = {}
+
+        # House light: off then back on
+        try:
+            self.house_light.off()
+            time.sleep(dur)
+            self.house_light.on()
+            time.sleep(dur)
+            results['house_light'] = 'PASS'
+        except Exception as e:
+            results['house_light'] = 'FAIL (%s)' % e
+
+        # RGB cue light: cycle through each color
+        try:
+            for color_fn, label in [(self.cue.red, 'red'), (self.cue.green, 'green'), (self.cue.blue, 'blue')]:
+                color_fn()
+                time.sleep(dur)
+            self.cue.off()
+            results['cue_light'] = 'PASS'
+        except Exception as e:
+            results['cue_light'] = 'FAIL (%s)' % e
+
+        # Peck port LEDs and IR sensors
+        for port, name in [(self.left, 'left'), (self.center, 'center'), (self.right, 'right')]:
+            # LED
+            try:
+                port.on()
+                time.sleep(dur)
+                port.off()
+                time.sleep(0.5)
+                results['%s_LED' % name] = 'PASS'
+            except Exception as e:
+                results['%s_LED' % name] = 'FAIL (%s)' % e
+            # IR sensor — beam should be clear when port is empty
+            try:
+                ir_blocked = port.status()
+                results['%s_IR' % name] = 'PASS (clear)' if not ir_blocked else 'FAIL (beam blocked)'
+            except Exception as e:
+                results['%s_IR' % name] = 'FAIL (%s)' % e
+
+        # Hopper reward and punish
+        try:
+            self.reward(value=dur)
+            self.punish(value=dur)
+            results['hopper'] = 'PASS'
+        except Exception as e:
+            results['hopper'] = 'FAIL (%s)' % e
+
+        # Speaker
+        try:
+            self.speaker.queue('/home/pi/test.wav')
+            self.speaker.play()
+            time.sleep(1.0)
+            self.speaker.stop()
+            results['speaker'] = 'PASS'
+        except Exception as e:
+            results['speaker'] = 'FAIL (%s)' % e
+
+        # Summary
+        print('\n--- Panel test results ---')
+        all_passed = True
+        for component, result in results.items():
+            print('  %-20s %s' % (component, result))
+            if not result.startswith('PASS'):
+                all_passed = False
+        print('--------------------------\n')
+
+        return all_passed
 
 
 class Pi1(PiPanel):

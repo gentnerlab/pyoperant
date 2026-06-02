@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import datetime
 from pyoperant import hwio, utils, ComponentError
 import logging
