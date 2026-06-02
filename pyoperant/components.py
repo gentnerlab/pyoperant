@@ -52,11 +52,11 @@ class Hopper(BaseComponent):
         PWM output channel for a servo-driven hopper (pass servo=True in
         params). Mutually exclusive with `solenoid`.
     up_angle : float, optional
-        PWM duty cycle (%) to move the servo to the raised position. Required
-        when using `servo`. Must be tuned per-panel in local_pi.py.
+        Angle in degrees (0-300) to move the servo to the raised position.
+        Required when using `servo`. Must be tuned per-panel in local_pi.py.
     down_angle : float, optional
-        PWM duty cycle (%) to move the servo to the lowered position. Required
-        when using `servo`. Must be tuned per-panel in local_pi.py.
+        Angle in degrees (0-300) to move the servo to the lowered position.
+        Required when using `servo`. Must be tuned per-panel in local_pi.py.
     max_lag : float, optional
         Seconds to wait for the IR beam to confirm position (default=0.3).
     inverted : bool, optional
@@ -71,7 +71,7 @@ class Hopper(BaseComponent):
     Servo hopper (Rev D Magpi boards)::
 
         hopper = Hopper(IR=ir_input, servo=pwm_output,
-                        up_angle=7.5, down_angle=2.5, inverted=True)
+                        up_angle=45, down_angle=10, inverted=True)
     """
     def __init__(self, IR, solenoid=None, servo=None, up_angle=None,
                  down_angle=None, max_lag=0.3, inverted=False, *args, **kwargs):

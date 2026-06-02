@@ -118,9 +118,9 @@ class PiPanel(panels.BasePanel):
         # Servo hopper — up_angle and down_angle must be tuned per panel
         self.hopper = components.Hopper(IR=self.inputs[0],
                                         servo=self.hopper_servo,
-                                        up_angle=7.5,
-                                        down_angle=2.5,
-                                        inverted=True)
+                                        up_angle=45,
+                                        down_angle=10,
+                                        inverted=False)
 
         # House Light (RGBW LED strip via PWM channels 0-3)
         self.house_light = components.LEDStripHouseLight(

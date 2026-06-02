@@ -57,7 +57,7 @@ def main():
     ir = hwio.BooleanInput(interface=raspi, params={'channel': INPUTS[0]})
 
     print("Controls:")
-    print("  Enter a number (0.0 - 100.0) to move the servo to that duty cycle")
+    print("  Enter a number (0.0 - 300.0) to move the servo to that angle in degrees")
     print("  'u'  = move to current up_angle")
     print("  'd'  = move to current down_angle")
     print("  'su' = set current angle as up_angle")
@@ -73,7 +73,7 @@ def main():
     def read_ir():
         """Read IR beam. Returns True if beam is broken (hopper up, inverted=True sensor)."""
         raw = ir.read()
-        broken = not raw  # inverted=True: low = broken
+        broken = raw  # high = beam broken (hopper up)
         print("  IR beam: %s (raw=%s)" % ("BROKEN (hopper up)" if broken else "CLEAR (hopper down)", raw))
         return broken
 
@@ -89,7 +89,7 @@ def main():
                 if down_angle is not None:
                     prompt += " down=%.1f" % down_angle
                 prompt += "]"
-            cmd = input("\n%s > " % prompt).strip().lower()
+            cmd = raw_input("\n%s > " % prompt).strip().lower()
         except (KeyboardInterrupt, EOFError):
             cmd = 'q'
 
@@ -157,8 +157,8 @@ def main():
         else:
             try:
                 angle = float(cmd)
-                if not 0.0 <= angle <= 100.0:
-                    print("  Value must be between 0.0 and 100.0")
+                if not 0.0 <= angle <= 300.0:
+                    print("  Value must be between 0.0 and 300.0 degrees")
                     continue
                 print("  Moving to %.1f..." % angle)
                 move(angle)

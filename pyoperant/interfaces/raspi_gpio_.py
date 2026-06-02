@@ -174,7 +174,7 @@ class RaspberryPiInterface(base_.BaseInterface):
 
         self.lights_address = lights_address
         self.servo_address = servo_address  # None on Rev C — faults if servo PWM is attempted
-        self.pi = pigpio.pi(port=7777)
+        self.pi = pigpio.pi()
 
         if not self.pi.connected:
             logger.debug("PIGPIO Not Connected...")
@@ -236,7 +236,10 @@ class RaspberryPiInterface(base_.BaseInterface):
         if servo:
             if self.pwm_servo is None:
                 raise InterfaceError("servo PWM requested but no servo_address was provided — is this a Rev C board?")
-            self.pwm_servo.set_duty_cycle(channel, value)
+            # value is in degrees (0-300) for goBILDA 2000-0025-0002:
+            # 0 deg = 500 us, 300 deg = 2500 us
+            pulse_us = 500.0 + (value / 300.0) * 2000.0
+            self.pwm_servo.set_pulse_width(channel, pulse_us)
         else:
             self.pwm.set_duty_cycle(channel, value)
         return value
