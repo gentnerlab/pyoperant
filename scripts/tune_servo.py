@@ -71,7 +71,7 @@ def main():
     current_angle = None
 
     def read_ir():
-        """Read IR beam. Returns True if beam is broken (hopper up, inverted=True sensor)."""
+        """Read IR beam. Returns True if beam is broken (hopper up). High = broken on Rev D."""
         raw = ir.read()
         broken = raw  # high = beam broken (hopper up)
         print("  IR beam: %s (raw=%s)" % ("BROKEN (hopper up)" if broken else "CLEAR (hopper down)", raw))
