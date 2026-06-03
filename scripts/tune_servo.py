@@ -178,7 +178,7 @@ def main():
         print("                                  servo=self.hopper_servo,")
         print("                                  up_angle=%.1f," % up_angle)
         print("                                  down_angle=%.1f," % down_angle)
-        print("                                  inverted=True)")
+        print("                                  inverted=False)")
     else:
         print("No final angles recorded.")
 
