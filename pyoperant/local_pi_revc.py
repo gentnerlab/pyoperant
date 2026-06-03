@@ -118,21 +118,6 @@ class PiPanel(panels.BasePanel):
         self.hopper.down()
         self.house_light.on()
 
-    def test(self):
-        self.reset()
-        dur = 2.0
-        for output in self.outputs:
-            output.write(True)
-            utils.wait(dur)
-            output.write(False)
-        self.reset()
-        self.reward(value=dur)
-        self.punish(value=dur)
-        self.speaker.queue('/home/pi/test.wav')
-        self.speaker.play()
-        time.sleep(1.0)
-        self.speaker.stop()
-        return True
 
 
 class Pi1(PiPanel):

@@ -74,7 +74,7 @@ class Hopper(BaseComponent):
                         up_angle=45, down_angle=10, inverted=True)
     """
     def __init__(self, IR, solenoid=None, servo=None, up_angle=None,
-                 down_angle=None, max_lag=0.3, inverted=False, *args, **kwargs):
+                 down_angle=None, max_lag=None, inverted=False, *args, **kwargs):
         super(Hopper, self).__init__(*args, **kwargs)
 
         # validate: exactly one actuator must be supplied
@@ -87,7 +87,12 @@ class Hopper(BaseComponent):
             raise ValueError('%s is not an input channel' % IR)
         self.IR = IR
         self.inverted = bool(inverted)
-        self.max_lag = max_lag
+        if max_lag is not None:
+            self.max_lag = max_lag
+        elif servo is not None:
+            self.max_lag = 1.0  # servos are slower than solenoids
+        else:
+            self.max_lag = 0.3
 
         if solenoid is not None:
             if not isinstance(solenoid, hwio.BooleanOutput):
@@ -148,13 +153,13 @@ class Hopper(BaseComponent):
             The hopper did not raise within max_lag seconds.
         """
         self._actuate_up()
-        time_up = self.IR.poll(timeout=self.max_lag)
-
-        if time_up is None:  # poll timed out — beam never tripped
-            self._actuate_down()  # safety: return to down position
-            raise HopperWontComeUpError
-        else:
-            return time_up
+        start = time.time()
+        while time.time() - start < self.max_lag:
+            if self.check():
+                return datetime.datetime.now()
+            time.sleep(0.05)
+        self._actuate_down()  # safety: return to down position
+        raise HopperWontComeUpError
 
     def down(self):
         """Lower the hopper.
