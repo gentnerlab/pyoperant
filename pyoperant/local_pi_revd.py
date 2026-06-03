@@ -109,11 +109,11 @@ class PiPanel(panels.BasePanel):
         #                      7=AUX_LED_1, 8=AUX_LED_2, 9=AUX_LED_3, 10=AUX_LED_4,
         #                      11=RGB_CUE_R, 12=RGB_CUE_G, 13=RGB_CUE_B
         self.left = components.PeckPort(IR=self.inputs[1], LED=self.pwm_outputs[4],
-                                          name='l', inverted=True)
+                                          name='l', inverted=False)
         self.center = components.PeckPort(IR=self.inputs[2], LED=self.pwm_outputs[5],
-                                          name='c', inverted=True)
+                                          name='c', inverted=False)
         self.right  = components.PeckPort(IR=self.inputs[3], LED=self.pwm_outputs[6],
-                                          name='r', inverted=True)
+                                          name='r', inverted=False)
 
         # Servo hopper — up_angle and down_angle must be tuned per panel
         self.hopper = components.Hopper(IR=self.inputs[0],

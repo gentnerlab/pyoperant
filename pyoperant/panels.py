@@ -1,5 +1,6 @@
- ## Panel classes
 import time
+
+## Panel classes
 
 class BasePanel(object):
     """Returns a panel instance.
@@ -126,6 +127,7 @@ class BasePanel(object):
         # ------------------------------------------------------------------
         print('\n=== Phase 2: User confirmation ===')
 
+        #check the houselight
         print('\nHouse light:')
         self.house_light.off()
         confirmed['house_light_off'] = 'CONFIRMED' if confirm('House light OFF -- confirm?') else 'FAIL'
@@ -138,6 +140,7 @@ class BasePanel(object):
        #     confirmed['cue_%s' % label] = 'CONFIRMED' if confirm('Cue light %s -- confirm?' % label) else 'FAIL'
        # self.cue.off()
 
+        #check the peck ports
         for port, name in [(self.left, 'left'), (self.center, 'center'), (self.right, 'right')]:
             print('\n%s peck port:' % name.capitalize())
             port.on()
@@ -158,14 +161,16 @@ class BasePanel(object):
                 confirmed['%s_IR' % name] = 'FAIL (no beam break detected)'
                 print('  %s IR: timed out -- no beam break detected' % name)
 
+        #check the  hopper
         print('\nHopper:')
         self.reward(value=dur)
         confirmed['hopper'] = 'CONFIRMED' if confirm('Hopper raised and lowered -- confirm?') else 'FAIL'
 
+        #check the audio ouput
         print('\nSpeaker:')
         self.speaker.queue('/home/pi/test.wav')
         self.speaker.play()
-        confirmed['speaker'] = 'CONFIRMED' if confirm('Sound played -- confirm?') else 'FAIL'
+        confirmed['speaker'] = 'CONFIRMED' if confirm('Is white noise playing? -- confirm to stop?') else 'FAIL'
         self.speaker.stop()
 
         # ------------------------------------------------------------------
