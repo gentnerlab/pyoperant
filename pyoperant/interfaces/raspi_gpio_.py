@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import time
 import datetime
 import logging
@@ -18,28 +19,20 @@ import time
 
 import pigpio
 
-PCA9685_ADDRESS = 0x55
-
 class PWM:
 
    """
    This class provides an interface to the I2C PCA9685 PWM chip.
-
    The chip provides 16 PWM channels.
-
    All channels use the same frequency which may be set in the
    range 24 to 1526 Hz.
-
    If used to drive servos the frequency should normally be set
-   in the range 50 to 60 Hz.
-
-   The duty cycle for each channel may be independently set
-   between 0 and 100%.
-
+   in the range 50 to 60 Hz.  For lights, the frequency should
+   be 1000 Hz. The duty cycle for each channel may be 
+   independently set between 0 and 100%.
    It is also possible to specify the desired pulse width in
    microseconds rather than the duty cycle.  This may be more
    convenient when the chip is used to drive servos.
-
    The chip has 12 bit resolution, i.e. there are 4096 steps
    between off and full on.
    """
@@ -67,7 +60,9 @@ class PWM:
    _OCH    = 1<<3
    _OUTDRV = 1<<2
 
-   def __init__(self, pi, bus=1, address=0x40):
+   def __init__(self, pi, bus=1, address=None):
+      if address is None:
+         raise InterfaceError("PWM address must be specified explicitly")
 
       self.pi = pi
       self.bus = bus
@@ -166,11 +161,20 @@ class PWM:
 class RaspberryPiInterface(base_.BaseInterface):
     """ Opens Raspberry Pi GPIO ports for operant interface """
 
-    def __init__(self, device_name, inputs=None, outputs=None,  *args, **kwargs):
+    def __init__(self, device_name, inputs=None, outputs=None,
+                 lights_address=None,
+                 servo_address=None,
+                 *args, **kwargs):
         super(RaspberryPiInterface, self).__init__(*args, **kwargs)
 
         self.device_name = device_name
-        self.pi = pigpio.pi(port=7777)
+
+        if lights_address is None:
+            raise InterfaceError("lights_address must be specified explicitly (e.g. LIGHTS_PCA9685_ADDRESS in local_pi_revd.py)")
+
+        self.lights_address = lights_address
+        self.servo_address = servo_address  # None on Rev C — faults if servo PWM is attempted
+        self.pi = pigpio.pi()
 
         if not self.pi.connected:
             logger.debug("PIGPIO Not Connected...")
@@ -191,10 +195,15 @@ class RaspberryPiInterface(base_.BaseInterface):
 
     def open(self):
         logger.debug("Opening device %s")
-        #GPIO.setmode(GPIO.BCM)
-        # Setup PWM
-        self.pwm = PWM(self.pi, address=PCA9685_ADDRESS)
-        self.pwm.set_frequency(1000) #used to be 240
+        # Setup lights PWM chip (PCB schematic U1) at 1000 Hz
+        self.pwm = PWM(self.pi, address=self.lights_address)
+        self.pwm.set_frequency(1000)
+        # Setup servo PWM chip (PCB schematic U7) at 50 Hz — Rev D only
+        if self.servo_address is not None:
+            self.pwm_servo = PWM(self.pi, address=self.servo_address)
+            self.pwm_servo.set_frequency(50)
+        else:
+            self.pwm_servo = None
 
 
     def close(self):
@@ -213,7 +222,7 @@ class RaspberryPiInterface(base_.BaseInterface):
                 v = self.pi.read(channel)
                 break
             except:
-                RaspberryPiException("Could not read GPIO")
+                raise InterfaceError("Could not read GPIO channel %s" % channel)
 
         return v == 1
 
@@ -223,8 +232,16 @@ class RaspberryPiInterface(base_.BaseInterface):
         else:
             self.pi.write(channel, 0)
 
-    def _write_pwm(self, channel, value, **kwargs):
-        self.pwm.set_duty_cycle(channel, value)
+    def _write_pwm(self, channel, value, servo=False, **kwargs):
+        if servo:
+            if self.pwm_servo is None:
+                raise InterfaceError("servo PWM requested but no servo_address was provided — is this a Rev C board?")
+            # value is in degrees (0-300) for goBILDA 2000-0025-0002:
+            # 0 deg = 500 us, 300 deg = 2500 us
+            pulse_us = 500.0 + (value / 300.0) * 2000.0
+            self.pwm_servo.set_pulse_width(channel, pulse_us)
+        else:
+            self.pwm.set_duty_cycle(channel, value)
         return value
 
     def _poll2(self, channel, timeout=None, suppress_longpress=True, **kwargs):

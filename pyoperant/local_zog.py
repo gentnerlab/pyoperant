@@ -130,16 +130,6 @@ class Zog8(ZogPanel):
     def __init__(self):
         super(Zog8, self).__init__(id=8)
 
-class Zog10(ZogPanel):
-    """Zog10 panel"""
-    def __init__(self):
-        super(Zog10, self).__init__(id=10)
-
-class Zog12(ZogPanel):
-    """Zog12 panel"""
-    def __init__(self):
-        super(Zog12, self).__init__(id=12)
-
 class Zog13(ZogPanel):
     """Zog13 panel"""
     def __init__(self):
