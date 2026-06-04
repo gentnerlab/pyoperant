@@ -89,7 +89,7 @@ def main():
                 if down_angle is not None:
                     prompt += " down=%.1f" % down_angle
                 prompt += "]"
-            cmd = raw_input("\n%s > " % prompt).strip().lower()
+            cmd = input("\n%s > " % prompt).strip().lower()
         except (KeyboardInterrupt, EOFError):
             cmd = 'q'
 

@@ -55,7 +55,7 @@ class BasePanel(object):
 
         def confirm(prompt):
             while True:
-                resp = raw_input('  %s (y/n): ' % prompt).strip().lower()
+                resp = input('  %s (y/n): ' % prompt).strip().lower()
                 if resp in ('y', 'n'):
                     return resp == 'y'
                 print('  Please enter y or n.')

@@ -7,7 +7,6 @@ import threading
 import traceback
 import shlex
 import os
-import string
 import random
 import datetime as dt
 import numpy as np
@@ -101,7 +100,7 @@ def run_state_machine(start_in='pre', error_state=None, error_callback=None, **s
     while state is not None:
         try:
             state = state_functions[state]()
-        except Exception, e:
+        except Exception as e:
             if error_callback:
                 error_callback(e)
                 state = error_state
@@ -147,7 +146,7 @@ class Command(object):
     output, error = '', ''
 
     def __init__(self, command):
-        if isinstance(command, basestring):
+        if isinstance(command, str):
             command = shlex.split(command)
         self.command = command
 
@@ -195,13 +194,13 @@ def parse_commandline(arg_str=sys.argv[1:]):
 
 def check_cmdline_params(parameters, cmd_line):
     # if someone is using red bands they should ammend the checks I perform here
-    allchars=string.maketrans('','')
-    nodigs=allchars.translate(allchars, string.digits)
-    if not ('box' not in cmd_line or cmd_line['box'] == int(parameters['panel_name'].encode('ascii','ignore').translate(allchars, nodigs))):
-        print "box number doesn't match config and command line"
+    def digits_only(s):
+        return ''.join(c for c in s if c.isdigit())
+    if not ('box' not in cmd_line or cmd_line['box'] == int(digits_only(parameters['panel_name']))):
+        print("box number doesn't match config and command line")
         return False
-    if not ('subj' not in cmd_line or int(cmd_line['subj'].encode('ascii','ignore').translate(allchars, nodigs)) == int(parameters['subject'].encode('ascii','ignore').translate(allchars, nodigs))):
-        print "subject number doesn't match config and command line"
+    if not ('subj' not in cmd_line or int(digits_only(cmd_line['subj'])) == int(digits_only(parameters['subject']))):
+        print("subject number doesn't match config and command line")
         return False
     return True
 

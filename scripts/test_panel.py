@@ -66,7 +66,7 @@ def main():
     print("Panel %d initialised.\n" % panel_id)
     print("Inspect the board before proceeding.")
     try:
-        resp = raw_input("Press Enter to begin the test, or Ctrl+C to abort: ")
+        resp = input("Press Enter to begin the test, or Ctrl+C to abort: ")
     except KeyboardInterrupt:
         print("\nAborted.")
         sys.exit(0)

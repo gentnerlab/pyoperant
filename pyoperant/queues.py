@@ -1,6 +1,6 @@
 import random
 from pyoperant.utils import rand_from_log_shape_dist
-import cPickle as pickle
+import pickle
 import numpy as np
 
 def random_queue(conditions,tr_max=100,weights=None):

@@ -23,16 +23,16 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
 
         """
         if not self.parameters['reduced_stims']:
-            mids = random.sample(xrange(self.num_stims), 3)
+            mids = random.sample(range(self.num_stims), 3)
         else:
-            mids = random.sample(xrange(2), 2) + random.sample(xrange(3), 1)
+            mids = random.sample(range(2), 2) + random.sample(range(3), 1)
 
         if trial_class == "L":
             mids[2] = mids[0]
         elif trial_class == "R":
             mids[2] = mids[1]
 
-        motif_names, motif_files = zip(*[self.parameters['stims'].items()[mid] for mid in mids])
+        motif_names, motif_files = zip(*[list(self.parameters['stims'].items())[mid] for mid in mids])
 
         motif_isi = [max(random.gauss(self.parameters['isi_mean'], self.parameters['isi_stdev']), 0.0) for mot in motif_names]
         motif_isi[-1] = 0.0
@@ -125,8 +125,8 @@ if __name__ == "__main__":
 
 
     if parameters['debug']:
-        print parameters
-        print PANELS
+        print(parameters)
+        print(PANELS)
 
     panel = PANELS[parameters['panel_name']]()
 
