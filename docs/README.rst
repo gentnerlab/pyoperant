@@ -30,7 +30,7 @@ Further, experimenters are able to integrate their behavioral protocols with oth
 Documentation
 -------------
 
-See the `pyoperant manual <https://github.com/gentnerlab/pyoperant/blob/master/pyoperant_manual_v16.docx>`_ in this repository for full documentation.
+See the `pyoperant manual <https://github.com/gentnerlab/pyoperant/blob/master/pyoperant_manual.docx>`_ in this repository for full documentation.
 
 PyOperant abstracts behavioral protocol logic from hardware interactions through a machine-specific configuration file. In the local.py configuration file, the experimenter defines the operant panels available for use. A Panel consists of a collection of Component objects and a set of standard methods to manipulate the Component. These Component objects are mirrors of their physical counterparts, such as a food hopper, response port, speaker, or house light.
 
