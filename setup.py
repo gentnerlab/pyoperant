@@ -1,44 +1,38 @@
-from distutils.core import setup, Extension
-import os
-import socket
-
-hnm = socket.gethostname()
-
-# def read(fname):
-#     return open(os.path.join(os.path.dirname(__file__), fname)).read()
-
-if 'zog' in hnm:
-    comedi_poll = Extension('comedi_poll',
-                    include_dirs = ['/usr/local/include'],
-                    libraries = ['comedi'],
-                    library_dirs = ['/usr/local/lib'],
-                    sources = ['src/comedi_poll.c'])
+from setuptools import setup
 
 setup(
-    name = 'pyoperant',
-    version = '0.1.2',
-    author = 'Justin Kiggins',
-    author_email = 'justin.kiggins@gmail.com',
-    description = 'hardware interface and controls for operant conditioning',
-    long_description = open('docs/README.rst', 'rt').read(),
-    packages = ['pyoperant'],
-    requires = ['pyephem','numpy'],
-    scripts = [
+    name='pyoperant',
+    version='0.1.2',
+    author='Justin Kiggins',
+    author_email='justin.kiggins@gmail.com',
+    maintainer='Timothy Gentner',
+    maintainer_email='tgentner@ucsd.edu',
+    description='hardware interface and controls for operant conditioning',
+    long_description=open('docs/README.rst', 'rt').read(),
+    packages=['pyoperant'],
+    install_requires=['ephem', 'numpy'],
+    python_requires='>=3.9',
+    scripts=[
         'scripts/behave',
         'scripts/pyoperantctl',
         'scripts/mutate_config_file',
         'scripts/tune_servo.py',
-        ],
-    license = "BSD",
-    classifiers = [
-        "Development Status :: 4 - Beta",
-        "Environment :: Console",
-        "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: GNU Affero General Public License v3",
-        "Natural Language :: English",
-        "Operating System :: Unix",
-        "Programming Language :: Python :: 2.7",
-        "Topic :: Scientific/Engineering",
-        ],
-#     ext_modules = [comedi_poll]
-    )
+        'scripts/test_panel.py',
+        'scripts/test_ir.py',
+    ],
+    license='BSD',
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Environment :: Console',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: BSD License',
+        'Natural Language :: English',
+        'Operating System :: Unix',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Topic :: Scientific/Engineering',
+    ],
+)
