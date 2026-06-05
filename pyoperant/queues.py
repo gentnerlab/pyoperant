@@ -67,6 +67,9 @@ class AdaptiveBase(object):
     def __iter__(self):
         return self
 
+    def __next__(self):
+        return self.next()
+
     def update(self, correct, no_resp):
         self.updated = True
         if no_resp:
