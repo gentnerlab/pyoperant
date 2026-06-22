@@ -2,6 +2,7 @@ import random
 import datetime as dt
 from pyoperant import panels
 from pyoperant import utils
+from pyoperant import components
 
 class Shaper(object):
     """
@@ -250,7 +251,11 @@ class Shaper(object):
     def reward(self, value, next_state):
         def temp():
             self.log.info('%d\t%d\t%s\t%s'%(self.recent_state, self.response_counter, self.last_response, dt.datetime.now().isoformat(' ')))
-            self.panel.reward(value=value)
+            try:
+                self.panel.reward(value=value)
+            except components.HopperWontComeUpError as err:
+                self.panel.reset()
+           
             return next_state
         return temp
 
