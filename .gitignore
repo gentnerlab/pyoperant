@@ -31,3 +31,10 @@ MANIFEST
 fabfile.py
 
 .DS_Store
+.claude/
+*.docx
+~$*
+download_packages.sh
+magpi_revd_setup.sh
+prep_sdcard.sh
+PYTHON3_MIGRATION.md
