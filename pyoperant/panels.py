@@ -113,7 +113,7 @@ class BasePanel(object):
 
         print('Testing speaker...')
         try:
-            self.speaker.queue('/home/pi/test.wav')
+            self.speaker.queue('/home/bird/test.wav')
             self.speaker.play()
             time.sleep(1.0)
             self.speaker.stop()
@@ -168,7 +168,7 @@ class BasePanel(object):
 
         #check the audio ouput
         print('\nSpeaker:')
-        self.speaker.queue('/home/pi/test.wav')
+        self.speaker.queue('/home/bird/test.wav')
         self.speaker.play()
         confirmed['speaker'] = 'CONFIRMED' if confirm('Is white noise playing? -- confirm to stop?') else 'FAIL'
         self.speaker.stop()

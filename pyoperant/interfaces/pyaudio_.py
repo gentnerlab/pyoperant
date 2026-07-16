@@ -1,3 +1,4 @@
+import os
 import pyaudio
 import wave
 import logging
@@ -26,7 +27,16 @@ class PyAudioInterface(base_.BaseInterface):
         self.open()
 
     def open(self):
-        self.pa = pyaudio.PyAudio()
+        # Suppress ALSA/JACK warnings from portaudio C library
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        old_stderr = os.dup(2)
+        os.dup2(devnull, 2)
+        os.close(devnull)
+        try:
+            self.pa = pyaudio.PyAudio()
+        finally:
+            os.dup2(old_stderr, 2)
+            os.close(old_stderr)
         #for index in range(self.pa.get_device_count()):
         #    if self.device_name == self.pa.get_device_info_by_index(index)['name']:
         #        self.device_index = index
