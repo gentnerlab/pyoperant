@@ -14,7 +14,7 @@ from pyoperant.errors import EndSession, EndBlock
 import math
 import types
 import time
-import pickle as cPickle
+import cPickle
 sys.path.append('/home/pi/')
 from sparray import *
 import sys
@@ -100,28 +100,28 @@ class text_markov(two_alt_choice.TwoAltChoiceExp):
             if np.random.binomial(1, self.parameters['prob_fixed_example']): # at some probability, make the model use a fixed example
                     # Choose which fixed example
                     if order == -1: # if this is a true sentence
-                        stim_dict["class"] =  self.parameters['reinforce_real_side']
+                        stim_dict[unicode("class", "utf-8")] =  self.parameters['reinforce_real_side']
                         seq = self.parameters['real_exemplars'][np.random.choice(self.parameters['n_exemplars'])] # chose a pregenerated real sequence
                     else:
-                        stim_dict["class"] = self.parameters['reinforce_markov_side']
+                        stim_dict[unicode("class", "utf-8")] = self.parameters['reinforce_markov_side']
                         seq = self.parameters['generated_exemplars'][np.random.choice(self.parameters['n_exemplars'])]  # choose a pregenerated fake sequence
             else:
                 if order == -1: # if this is a true sentence
-                    stim_dict["class"] =  self.parameters['reinforce_real_side'] # either L or R, this represents the reinforcement
+                    stim_dict[unicode("class", "utf-8")] =  self.parameters['reinforce_real_side'] # either L or R, this represents the reinforcement
                     seq = sentences[np.random.choice(len(sentences))]
                 else: # if this is a Markov generated sentence
-                    stim_dict["class"] = self.parameters['reinforce_markov_side']
+                    stim_dict[unicode("class", "utf-8")] = self.parameters['reinforce_markov_side']
                     sequence_length = sentence_lens[np.random.choice(len(sentence_lens))] # length of the sentence to be generated
                     seq = generate_MM_seq(sequence_length, MMs[:order+1], self.parameters['n_symbols'], use_tqdm=False)
             seq_str = '-'.join([str(i) for i in seq]) # create a string representing the sequence
-            stim_dict["stim_name"] = seq_str
-            stim_dict["seq"] = list(seq)
-            stim_dict["order"] = str(order)
+            stim_dict[unicode("stim_name", "utf-8")] = seq_str
+            stim_dict[unicode("seq", "utf-8")] = list(seq)
+            stim_dict[unicode("order", "utf-8")] = str(order)
             #self.sequences.append(seq)
             self.parameters["stims"][seq_str] = self.parameters["stim_path"] + str(trial_num) + '.wav'
             # generate the wav
 
-            stim_dict["syll_time_lens"] = self.build_wav(seq, self.parameters["stim_path"] + str(trial_num) + '.wav')
+            stim_dict[unicode("syll_time_lens", "utf-8")] = self.build_wav(seq, self.parameters["stim_path"] + str(trial_num) + '.wav')
 
 
             self.parameters["block_design"]["blocks"]["default"]["conditions"].append(stim_dict) # add to the list of stims

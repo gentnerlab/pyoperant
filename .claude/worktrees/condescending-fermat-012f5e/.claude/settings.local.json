@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"from pyoperant.behavior import place_pref_24hr\")",
+      "Read(//Users/tqg/Documents/GitHub/pyoperant/**)",
+      "Bash(2to3 pyoperant/local_pi_revd.py)",
+      "Bash(2to3 pyoperant/local_pi_revc.py)",
+      "Bash(2to3 scripts/tune_servo.py)",
+      "Bash(python3 -)",
+      "Bash(2to3 pyoperant/interfaces/raspi_gpio_.py pyoperant/local_pi_revd.py scripts/tune_servo.py)",
+      "Bash(2to3 pyoperant/local_pi_revd.py pyoperant/components.py)"
+    ]
+  }
+}
