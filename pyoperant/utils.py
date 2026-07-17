@@ -379,15 +379,16 @@ def get_num_open_fds():
     '''
     return the number of open file descriptors for current process
 
-    .. warning: will only work on Linux (reads /proc/self/fd). Previously
-    shelled out to lsof, which isn't installed on a minimal Raspberry Pi
-    OS image and isn't in this project's offline package set -- that
-    raised FileNotFoundError, which run_state_machine()'s error_callback
-    silently swallows unless the exception is InterfaceError/ComponentError,
-    so a session would fail on every single trial without any error in
-    the log.
+    .. warning: will only work on UNIX-like OSes with /dev/fd (Linux --
+    where /dev/fd is a standard symlink to /proc/self/fd -- and macOS,
+    used for dev-machine testing). Previously shelled out to lsof, which
+    isn't installed on a minimal Raspberry Pi OS image and isn't in this
+    project's offline package set -- that raised FileNotFoundError, which
+    run_state_machine()'s error_callback silently swallows unless the
+    exception is InterfaceError/ComponentError, so a session would fail
+    on every single trial without any error in the log.
     '''
-    return len(os.listdir('/proc/self/fd'))
+    return len(os.listdir('/dev/fd'))
 
 def rand_from_log_shape_dist(alpha=10):
     """
