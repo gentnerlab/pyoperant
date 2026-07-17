@@ -191,4 +191,8 @@ class BasePanel(object):
         print('\n  Overall: %s' % ('PASS' if all_passed else 'FAIL'))
         print('==========================\n')
 
+        # Leave panel in a safe state
+        self.house_light.off()
+        self.hopper.down()
+
         return all_passed
