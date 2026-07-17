@@ -130,7 +130,7 @@ class PlacePrefExp24hr(base.BaseExp):
         This creates a new csv file at experiment.data_csv and writes a header row
         with the fields in experiment.fields_to_save
         """
-        with open(self.data_csv, 'wb') as data_fh:
+        with open(self.data_csv, 'w', newline='') as data_fh:
             trialWriter = csv.writer(data_fh)
             trialWriter.writerow(self.fields_to_save)
 
@@ -443,7 +443,7 @@ class PlacePrefExp24hr(base.BaseExp):
             except AttributeError:
                 visit_dict[field] = visit.annotations[field] ## it might be in annotations for some reason
 
-        with open(self.data_csv, 'ab') as data_fh:
+        with open(self.data_csv, 'a', newline='') as data_fh:
             visitWriter = csv.DictWriter(data_fh, fieldnames = self.fields_to_save, extrasaction = 'ignore')
             visitWriter.writerow(visit_dict)
 

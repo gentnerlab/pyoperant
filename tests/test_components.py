@@ -10,19 +10,9 @@ import datetime
 import sys
 import os
 import unittest
+from unittest.mock import patch, Mock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-try:
-    from unittest.mock import patch, Mock, MagicMock
-except ImportError:
-    from mock import patch, Mock, MagicMock
-
-# pyoperant.utils has Python 2 print statements — stub it before importing
-# components so these tests run on Python 3 dev machines as well as the Pi.
-_mock_utils = MagicMock()
-_mock_utils.wait = Mock()
-sys.modules.setdefault('pyoperant.utils', _mock_utils)
 
 from pyoperant import hwio
 from pyoperant.components import (

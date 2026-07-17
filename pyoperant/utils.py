@@ -322,7 +322,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
 
     cursor = 0
     epochs = [] # list of file epochs
-    audio_data = ''
+    audio_data = b''
     with closing(wave.open(output_filename, 'wb')) as output:
         for input_filename, isi in input_file_list:
 
@@ -354,7 +354,7 @@ def concat_wav(input_file_list, output_filename='concat.wav'):
 
             # add isi
             if isi > 0.0:
-                isi_frames = ''.join([struct.pack('h', fr) for fr in [0]*int(fs*isi)])
+                isi_frames = b''.join([struct.pack('h', fr) for fr in [0]*int(fs*isi)])
                 audio_data += isi_frames
                 cursor += len(isi_frames)/params[1]
 
@@ -384,12 +384,12 @@ def get_num_open_fds():
 
     pid = os.getpid()
     procs = subprocess.check_output(
-        [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
+        [ "lsof", '-w', '-Ff', "-p", str( pid ) ], universal_newlines=True )
 
     nprocs = len(
-        filter(
+        list(filter(
             lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
-            procs.split( '\n' ) )
+            procs.split( '\n' ) ))
         )
     return nprocs
 

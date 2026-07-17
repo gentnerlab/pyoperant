@@ -66,7 +66,7 @@ class TargObjObj(two_alt_choice.TwoAltChoiceExp):
         repeats = self.parameters["repeats"]
         motif_seq = self.trials        
 
-      	for i in motif_seq:
+        for i in motif_seq:
           thisstim = []
 
           first_motif = int(random.randrange(0,molen,1))

@@ -4,9 +4,9 @@ import os
 hostname = socket.gethostname()
 
 if 'vogel' in hostname:
-    from local_vogel import *
+    from .local_vogel import *
 elif 'zog' in hostname:
-    from local_zog import *
+    from .local_zog import *
 elif 'magpi' in hostname:
     # Magpi Rev C and Rev D board revisions have different hardware
     # (solenoid vs servo hopper). To be sure we use the correct config,
@@ -28,9 +28,9 @@ elif 'magpi' in hostname:
         )
 
     if revision == 'revd':
-        from local_pi_revd import *
+        from .local_pi_revd import *
     elif revision == 'revc':
-        from local_pi_revc import *
+        from .local_pi_revc import *
     else:
         raise RuntimeError(
             "Unknown Magpi board revision '%s' in %s. "
