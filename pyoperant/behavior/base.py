@@ -326,3 +326,9 @@ class BaseExp(object):
     def log_error_callback(self, err):
         if err.__class__ is InterfaceError or err.__class__ is ComponentError:
             self.log.critical(str(err))
+        else:
+            # Previously silently discarded any error that wasn't
+            # InterfaceError/ComponentError, so a session could fail on
+            # every single trial (e.g. a bug in trial_pre()) with nothing
+            # in the log to explain why. Always log, with a traceback.
+            self.log.error("Unhandled exception: %s", err, exc_info=True)

@@ -264,13 +264,17 @@ class RaspberryPiInterface(base_.BaseInterface):
                     return None
 
     def _poll(self, channel, timeout=None, suppress_longpress=True, **kwargs):
-        date_fmt = '%Y-%m-%d %H:%M:%S.%f'
-        if timeout is not None:
-            start = time.time()
-        if self.pi.wait_for_edge(channel, pigpio.RISING_EDGE, timeout):
-            return datetime.datetime.now()
-        else:
-            return None
+        """ polls the input in a loop until it reads True (beam broken), or
+        times out. wait_for_edge()/pigpio callbacks proved unreliable on
+        this hardware (see Hopper.up(), which hit the same issue and was
+        switched to this same polling approach) -- missed edges rather
+        than a slow response, so we read the level directly instead. """
+        start = time.time()
+        while timeout is None or time.time() - start < timeout:
+            if self._read_bool(channel):
+                return datetime.datetime.now()
+            time.sleep(0.05)
+        return None
 
     def _callback(self, channel, func=None, **kwargs):
         date_fmt = '%Y-%m-%d %H:%M:%S.%f'
