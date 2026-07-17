@@ -72,7 +72,7 @@ class Hopper(BaseComponent):
     Servo hopper (Rev D Magpi boards)::
 
         hopper = Hopper(IR=ir_input, servo=pwm_output,
-                        up_angle=45, down_angle=10, inverted=True)
+                        up_angle=45, down_angle=10, inverted=False)
     """
     def __init__(self, IR, solenoid=None, servo=None, up_angle=None,
                  down_angle=None, max_lag=None, inverted=False, *args, **kwargs):

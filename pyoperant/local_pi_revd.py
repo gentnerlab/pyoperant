@@ -159,7 +159,7 @@ BEHAVIORS = ['pyoperant.behavior',
              'glab_behaviors',
              ]
 
-DATAPATH = '/home/pi/opdat/'
+DATAPATH = '/home/bird/opdat/'
 
 DEFAULT_EMAIL = 'bradtheilman@gmail.com'
 

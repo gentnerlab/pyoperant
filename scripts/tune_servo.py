@@ -3,8 +3,8 @@
 tune_servo.py -- Interactive servo angle tuning for Rev D Magpi hopper.
 
 Run this script directly on the Raspberry Pi to find the correct up_angle
-and down_angle values for a panel's hopper servo. Once you have good values,
-update up_angle and down_angle in local_pi_revd.py for that panel.
+and down_angle values for a panel's hopper servo. Once you have good values
+the script can write them directly back to local_pi_revd.py.
 
 Usage:
     python tune_servo.py
@@ -15,8 +15,69 @@ Requirements:
     - Run from the pyoperant repo root, or ensure pyoperant is on PYTHONPATH
 """
 
+import os
+import re
 import sys
 import time
+
+def _write_angles_to_config(up_angle, down_angle):
+    """Offer to write tuned angles back to local_pi_revd.py."""
+    # Locate local_pi_revd.py relative to this script
+    # scripts/tune_servo.py -> pyoperant/local_pi_revd.py
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, '..', 'pyoperant', 'local_pi_revd.py')
+    config_path = os.path.normpath(config_path)
+
+    if not os.path.isfile(config_path):
+        print("\nCould not find local_pi_revd.py at %s" % config_path)
+        print("Update manually:")
+        print("  up_angle=%.1f, down_angle=%.1f" % (up_angle, down_angle))
+        return
+
+    with open(config_path, 'r') as f:
+        original = f.read()
+
+    # Replace up_angle=<number> and down_angle=<number> inside the Hopper() call.
+    # Using a targeted pattern so we only touch the Hopper constructor, not any
+    # other hypothetical uses of those keyword names elsewhere in the file.
+    updated = re.sub(r'(components\.Hopper\(.*?)\bup_angle\s*=\s*[\d.]+',
+                     lambda m: m.group(1) + ('up_angle=%.1f' % up_angle),
+                     original, flags=re.DOTALL)
+    updated = re.sub(r'(components\.Hopper\(.*?)\bdown_angle\s*=\s*[\d.]+',
+                     lambda m: m.group(1) + ('down_angle=%.1f' % down_angle),
+                     updated, flags=re.DOTALL)
+
+    if updated == original:
+        print("\nCould not locate up_angle/down_angle in %s" % config_path)
+        print("Check that components.Hopper() is present and update manually.")
+        return
+
+    # Show what will change
+    print("\nProposed changes to %s:" % os.path.relpath(config_path))
+    old_lines = original.splitlines()
+    new_lines = updated.splitlines()
+    diff_shown = False
+    for i, (old, new) in enumerate(zip(old_lines, new_lines)):
+        if old != new:
+            print("  line %d:  %s" % (i + 1, old.strip()))
+            print("         -> %s" % new.strip())
+            diff_shown = True
+    if not diff_shown:
+        print("  (no textual difference detected)")
+        return
+
+    try:
+        resp = input("\nWrite these values to local_pi_revd.py? [y/N]: ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        resp = 'n'
+
+    if resp == 'y':
+        with open(config_path, 'w') as f:
+            f.write(updated)
+        print("  -> %s updated." % os.path.relpath(config_path))
+    else:
+        print("  -> Not written. Update manually if needed.")
+
 
 def main():
     # --- connect to hardware ---
@@ -172,13 +233,8 @@ def main():
     if up_angle is not None and down_angle is not None:
         print("Final values:")
         print("  up_angle   = %.1f" % up_angle)
-        print("  down_angle = %.1f\n" % down_angle)
-        print("Update local_pi_revd.py:")
-        print("  self.hopper = components.Hopper(IR=self.inputs[0],")
-        print("                                  servo=self.hopper_servo,")
-        print("                                  up_angle=%.1f," % up_angle)
-        print("                                  down_angle=%.1f," % down_angle)
-        print("                                  inverted=False)")
+        print("  down_angle = %.1f" % down_angle)
+        _write_angles_to_config(up_angle, down_angle)
     else:
         print("No final angles recorded.")
 
