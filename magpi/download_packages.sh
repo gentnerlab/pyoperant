@@ -223,34 +223,34 @@ echo "  -> Smoke test passed"
 # -----------------------------------------------------------------------------
 echo "[4/6] Cloning git repositories..."
 
-# pyoperant (public) — python3-migration branch
-# TODO: once python3-migration is merged into main, remove --branch flag and
-#       the fetch/checkout lines below so this clones the default branch.
+# pyoperant (public) — default branch (master), which is Python 3.
+# Python 2 is preserved on the python2-legacy branch for legacy users.
 if [ ! -d "$REPOS_DIR/pyoperant" ]; then
-  git clone --branch python3-migration git@github.com:gentnerlab/pyoperant.git "$REPOS_DIR/pyoperant"
-  echo "  -> pyoperant cloned (python3-migration branch)"
+  git clone git@github.com:gentnerlab/pyoperant.git "$REPOS_DIR/pyoperant"
+  echo "  -> pyoperant cloned"
 else
   echo "  -> pyoperant already exists, pulling latest..."
   git -C "$REPOS_DIR/pyoperant" fetch
   # Reset hard so local patches (applied below) don't block the pull
-  git -C "$REPOS_DIR/pyoperant" reset --hard origin/python3-migration
+  git -C "$REPOS_DIR/pyoperant" reset --hard origin/master
   echo "  -> pyoperant updated to $(git -C "$REPOS_DIR/pyoperant" rev-parse --short HEAD)"
 fi
 
-# py-behaviors (private) — clone to tmp, extract glab_behaviors subfolder
-if [ ! -d "$REPOS_DIR/glab_behaviors" ]; then
-  echo "  -> Cloning py-behaviors (private repo, requires SSH key)..."
-  git clone git@github.com:gentnerlab/py-behaviors.git "$TMP_DIR/py-behaviors"
-  if [ -d "$TMP_DIR/py-behaviors/glab_behaviors" ]; then
-    cp -r "$TMP_DIR/py-behaviors/glab_behaviors" "$REPOS_DIR/glab_behaviors"
-    echo "  -> glab_behaviors extracted from py-behaviors"
-  else
-    echo "WARNING: glab_behaviors subfolder not found in py-behaviors — check repo structure"
-  fi
-  rm -rf "$TMP_DIR/py-behaviors"
+# py-behaviors (private) — default branch (master), which is Python 3.
+# Clone to tmp, extract glab_behaviors subfolder. Always re-fetched (this
+# clone is lightweight, unlike the .deb/wheel steps above) so a fix that
+# lands on py-behaviors' master doesn't go unnoticed on a repeat build.
+echo "  -> Cloning py-behaviors (private repo, requires SSH key)..."
+rm -rf "$TMP_DIR/py-behaviors"
+git clone git@github.com:gentnerlab/py-behaviors.git "$TMP_DIR/py-behaviors"
+if [ -d "$TMP_DIR/py-behaviors/glab_behaviors" ]; then
+  rm -rf "$REPOS_DIR/glab_behaviors"
+  cp -r "$TMP_DIR/py-behaviors/glab_behaviors" "$REPOS_DIR/glab_behaviors"
+  echo "  -> glab_behaviors extracted from py-behaviors"
 else
-  echo "  -> glab_behaviors already exists, skipping"
+  echo "WARNING: glab_behaviors subfolder not found in py-behaviors — check repo structure"
 fi
+rm -rf "$TMP_DIR/py-behaviors"
 
 # Patch default email in pyoperant
 sed -i '' "s/bradtheilman@gmail\.com/tgentner@ucsd.edu/g" \
