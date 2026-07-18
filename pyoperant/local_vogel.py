@@ -137,7 +137,7 @@ DATA_PATH = '/home/bird/opdat/'
 
 DEFAULT_EMAIL = 'justin.kiggins@gmail.com'
 
-SMTP_CONFIG = {'mailhost': 'localhost',
+SMTP_CONFIG = {'mailhost': '192.168.1.100',
                'toaddrs': [DEFAULT_EMAIL],
                'fromaddr': 'Vogel <bird@vogel.ucsd.edu>',
                'subject': '[pyoperant notice] on vogel',

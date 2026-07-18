@@ -163,7 +163,7 @@ DATAPATH = '/home/bird/opdat/'
 
 DEFAULT_EMAIL = 'bradtheilman@gmail.com'
 
-SMTP_CONFIG = {'mailhost': 'localhost',
+SMTP_CONFIG = {'mailhost': '192.168.1.100',
                'toaddrs': [DEFAULT_EMAIL],
                'fromaddr': 'bird@magpi.ucsd.edu',
                'subject': '[pyoperant notice] on magpi',
