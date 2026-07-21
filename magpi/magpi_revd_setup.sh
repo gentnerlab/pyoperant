@@ -94,7 +94,7 @@ echo ""
 # -----------------------------------------------------------------------------
 # 1. HOSTNAME
 # -----------------------------------------------------------------------------
-echo "[1/11] Setting hostname..."
+echo "[1/12] Setting hostname..."
 
 hostnamectl set-hostname "$HOSTNAME"
 sed -i "s/127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
@@ -103,7 +103,7 @@ echo "  -> hostname set to $HOSTNAME"
 # -----------------------------------------------------------------------------
 # 2. STATIC IP (Bookworm uses NetworkManager / nmcli)
 # -----------------------------------------------------------------------------
-echo "[2/11] Configuring static IP..."
+echo "[2/12] Configuring static IP..."
 
 nmcli con delete eth0-static 2>/dev/null || true
 
@@ -121,7 +121,7 @@ echo "  -> static IP $IP_ADDRESS configured"
 # -----------------------------------------------------------------------------
 # 3. NTP TIME SYNCHRONISATION
 # -----------------------------------------------------------------------------
-echo "[3/11] Configuring NTP time synchronisation..."
+echo "[3/12] Configuring NTP time synchronisation..."
 
 mkdir -p /etc/systemd/timesyncd.conf.d
 cat > /etc/systemd/timesyncd.conf.d/magpi.conf << 'EOF'
@@ -137,7 +137,7 @@ echo "  -> NTP configured: time.ucsd.edu 192.168.1.100"
 # -----------------------------------------------------------------------------
 # 4. BOOT CONFIG
 # -----------------------------------------------------------------------------
-echo "[4/11] Writing /boot/firmware/config.txt..."
+echo "[4/12] Writing /boot/firmware/config.txt..."
 
 # Only add config if not already present
 if ! grep -q "MagPi Rev D config" $BOOT/config.txt; then
@@ -180,7 +180,7 @@ fi
 # -----------------------------------------------------------------------------
 # 5. DISABLE UNNECESSARY SERVICES
 # -----------------------------------------------------------------------------
-echo "[5/11] Disabling unnecessary services..."
+echo "[5/12] Disabling unnecessary services..."
 
 systemctl disable bluetooth     2>/dev/null || true
 systemctl disable hciuart       2>/dev/null || true
@@ -212,7 +212,7 @@ echo "  -> services disabled"
 # -----------------------------------------------------------------------------
 # 6. PACKAGE INSTALLATION (offline from SD card)
 # -----------------------------------------------------------------------------
-echo "[6/11] Installing .deb packages..."
+echo "[6/12] Installing .deb packages..."
 
 if [ ! -d "$PACKAGES_DIR/deb" ] || [ "$(ls $PACKAGES_DIR/deb/*.deb 2>/dev/null | wc -l)" -eq 0 ]; then
   echo "ERROR: No .deb files found in $PACKAGES_DIR/deb"
@@ -253,7 +253,7 @@ echo "  -> pigpiod enabled"
 # -----------------------------------------------------------------------------
 # 7. HIFIBERRY AUDIO CONFIG
 # -----------------------------------------------------------------------------
-echo "[7/11] Configuring HiFiBerry as default ALSA device..."
+echo "[7/12] Configuring HiFiBerry as default ALSA device..."
 
 # Detect HiFiBerry card number for pre-reboot amixer command
 HIFI_CARD=$(aplay -l 2>/dev/null | grep -i hifiberry | grep -o 'card [0-9]*' | grep -o '[0-9]*' | head -1)
@@ -284,7 +284,7 @@ echo "  -> ALSA configured"
 # -----------------------------------------------------------------------------
 # 8. PYOPERANT & GLAB_BEHAVIORS (offline from SD card)
 # -----------------------------------------------------------------------------
-echo "[8/11] Installing pyoperant and glab_behaviors..."
+echo "[8/12] Installing pyoperant and glab_behaviors..."
 
 # Clean up any stale egg-links from previous installs
 find /usr -name "pyoperant.egg-link" -delete 2>/dev/null || true
@@ -361,7 +361,7 @@ fi
 # -----------------------------------------------------------------------------
 # 9. POSTFIX — satellite relay through magpi server (192.168.1.100)
 # -----------------------------------------------------------------------------
-echo "[9/11] Configuring postfix mail relay..."
+echo "[9/12] Configuring postfix mail relay..."
 
 postconf -e "relayhost = [192.168.1.100]"
 postconf -e "inet_interfaces = loopback-only"
@@ -375,9 +375,34 @@ systemctl restart postfix || true
 echo "  -> postfix configured as satellite relay via 192.168.1.100"
 
 # -----------------------------------------------------------------------------
-# 10. MAGPI-SPECIFIC CONFIG
+# 10. SSH ACCESS FOR magpi.ucsd.edu (data pipeline + rpioperantctl)
 # -----------------------------------------------------------------------------
-echo "[10/11] Writing MagPi Rev D system files..."
+echo "[10/12] Authorizing magpi.ucsd.edu's SSH key..."
+
+# magpi.ucsd.edu SSHes into every client to pull opdat/ (allsummary.py) and to
+# start/stop the correct behavior (rpioperantctl) -- this box needs to trust
+# its key from first boot, or that only ever gets set up by someone running
+# ssh-copy-id manually after the fact. Public key only, safe to embed here.
+MAGPI_FLEET_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEt3hAUDhvc69b5VqU6x00LsxKy3oPC6LQPXtBGl+EgK bird@magpi.ucsd.edu"
+
+mkdir -p "$HOME_DIR/.ssh"
+chmod 700 "$HOME_DIR/.ssh"
+touch "$HOME_DIR/.ssh/authorized_keys"
+chmod 600 "$HOME_DIR/.ssh/authorized_keys"
+
+if ! grep -qF "$MAGPI_FLEET_KEY" "$HOME_DIR/.ssh/authorized_keys"; then
+  echo "$MAGPI_FLEET_KEY" >> "$HOME_DIR/.ssh/authorized_keys"
+  echo "  -> magpi.ucsd.edu key added to authorized_keys"
+else
+  echo "  -> magpi.ucsd.edu key already authorized, skipping"
+fi
+
+chown -R $MAGPI_USER:$MAGPI_USER "$HOME_DIR/.ssh"
+
+# -----------------------------------------------------------------------------
+# 11. MAGPI-SPECIFIC CONFIG
+# -----------------------------------------------------------------------------
+echo "[11/12] Writing MagPi Rev D system files..."
 
 echo 'revd' > /etc/magpi_revision
 echo "  -> /etc/magpi_revision set to revd"
@@ -412,9 +437,9 @@ chown $MAGPI_USER:$MAGPI_USER $HOME_DIR/test.wav
 echo "  -> test.wav generated in $HOME_DIR"
 
 # -----------------------------------------------------------------------------
-# 11. CUSTOM MOTD
+# 12. CUSTOM MOTD
 # -----------------------------------------------------------------------------
-echo "[11/11] Setting MOTD..."
+echo "[12/12] Setting MOTD..."
 
 # Write ASCII art with quoted heredoc (no variable expansion, safe for special chars)
 cat > /etc/motd << 'EOF'
