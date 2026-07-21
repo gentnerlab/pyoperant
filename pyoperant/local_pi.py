@@ -128,7 +128,7 @@ DATAPATH = '/home/pi/opdat/'
 
 # SMTP_CONFIG
 
-DEFAULT_EMAIL = 'bradtheilman@gmail.com'
+DEFAULT_EMAIL = 'tgentner@ucsd.edu'
 
 SMTP_CONFIG = {'mailhost': '192.168.1.100',
                'toaddrs': [DEFAULT_EMAIL],
