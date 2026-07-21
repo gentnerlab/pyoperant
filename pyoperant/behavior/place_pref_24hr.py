@@ -172,7 +172,7 @@ class PlacePrefExp24hr(base.BaseExp):
 
             ## Record time of break
             self.log.debug("Beam-break sensed on %s" % (self.current_perch))
-            self.current_visit = utils.Visit()
+            self.current_visit = Visit()
             self.current_visit.perch_strt = dt.datetime.now()
             self.current_visit.perch_loc = self.current_perch['IRName']
             self.current_visit.class_ = self.current_perch_stim_class()
@@ -349,7 +349,7 @@ class PlacePrefExp24hr(base.BaseExp):
         while True:
             ## if deperching has been detected, or light schedule expires, quit this function
             if (self.validate_deperching() == True or self.light_switch()):
-                if self.light_switch:
+                if self.light_switch():
                     self.current_visit.perch_end = dt.datetime.now()
                 self.stop_stimuli()
                 return

@@ -24,7 +24,6 @@ _BEHAVIOR_MODULES = [
     "pyoperant.behavior.shape",
     "pyoperant.behavior.two_alt_choice",
     "pyoperant.behavior.two_alt_choice_early_responses",
-    "pyoperant.behavior.place_pref",
     "pyoperant.behavior.place_pref_24hr",
     "pyoperant.behavior.three_ac_matching",
 ]

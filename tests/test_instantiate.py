@@ -13,10 +13,12 @@ full scheduling loop, call new_trial()/run_trial() directly). Lights
 doesn't fit that pattern (no trial concept of its own beyond BaseExp's
 defaults), so it gets its own, simpler test.
 
-PlacePrefExp/PlacePrefExp24hr are deliberately not covered here yet --
-open_all_perches() calls utils.Visit(), which doesn't exist anywhere in
-pyoperant.utils, so neither class can get past its first beam-break. Under
-investigation; add their Tier 2 coverage once that's resolved.
+PlacePrefExp24hr isn't covered here yet -- open_all_perches() used to call
+utils.Visit(), which doesn't exist anywhere in pyoperant.utils, so the
+class could never get past its first beam-break; that's now fixed (it
+uses the class's own local Visit() instead), but Tier 2 coverage hasn't
+been built. PlacePrefExp (the non-24hr version) has been removed --
+confirmed superseded by PlacePrefExp24hr, not something to migrate.
 """
 
 import json
