@@ -1,0 +1,50 @@
+{
+    "comments": "Minimal smoke-test config for the base TwoAltChoiceExp class itself.",
+    "experimenter": {
+        "name": "smoke test",
+        "email": "tgentner@ucsd.edu"
+    },
+    "panel_name": "1",
+    "debug": true,
+    "log_handlers": [],
+    "stim_path": "/home/bird",
+    "stims": {
+        "a": "a.wav",
+        "c": "c.wav"
+    },
+    "classes": {
+        "L": {
+            "reward_value": 2.0,
+            "punish_value": 4.0,
+            "component": "left"
+        },
+        "R": {
+            "reward_value": 2.0,
+            "punish_value": 4.0,
+            "component": "right"
+        }
+    },
+    "block_design": {
+        "blocks": {
+            "default": {
+                "queue": "block",
+                "conditions": [
+                    {"class": "L", "stim_name": "a"},
+                    {"class": "R", "stim_name": "c"}
+                ]
+            }
+        },
+        "order": ["default"]
+    },
+    "reinforcement": {
+        "schedule": "percent_reinf",
+        "prob": 1.0,
+        "secondary": false
+    },
+    "correction_trials": false,
+    "response_win": 5.0,
+    "intertrial_min": 2.0,
+    "light_schedule": [["00:00", "23:59"]],
+    "session_schedule": [["00:00", "23:59"]],
+    "shape": null
+}

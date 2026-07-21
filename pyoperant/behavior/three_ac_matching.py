@@ -18,10 +18,18 @@ class ThreeACMatchingExp(two_alt_choice.TwoAltChoiceExp):
         self.shaper = shape.Shaper3ACMatching(self.panel, self.log, self.parameters, self.get_stimuli, self.log_error_callback)
         self.num_stims = len(self.parameters['stims'].items())
 
-    def get_stimuli(self, trial_class):
+    def get_stimuli(self, trial_class=None, **conditions):
         """ take trial class and return a tuple containing the stimulus event to play and a list of additional events
 
+        Called two different ways depending on caller: shape.py's
+        Shaper3ACMatching._play_audio() passes trial_class positionally
+        during shaping, while two_alt_choice.py's new_trial() unpacks a
+        conditions dict (with a "class" key -- not a valid Python
+        identifier, so it can't be its own named parameter) via **conditions
+        during normal trials.
         """
+        if trial_class is None:
+            trial_class = conditions['class']
         if not self.parameters['reduced_stims']:
             mids = random.sample(range(self.num_stims), 3)
         else:
