@@ -1,6 +1,7 @@
 from pyoperant import hwio, components, panels, utils
 from pyoperant.interfaces import comedi_, pyaudio_
 from pyoperant import InterfaceError
+import socket
 import time
 
 _ZOG_MAP = {
@@ -234,7 +235,7 @@ DEFAULT_EMAIL = 'justin.kiggins@gmail.com'
 SMTP_CONFIG = {'mailhost': '192.168.1.100',
                'toaddrs': [DEFAULT_EMAIL],
                'fromaddr': 'Zog <bird@zog.ucsd.edu>',
-               'subject': '[pyoperant notice] on zog',
+               'subject': '[pyoperant notice] on %s' % socket.gethostname(),
                'credentials': None,
                'secure': None,
                }

@@ -1,5 +1,6 @@
 from pyoperant import hwio, components, panels, utils
 from pyoperant.interfaces import comedi_, pyaudio_
+import socket
 
 _VOGEL_MAP = {
     1: ('/dev/comedi0', 2, 0, 2, 8), # box_id:(subdevice,in_dev,in_chan,out_dev,out_chan)
@@ -140,7 +141,7 @@ DEFAULT_EMAIL = 'justin.kiggins@gmail.com'
 SMTP_CONFIG = {'mailhost': '192.168.1.100',
                'toaddrs': [DEFAULT_EMAIL],
                'fromaddr': 'Vogel <bird@vogel.ucsd.edu>',
-               'subject': '[pyoperant notice] on vogel',
+               'subject': '[pyoperant notice] on %s' % socket.gethostname(),
                'credentials': None,
                'secure': None,
                }

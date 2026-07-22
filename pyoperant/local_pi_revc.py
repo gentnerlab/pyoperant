@@ -11,6 +11,7 @@ automatically by local.py reading /etc/magpi_revision.
 from pyoperant import hwio, components, panels, utils
 from pyoperant.interfaces import raspi_gpio_, pyaudio_
 from pyoperant import InterfaceError
+import socket
 import time
 
 # PCA9685 I2C address — must match hardware address pin wiring on the board.
@@ -141,7 +142,7 @@ DEFAULT_EMAIL = 'tgentner@ucsd.edu'
 SMTP_CONFIG = {'mailhost': '192.168.1.100',
                'toaddrs': [DEFAULT_EMAIL],
                'fromaddr': 'bird@magpi.ucsd.edu',
-               'subject': '[pyoperant notice] on magpi',
+               'subject': '[pyoperant notice] on %s' % socket.gethostname(),
                'credentials': None,
                'secure': None,
                }
