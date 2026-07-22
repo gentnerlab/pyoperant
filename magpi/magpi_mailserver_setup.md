@@ -1,229 +1,75 @@
-# MagPi Mail Server Setup
-**Server:** 192.168.1.100 (magpi server / relay host)  
-**Purpose:** Accept mail from all MagPi boxes on 192.168.1.x and relay to external SMTP  
-**Default recipient:** tgentner@ucsd.edu
+# MagPi Mail Relay
+
+**Server:** magpi.ucsd.edu (192.168.1.100 on the MagPi subnet, 132.239.182.189 on campus)
+**Purpose:** let every MagPi box on 192.168.1.x relay pyoperant's error-notification emails through magpi.ucsd.edu to a real inbox
+**Default recipient:** whatever `experimenter.email` a subject's `config.json` sets (`pyoperant/behavior/base.py`'s `SMTPHandler` sets `toaddrs` from that per-behavior-class, no server-side rewriting needed)
 
 ---
 
-## Overview
-
-Each MagPi Pi (192.168.1.x) is configured as a postfix **satellite** — it sends all mail to
-192.168.1.100, which acts as the **relay host**. The relay host forwards mail onward to an
-external SMTP server for final delivery.
+## How it actually works
 
 ```
-MagPi box (192.168.1.1)
-    └─→ postfix satellite
-            └─→ 192.168.1.100 (relay host)
-                    └─→ UCSD SMTP (smtp.ucsd.edu) or Gmail
-                            └─→ tgentner@ucsd.edu
+MagPi box (192.168.1.x)
+    └─→ smtplib.SMTP('192.168.1.100')  (pyoperant's SMTP_CONFIG['mailhost'], already set in every local_*.py)
+            └─→ magpi.ucsd.edu:25 (accepts, no auth needed -- see below)
+                    └─→ relayhost = outbound.ucsd.edu (accepts, no auth needed -- trusted by campus IP)
+                            └─→ real inbox
 ```
+
+magpi.ucsd.edu is a shared, campus-managed host (UCSD's SSCF, config pushed by CFEngine — see `[[reference_magpi_server]]` if you have that memory context, or ask whoever's touched this before). **Postfix is not something the lab installs or configures from scratch** — it's already there, and its config is centrally managed. The only thing that was actually missing was a *network permission*: Postfix's `inet_interfaces`/`mynetworks` were scoped to localhost only, so nothing on the 192.168.1.0/24 subnet could even open a TCP connection to port 25 — every relay attempt got a plain `Connection refused`. Fixed by filing a request with SSCF (confirmed working 2026-07-22) to allow relay from the MagPi subnet; no client-side or lab-side Postfix configuration was needed once that permission was granted.
+
+**Client-side config is already done** — `pyoperant/local_pi.py`, `local_pi_revc.py`, `local_pi_revd.py`, `local_vogel.py`, `local_zog.py` all set `SMTP_CONFIG['mailhost'] = '192.168.1.100'` already. Nothing to change there.
 
 ---
 
-## 1. Install postfix on the server
+## Live config (confirmed 2026-07-22)
 
-```bash
-sudo apt-get update
-sudo apt-get install -y postfix mailutils
 ```
-
-During the interactive setup, select **"Internet Site"** and enter the server's hostname.
-
----
-
-## 2. Configure postfix as a relay host
-
-Edit `/etc/postfix/main.cf`:
-
-```bash
-sudo nano /etc/postfix/main.cf
-```
-
-Set the following values (add or replace as needed):
-
-```ini
-# Server identity
-myhostname = magpiserver.local
-mydomain = local
-myorigin = $myhostname
-
-# Accept mail from localhost and local MagPi subnet
 inet_interfaces = all
-inet_protocols = ipv4
-
-# Do not deliver locally — relay everything outbound
-mydestination = $myhostname, localhost.$mydomain, localhost
 mynetworks = 127.0.0.0/8, 192.168.1.0/24
-
-# Relay outbound mail through UCSD SMTP
-# (see Section 3 for Gmail alternative)
-relayhost = [smtp.ucsd.edu]:587
-
-# Allow the MagPi subnet to relay through this server
-smtpd_relay_restrictions =
-    permit_mynetworks,
-    reject_unauth_destination
-
-# TLS for outbound relay (required by most SMTP servers)
-smtp_tls_security_level = encrypt
-smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
-
-# SASL authentication for outbound relay
-smtp_sasl_auth_enable = yes
-smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
-smtp_sasl_security_options = noanonymous
-smtp_sasl_tls_security_options = noanonymous
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+relayhost = outbound.ucsd.edu
+myhostname = magpi.ucsd.edu   (system default, not explicitly overridden)
+myorigin = /etc/mailname      (contents: magpi.ucsd.edu)
+mydestination = $myhostname, $myorigin, localhost.ucsd.edu, localhost
 ```
+
+**No SASL, no TLS credentials, no sender-address rewriting are configured or needed.** `outbound.ucsd.edu` accepts unauthenticated relay from magpi.ucsd.edu because it's a trusted on-campus IP — this is much simpler than an earlier draft of this doc assumed (that draft described a `smtp.ucsd.edu:587` + SASL-password plan that was never actually built; the real config above is what's live). Mail from `bird@magpi.ucsd.edu` is already a real, deliverable sender address — no `sender_canonical_maps` rewrite needed like you'd need for a fake `.local` domain.
 
 ---
 
-## 3. Configure outbound SMTP credentials
+## Testing the relay
 
-### Option A: UCSD SMTP (smtp.ucsd.edu)
-
-Check with UCSD IT for the correct relay settings. UCSD may allow relay from on-campus
-IP ranges without authentication, or may require AD credentials.
-
-Create `/etc/postfix/sasl_passwd`:
-
-```
-[smtp.ucsd.edu]:587    your-ucsd-username@ucsd.edu:your-password
-```
-
-### Option B: Gmail SMTP
-
-Requires a Gmail **App Password** (not your regular password).
-To generate one: Google Account → Security → 2-Step Verification → App Passwords.
-
-Create `/etc/postfix/sasl_passwd`:
-
-```
-[smtp.gmail.com]:587    tgentner@gmail.com:your-app-password
-```
-
-Update `main.cf`:
-```ini
-relayhost = [smtp.gmail.com]:587
-```
-
-### After creating sasl_passwd (both options):
+From magpi itself, targeting its own LAN-facing IP (this exercises the exact path a Pi client uses — `mynetworks`/`inet_interfaces` gate on that interface, not on being the same machine):
 
 ```bash
-sudo chmod 600 /etc/postfix/sasl_passwd
-sudo postmap /etc/postfix/sasl_passwd
-sudo systemctl restart postfix
+{
+echo "EHLO test-client"
+sleep 1
+echo "MAIL FROM:<bird@magpi.ucsd.edu>"
+sleep 1
+echo "RCPT TO:<you@ucsd.edu>"
+sleep 1
+echo "DATA"
+sleep 1
+echo "Subject: Magpi mail relay test"
+echo ""
+echo "test body"
+echo "."
+sleep 1
+echo "QUIT"
+} | nc 192.168.1.100 25
 ```
+
+Expect `220` greeting, `250 2.1.0 Ok` / `250 2.1.5 Ok` for `MAIL FROM`/`RCPT TO`, and the message actually arriving. From an actual Pi client, the equivalent smoke test is just running pyoperant's own error-notification path, or the same `nc`/`sendmail` test targeting `192.168.1.100`.
 
 ---
 
-## 4. Set up sender address rewriting (optional but recommended)
-
-By default, mail from a MagPi will arrive as `bird@magpi00.local`, which most SMTP
-servers will reject. Map all outgoing addresses to `tgentner@ucsd.edu`:
-
-Create `/etc/postfix/sender_canonical`:
-
-```
-bird@magpi00.local    tgentner@ucsd.edu
-@magpi00.local        tgentner@ucsd.edu
-```
-
-Or to catch all MagPi boxes at once:
-
-```
-/.*/    tgentner@ucsd.edu
-```
-
-Add to `main.cf`:
-
-```ini
-sender_canonical_maps = regexp:/etc/postfix/sender_canonical
-```
-
-Then:
-
-```bash
-sudo postmap /etc/postfix/sender_canonical
-sudo systemctl restart postfix
-```
-
----
-
-## 5. Enable and start postfix
-
-```bash
-sudo systemctl enable postfix
-sudo systemctl start postfix
-```
-
----
-
-## 6. Test the relay
-
-### From the server itself:
-
-```bash
-echo "Test from magpi server" | mail -s "postfix relay test" tgentner@ucsd.edu
-```
-
-Check the mail log:
-
-```bash
-sudo tail -f /var/log/mail.log
-```
-
-### From a MagPi box (192.168.1.1):
-
-```bash
-echo "Test from magpi00" | mail -s "magpi00 relay test" tgentner@ucsd.edu
-```
-
-Check the log on the Pi:
-
-```bash
-sudo tail -f /var/log/mail.log
-```
-
-### Expected log output (success):
-
-```
-postfix/smtp[xxxx]: ... relay=smtp.ucsd.edu[...]:587, status=sent (250 OK)
-```
-
----
-
-## 7. Troubleshooting
+## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| Mail stuck in queue | `mailq` — shows queued messages |
-| Force retry | `sudo postfix flush` |
-| View full log | `sudo tail -100 /var/log/mail.log` |
-| Test SMTP connection | `telnet 192.168.1.100 25` from a MagPi |
-| Check postfix config | `sudo postconf -n` |
-| Relay rejected | Check `mynetworks` includes 192.168.1.0/24 |
-| TLS error | Check `smtp_tls_CAfile` path is correct |
-
----
-
-## 8. Firewall
-
-If the server has a firewall (ufw), allow SMTP from the MagPi subnet:
-
-```bash
-sudo ufw allow from 192.168.1.0/24 to any port 25
-sudo ufw reload
-```
-
----
-
-## Summary checklist
-
-- [ ] postfix installed on 192.168.1.100
-- [ ] `mynetworks` includes 192.168.1.0/24
-- [ ] `relayhost` set to upstream SMTP server
-- [ ] `sasl_passwd` created and `postmap`ed
-- [ ] Sender canonical rewriting configured
-- [ ] Port 25 open from MagPi subnet
-- [ ] Test mail received at tgentner@ucsd.edu
+| `Connection refused` from a Pi client | `sudo postconf -n \| grep -E "inet_interfaces\|mynetworks"` on magpi.ucsd.edu — if `inet_interfaces` isn't `all` or `mynetworks` doesn't include `192.168.1.0/24`, the network permission has regressed (this exact thing happened once: a manual fix worked temporarily then got silently reverted within ~10-20 min by CFEngine, because it wasn't landed in the actual managed policy source). File with SSCF again rather than re-applying a live `postconf -e` edit, which won't stick. |
+| Mail accepted by magpi but never arrives | `mailq` on magpi.ucsd.edu, `sudo tail -100 /var/log/mail.log`. Since `relayhost = outbound.ucsd.edu` needs no auth, a failure here is more likely an outbound.ucsd.edu-side issue than a magpi config problem. |
+| Unsure what's actually configured right now | `sudo postconf -n` on magpi.ucsd.edu is the source of truth — don't trust this doc's "Live config" section blindly if it's been a while, config drift is exactly what caused problems here before. |
+| Firewall | This box uses `iptables` (CFEngine-managed, from `generated-firewall/iptables.generic`), not `ufw`. The MagPi subnet already has a blanket `ACCEPT` rule for `192.168.1.0/24` with no port restriction, so firewall is not expected to be the blocker for anything on this subnet. |
