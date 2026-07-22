@@ -742,7 +742,17 @@ A 220 greeting and 250 responses to MAIL FROM/RCPT TO confirm the server is acce
 | `"email"` in `log_handlers` | top-level config.json list | If absent, nothing is emailed regardless of the field below — everything just goes to the local `.log` file. |
 | `experimenter.email` | `experimenter` object | If `"email"` is in `log_handlers` but this is missing or empty, email notifications are disabled for that session (logged as a warning, not a crash) — as of July 2026; a config written before that fix would have crashed the whole experiment on startup instead. |
 
-When both are set correctly, *any* `WARNING`/`ERROR`/`CRITICAL`-level log call anywhere in the running process gets emailed — not just deliberate "notify" calls. This includes: uncaught exceptions, the structured hardware-error callback (`InterfaceError`/`ComponentError`), hopper malfunction warnings, and — intentionally — `shape.py`'s block-progress messages, which let the experimenter track how a bird is advancing through shaping.
+When both are set correctly, *any* `WARNING`/`ERROR`/`CRITICAL`-level log call anywhere in the running process is a candidate for email — not just deliberate "notify" calls. This includes: uncaught exceptions, the structured hardware-error callback (`InterfaceError`/`ComponentError`), hopper malfunction warnings, and `shape.py`'s block-progress messages. Every one of these always reaches the local `.log` file regardless of what follows.
+
+**Not every candidate actually sends an email, though.** To avoid overwhelming the experimenter with routine, low-value notifications (a flaky hopper generating one email per hiccup, for instance), a threshold filter sits in front of the email handler:
+
+| Always emails immediately | Only emails after recurring |
+|---|---|
+| `CRITICAL` records (hardware failures via the structured callback) | Everything else (routine `WARNING`/`ERROR` calls — e.g. hopper hiccups) |
+| Unhandled top-level exceptions (these may be the last thing the process ever logs before crashing, so they can't wait for a "next occurrence") | Threshold is `EMAIL_OCCURRENCE_THRESHOLD` (3) recurrences of the *same call site* (grouped by module + function, not exact message text — different hopper errors from the same check don't reset each other's count) |
+| `shape.py`'s block-progress messages (kept real-time so the experimenter can track shaping progress) | Once the threshold is hit, later occurrences from that same call site keep emailing too, not just the 3rd one |
+
+This is occurrence-count only for now — no time-window escalation (e.g. an issue that recurs slowly over hours doesn't get bumped up before hitting the raw count). That's a known simplification, not an oversight; can be refined later if needed.
 
 The email subject line includes the sending box's hostname (e.g. `[pyoperant notice] on magpi04`), so notifications from multiple boxes can be discriminated; the body includes the bird ID, log level, and timestamp.
 
