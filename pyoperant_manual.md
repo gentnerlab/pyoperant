@@ -632,6 +632,42 @@ The pyoperantctl script (in scripts/pyoperantctl) provides a higher-level view: 
 > 
 > pyoperantctl -sk \# do both
 
+#### Mail Relay
+
+MagPi clients have no direct internet access, so PyOperant's error-notification emails (sent via SMTPHandler in pyoperant/behavior/base.py, using each subject's experimenter.email as the recipient) relay through the MagPi server rather than going out directly. Each client's local config file (local\_pi\_revd.py, local\_pi\_revc.py, etc.) already points at the server:
+
+> SMTP\_CONFIG = {'mailhost': '192.168.1.100', ...}
+
+The server relays outbound through UCSD's mail infrastructure (outbound.ucsd.edu), which trusts the server's on-campus IP directly — no authentication is required anywhere in the chain, on the server or on any client.
+
+For this to work, the server's Postfix has to accept connections from the MagPi subnet, which is not the default:
+
+> inet\_interfaces = all
+> 
+> mynetworks = 127.0.0.0/8, 192.168.1.0/24
+
+The server's configuration is centrally managed by SSCF via CFEngine, so this isn't something to set with a one-off postconf edit on the box — a live edit not backed by a matching SSCF/CFEngine policy change gets silently reverted within minutes. Request the network permission directly from SSCF instead; this was granted for the MagPi subnet in July 2026.
+
+To test the relay end-to-end without needing a client, connect directly to the server's LAN-facing address and walk through the SMTP conversation by hand — this exercises the same path a client's SMTP call would use:
+
+> nc 192.168.1.100 25
+> 
+> EHLO test-client
+> 
+> MAIL FROM:\<bird@magpi.ucsd.edu\>
+> 
+> RCPT TO:\<you@ucsd.edu\>
+> 
+> DATA
+> 
+> Subject: relay test
+> 
+> (blank line, then a body line, then a line with just a period)
+> 
+> QUIT
+
+A 220 greeting and 250 responses to MAIL FROM/RCPT TO confirm the server is accepting the connection; the message actually arriving confirms the full outbound path.
+
 ### 5.3 The panel\_subject\_behavior File
 
 The panel\_subject\_behavior file (located at /home/bird/opdat/panel\_subject\_behavior on the server) is the central configuration table for the whole system. It has one row per operant box with five whitespace-delimited columns:
@@ -659,7 +695,9 @@ The MagPi server’s firewall (managed by CFEngine/SSCF) must allow the followin
 
   - TCP on SSH port 22 — for git clones and remote login from clients
 
-These must be explicitly requested from SSCF. Without the NTP rule, clocks on clients will drift and timestamps will be unreliable. Without the SSH rule, clients cannot pull code updates from the server.
+  - TCP on SMTP port 25 — for clients (and the server itself) to relay error-notification email through the server (see Mail Relay above)
+
+These must be explicitly requested from SSCF. Without the NTP rule, clocks on clients will drift and timestamps will be unreliable. Without the SSH rule, clients cannot pull code updates from the server. Without the SMTP rule, mail relay attempts fail with a plain connection-refused error.
 
 ## 6. Software Setup
 
