@@ -538,39 +538,55 @@ This section walks through connecting all components for a new or reconfigured p
 
 ## 5. Network and Server Organization
 
-Each MagPi client runs as an autonomous unit — PyOperant controls the experiment, manages the light schedule, and saves data locally without needing a continuous connection to any server. The MagPi server provides centralized code distribution, data aggregation, time synchronization, and remote monitoring across all boxes in the lab.
+Each MagPi client runs as an autonomous unit — PyOperant controls the experiment, manages the light schedule, and saves data locally without needing a continuous connection to any server. The MagPi server provides centralized code distribution, data aggregation, process orchestration, time synchronization, mail relay, and remote monitoring across all clients/boxes in the lab.
 
 ### 5.1 Network Topology
 
 The RPiOperant network is a private LAN hosted on the MagPi server. The server has two wired Ethernet interfaces:
 
-  - eno1 — connected to the UCSD campus network (IP 132.239.182.189). This is the WAN-facing interface managed by SSCF.
+  - eno1 — connected to the UCSD campus network (IP 132.239.182.189). This is the WAN-facing interface managed by SSCF. 
 
   - eno2 — connected to a 48-port Ethernet switch to which all MagPi clients connect (IP 192.168.1.100, netmask 255.255.255.0).
 
-Each MagPi client is assigned a static IP address of 192.168.1.XX, where XX is the box number (e.g., box 3 has IP 192.168.1.3). This is configured in /etc/network/interfaces on each client:
+Each MagPi client is assigned a static IP address of 192.168.1.XX, where XX is the box number (e.g., box 3 has IP 192.168.1.3). This is normally configured when each client is intially setup (see section6) and can be changed in /etc/network/interfaces on each client:
 
 > auto eth0
-> 
+>
 > iface eth0 inet static
-> 
+>
 > address 192.168.1.XX
-> 
+>
 > netmask 255.255.255.0
-> 
+>
 > gateway 192.168.1.100
 
-The hostname of each client is set to magpiXX (e.g., magpi03). To log in to a client from the MagPi server or any machine on the LAN:
+Note: the `gateway` line is set for historical reasons but is not functional — `ip_forward` is disabled on the server and there are no NAT/MASQUERADE rules, so MagPi clients have no routed internet access. This is intentional, not a bug: it keeps the client subnet isolated. Anything a client needs from the outside world (code, time sync, mail relay) goes through a specific server-side service instead of general routing — see 5.2 below.
 
-> ssh bird@192.168.1.XX
+The server hostname is magpi (magpi.ucsd.edu) 
 
-The default password is starling. Change this after initial setup.
+The hostname of each client is set to magpiXX (e.g., magpi03, see section 6). To log in to a client from the MagPi server or any machine on the LAN:
 
-Video cameras are on a separate subnet (192.168.2.0/24) managed through PoE switches. Each camera’s IP is 192.168.2.1XX where XX is the box number.
+> ssh bird@192.168.1.XX, or
+> ssh magpixx
+
+Video cameras are on a separate subnet (192.168.2.0/24) managed through PoE switches. Each camera's IP is 192.168.2.1XX where XX is the box number.
 
 ### 5.2 The MagPi Server
 
-The MagPi server is a desktop/rackmount computer running Ubuntu. It performs four main roles for the RPiOperant system:
+The MagPi server is a rackmount computer (Supermicro, Ubuntu 24.04, as of July 2026) provisioned under UCSD's SSCF and managed centrally by CFEngine. Most of the server's base configuration (Postfix, the firewall, NTP's inbound access) is not something the lab can edit directly — changes to those pieces have to go through SSCF, and any live edits not backed by a matching CFEngine policy change tends to get silently reverted.
+
+The Magpi server performs six functions for the RPiOperant system:
+
+| Function | Purpose | Runs | Code |
+|---|---|---|---|
+| Git Code Distribution | Lets clients pull code without direct GitHub access | On demand (`git pull`) | N/A — plain git remotes |
+| NTP Time Synchronization | Keeps client clocks correct (light schedule, timestamps depend on this) | Continuous (ntpsec daemon) | Server: `ntpsec`. Client: `systemd-timesyncd` |
+| Data Aggregation | Pulls each active subject's data to the server, writes a combined status file | Every 15 min (cron) | `glab-common-py`: `glab_common/allsummary.py` |
+| Process Orchestration | Reconciles what's running on each box against what should be running | Every 5 min (cron) | `rpioperantctl`: `rpioperantctl.py` |
+| Mail Relay | Lets clients (with no direct internet) relay error-notification email out through the server | Continuous (Postfix) | Server: Postfix. Client: `pyoperant`'s `SMTPHandler` |
+| Dashboard | Renders per-bird plots and a login-gated status page from the aggregated data | Every 15 min (cron) | `websitebehavior`: `daily_website.sh` → `website_update_cron.py` |
+
+Each is detailed below, in the same order.
 
 #### Git Code Distribution
 
@@ -578,7 +594,9 @@ The MagPi server is the git remote for all MagPi clients. The clients cannot rea
 
 To set up a repository on the server:
 
-> git clone https://github.com/gentnerlab/pyoperant.git \~/code/pyoperant
+> git clone git@github.com:gentnerlab/pyoperant.git \~/code/pyoperant
+
+(Use the SSH remote form, `git@github.com:...`, not `https://...` — an HTTPS remote will just fail every push/pull with a credential prompt. All three server-side pipeline repos — `pyoperant`, `glab-common-py`, `rpioperantctl` — should be on SSH remotes; if `git remote -v` shows `https://github.com/...` for any of them, switch it with `git remote set-url origin git@github.com:gentnerlab/<repo>.git`.)
 
 To clone from the server onto a client (run on the client):
 
@@ -588,7 +606,7 @@ To update a client after pushing changes to the server:
 
 > cd \~/pyoperant && git pull origin master
 
-The same workflow applies to py-behaviors (the lab’s private behavior repository) and any other code the clients need.
+The same workflow applies to py-behaviors (the lab's private behavior repository) and any other code the clients need.
 
 #### NTP Time Synchronization
 
@@ -598,98 +616,176 @@ Time synchronization is configured in /etc/systemd/timesyncd.conf on each client
 
 > NTP=time.ucsd.edu 192.168.1.100
 
-The server must be running an NTP service and must allow UDP connections from the 192.168.1.0 subnet. This firewall exception must be set up by SSCF, as the server runs CFEngine. If clients show incorrect times after reboot, contact SSCF to verify the NTP firewall rule.
+Note: the `time.ucsd.edu` entry here is effectively dead weight — clients have no routed internet access (see 5.1), so only the `192.168.1.100` half actually resolves. Harmless, just not doing anything.
+
+On the server, NTP is provided by `ntpsec` (`/etc/ntpsec/ntp.conf`), synced upstream to `time.ucsd.edu`/`bigben.ucsd.edu`. The config includes a `restrict` line explicitly permitting query access from the whole MagPi subnet:
+
+> restrict 192.168.0.0 mask 255.255.0.0 nomodify notrap
+
+If clients ever show incorrect times after reboot, check `sudo systemctl status ntpsec` on the server first, then confirm the `restrict` line above is still present (it's CFEngine-managed like everything else on this box, so if it's disappeared, that's a CFEngine policy question for SSCF, not something to hand-edit back in permanently).
 
 To manually check that time is synchronized on a client:
 
 > date
-> 
+>
 > timedatectl status
 
-#### Data Aggregation
+#### Data Aggregation (`allsummary.py`)
 
-The server runs a cron job every 16 minutes that rsyncs behavioral data from all active clients. The script reads /home/bird/opdat/panel\_subject\_behavior on the server to determine which boxes are active, then runs:
+Runs every 15 minutes via cron on the server:
 
-> rsync -avz bird@magpiXX:/home/bird/opdat/ /home/bird/opdat
+> */15 * * * * /home/bird/anaconda3/bin/python3 /home/bird/code/glab-common-py/glab_common/allsummary.py > /home/bird/allsummary.log 2>&1
 
-After syncing, it reads all individual summaryDAT files and writes a combined all.summary file so you can see the status of all boxes at a glance.
+For every box marked enabled in `panel_subject_behavior` (5.3), it rsyncs that subject's own data folder from the client, then parses `.summaryDAT` and today's trial CSVs into one combined status file.
 
-Data is stored on each client under /home/pi/opdat/BXXXX/ where BXXXX is the bird ID. The same directory structure is mirrored on the server.
+**What it pulls.** Long rsyncs can cause problems, so the rsync source is scoped to just the active subject's own folder — `bird@<box>:/home/bird/opdat/B<bird>/`, not the box's whole `opdat/` tree. A box accumulates a folder for every subject that's ever run there (previous residents of that chamber), and no client ever runs more than one bird at a time, so pulling the whole tree just re-transfers old, orphaned data on every cycle. Stimulus libraries used in specific experiments are not generally backed up. To avoid copying large stimulus libraries three "excludes" apply to each box's rsync:
 
-#### Remote Monitoring
+| Exclude | Always applied? | Purpose |
+|---|---|---|
+| `Generated_Songs` | Yes | Per-session regenerated stimulus output, never irreplaceable |
+| `*stim*` | Yes | Catches any directory with "stim" in the name (`stims`, `stimuli`, `cdp_stimuli`, `stimulus_set`, etc.) |
+| Resolved path from `panel_stim_excludes` | If available | Exact match for a subject's real `stim_path` (from their `config.json`), for a stim dir that doesn't happen to have "stim" in the name |
 
-From the server you can SSH into any client and check the status of a running experiment:
+`panel_stim_excludes` (`/home/bird/opdat/panel_stim_excludes`) is written by `rpioperantctl`, not `allsummary.py` itself — see Process Orchestration below.
 
-> ssh bird@192.168.1.XX
-> 
-> tail -f \~/opdat/BXXXX/BXXXX.log
+**Straggler catch-up.** If a bird is swapped out of `panel_subject_behavior` between rsync cycles, the crontab may point at a different bird and any data from the previous bird collected between the last and current sync would be silently lost. To prevent this, `allsummary.py` tracks each run's box→bird mapping in `/home/bird/opdat/.allsummary_sync_state.json` and gives a departed bird one more pull, retried every cycle until it actually succeeds (so a box that happened to be unreachable exactly during a swap doesn't lose data either).
 
-The pyoperantctl script (in scripts/pyoperantctl) provides a higher-level view: it reads the panel\_subject\_behavior file and compares what should be running against what is actually running, flagging mismatches. Run it with -s to start missing processes and -k to kill incorrect ones:
+**Hardcoded paths** (no CLI flags — everything below is a constant at the top of the script):
 
-> pyoperantctl -s \# start any boxes that should be running but aren't
-> 
-> pyoperantctl -k \# kill any boxes running the wrong behavior
-> 
-> pyoperantctl -sk \# do both
+| Constant | Path |
+|---|---|
+| `process_fname` | `/home/bird/opdat/panel_subject_behavior` |
+| `OPDAT_ROOT` | `/home/bird/opdat/` |
+| `STIM_EXCLUDES_FNAME` | `/home/bird/opdat/panel_stim_excludes` |
+| `SYNC_STATE_FNAME` | `/home/bird/opdat/.allsummary_sync_state.json` |
+| output | `/home/bird/all.summary` |
+
+**Output format.** `all.summary` has one line per enabled box, always 9 tab-separated fields (box, bird, behavior, trials, feeds, timeouts, no-responses, feed errors, last-trial time) regardless of which case below applies — the dashboard's parser builds a fixed-width table from this file and breaks on any row with a different shape:
+
+| Case | `last @ ...` field reads |
+|---|---|
+| Normal, with trial data today | `<timestamp> (N mins ago)` |
+| `Lights`/`shape`/`pylights`/`lights.py` box (no trial concept) | `N/A (non-trial box)` |
+| Subject has no `.summaryDAT` yet (brand new) | `N/A (new subject, no data yet)` |
+| Real experiment, zero trials so far today | `N/A (no trials yet today)` |
+| Any other/unexpected failure | `N/A (error, see allsummary.log)` |
+
+`-avhW` on the rsync calls (specifically `-W`/`--whole-file`) is a deliberate choice, not an oversight: it trades bandwidth for CPU — a changed file gets resent in full rather than delta-transferred. Data integrity is unaffected either way (rsync verifies the transferred file against the source regardless of `-W`); it's purely an efficiency trade-off, and the lab's preference is minimizing server CPU load over bandwidth.
+
+#### Process Orchestration (`rpioperantctl`)
+
+Runs every 5 minutes via cron on the server:
+
+> */5 * * * * /home/bird/code/rpioperantctl/rpioperantctl.py -psb_loc=/home/bird/opdat/panel_subject_behavior -s -k
+
+For every row in `panel_subject_behavior` (enabled or not), it SSHes into that panel, checks `ps -ef`, and reconciles: starts the correct behavior if the panel's enabled and it isn't running; kills it if disabled but running; kills it if the *wrong* behavior is running regardless of enabled state.
+
+**Editing the `panel_subject_behavior` config file is the preferred method for process control.**
+ `rpioperantctl` treats this file as the single source of truth for what should be running on every box, and it re-asserts that truth every 5 minutes. That has a direct consequence: starting or stopping a behavior by hand — SSHing into a panel and running `nohup .../behave ... &`, or killing a process directly — only lasts until the next cron cycle. If the file doesn't agree with what you just did by hand, `rpioperantctl` will undo it: a manually-started process that doesn't match the file gets killed as "wrong behavior running"; a manually-killed process that the file still marks enabled gets restarted. This isn't a bug to work around — it's the whole point of the reconciliation loop, and it's why the file (not memory of what was last typed at an SSH prompt) has to be the actual record of intent. Always make the change in `panel_subject_behavior` first, then let `rpioperantctl` carry it out on its own schedule (or run it by hand with `-s -k` to apply immediately) — never the other way around.
+
+**Flags:**
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-s` | `False` | Start behaviors that should be running but aren't. Bare `-s` = `True`; accepts explicit `-s true`/`-s false` too |
+| `-k` | `False` | Kill behaviors that shouldn't be running (wrong behavior, or disabled panel) |
+| `-is_magpi` | `True` | Whether running directly on magpi.ucsd.edu vs. hopping through it from elsewhere |
+| `-psb_loc` | `/home/bird/opdat/panel_subject_behavior` | Path to the panel/subject/behavior config file |
+| `-stim_excludes_loc` | `/home/bird/opdat/panel_stim_excludes` | Where to write each panel's resolved stim exclude, for `allsummary.py` to read |
+
+With no flags at all, it does a **dry run**, and prints what it would start/kill without doing either. The `panel_stim_excludes` write (see below) happens on every run regardless of `-s`/`-k`.
+
+**Note** The crontab `rpioperantctl` call should run generally with both `-s` and `-k`. Without both flags, a single magpi can end up running the wrong behavior, or multiple behaviors simultaneously — both fighting over the same hardware. `-k` fixes that, but it isn't entirely fail-safe.  A typo or bad edit in `panel_subject_behavior` picked up by cron can kill a currently-running, legitimate experiment. Keep this in mind when editing the file live — see the note above on why the file has to stay the accurate source of truth.
+
+**Stim-exclude resolution.** While it's already SSHed into each panel for the process check, `rpioperantctl` also reads that subject's `config.json` to resolve their real `stim_path` (explicit, or pyoperant's own default of `<experiment_path>/stims`), and writes the result to `panel_stim_excludes` (tab-separated: panel, subject, exclude-path-relative-to-the-subject's-own-folder) for `allsummary.py` to consume — this avoids `allsummary.py` needing its own separate SSH connection to redo the same lookup every 15 minutes.
 
 #### Mail Relay
 
-MagPi clients have no direct internet access, so PyOperant's error-notification emails (sent via SMTPHandler in pyoperant/behavior/base.py, using each subject's experimenter.email as the recipient) relay through the MagPi server rather than going out directly. Each client's local config file (local\_pi\_revd.py, local\_pi\_revc.py, etc.) already points at the server:
+MagPi clients have no direct internet access, so PyOperant's error-notification emails (sent via `SMTPHandler` in `pyoperant/behavior/base.py`, using each subject's `experimenter.email` as the recipient) relay through the MagPi server rather than going out directly. Each client's local config file (`local_pi_revd.py`, `local_pi_revc.py`, etc.) already points at the server:
 
-> SMTP\_CONFIG = {'mailhost': '192.168.1.100', ...}
+> SMTP_CONFIG = {'mailhost': '192.168.1.100', ...}
 
-The server relays outbound through UCSD's mail infrastructure (outbound.ucsd.edu), which trusts the server's on-campus IP directly — no authentication is required anywhere in the chain, on the server or on any client.
+The server relays outbound through UCSD's mail infrastructure (`outbound.ucsd.edu`), which trusts the server's on-campus IP directly — no authentication is required anywhere in the chain, on the server or on any client.
 
 For this to work, the server's Postfix has to accept connections from the MagPi subnet, which is not the default:
 
-> inet\_interfaces = all
-> 
+> inet_interfaces = all
+>
 > mynetworks = 127.0.0.0/8, 192.168.1.0/24
 
-The server's configuration is centrally managed by SSCF via CFEngine, so this isn't something to set with a one-off postconf edit on the box — a live edit not backed by a matching SSCF/CFEngine policy change gets silently reverted within minutes. Request the network permission directly from SSCF instead; this was granted for the MagPi subnet in July 2026.
+As noted at the top of this section, this is CFEngine-managed — request the network permission from SSCF rather than editing `main.cf` directly (a live edit not backed by a matching policy change gets silently reverted within minutes; this happened once). This was granted for the MagPi subnet in July 2026.
 
 To test the relay end-to-end without needing a client, connect directly to the server's LAN-facing address and walk through the SMTP conversation by hand — this exercises the same path a client's SMTP call would use:
 
 > nc 192.168.1.100 25
-> 
+>
 > EHLO test-client
-> 
+>
 > MAIL FROM:\<bird@magpi.ucsd.edu\>
-> 
+>
 > RCPT TO:\<you@ucsd.edu\>
-> 
+>
 > DATA
-> 
+>
 > Subject: relay test
-> 
+>
 > (blank line, then a body line, then a line with just a period)
-> 
+>
 > QUIT
 
 A 220 greeting and 250 responses to MAIL FROM/RCPT TO confirm the server is accepting the connection; the message actually arriving confirms the full outbound path.
 
-### 5.3 The panel\_subject\_behavior File
+**Configuring email notifications for a subject.** Two things have to both be set in that subject's `config.json`:
 
-The panel\_subject\_behavior file (located at /home/bird/opdat/panel\_subject\_behavior on the server) is the central configuration table for the whole system. It has one row per operant box with five whitespace-delimited columns:
+| Setting | Location | Effect if missing/invalid |
+|---|---|---|
+| `"email"` in `log_handlers` | top-level config.json list | If absent, nothing is emailed regardless of the field below — everything just goes to the local `.log` file. |
+| `experimenter.email` | `experimenter` object | If `"email"` is in `log_handlers` but this is missing or empty, email notifications are disabled for that session (logged as a warning, not a crash) — as of July 2026; a config written before that fix would have crashed the whole experiment on startup instead. |
+
+When both are set correctly, *any* `WARNING`/`ERROR`/`CRITICAL`-level log call anywhere in the running process gets emailed — not just deliberate "notify" calls. This includes: uncaught exceptions, the structured hardware-error callback (`InterfaceError`/`ComponentError`), hopper malfunction warnings, and — intentionally — `shape.py`'s block-progress messages, which let the experimenter track how a bird is advancing through shaping.
+
+The email subject line includes the sending box's hostname (e.g. `[pyoperant notice] on magpi04`), so notifications from multiple boxes can be discriminated; the body includes the bird ID, log level, and timestamp.
+
+#### Dashboard (`websitebehavior`)
+
+Runs every 15 minutes via cron on the server, through a small wrapper that activates the right conda environment first:
+
+> */15 * * * * /home/bird/code/websitebehavior/daily_website.sh > /home/bird/code/websitebehavior/log.out 2>&1
+
+`daily_website.sh` just sets `PATH` to a dedicated conda env (`websiteupdate_36`) and runs `website_update_cron.py`. That script reads `all.summary` (Data Aggregation's output — this is why Data Aggregation has to run first, and why the two cron lines share the same 15-minute cadence) and `panel_subject_behavior`, renders per-bird plots and status tables, and writes a single `behav.php` file, which it then pushes off-box:
+
+> scp behav.php starling@psych-labs.ucsd.edu:/home/websites/gentnerlab/behavior/behav.php
+
+**The dashboard** is hosted on `psych-labs.ucsd.edu` (managed by sscf-psych), not magpi.ucsd.edu. The MagPi server only *generates* the page and pushes it to psych-labs; nothing about the dashboard itself runs on the MagPi server. This push requires its own SSH key trust from magpi.ucsd.edu to `starling@psych-labs.ucsd.edu`, independent of anything else in this chapter.
+
+**Access the dashboard via gentnerlab.ucsd.edu/behavior**, using a shared, hardcoded password not a per-user account or AD credentials.
+
+**Other known debt in this repo**, for whoever picks it up next: Google Calendar OAuth credentials (`credentials/credentials.json`, `token.pickle`, used for the bird-duty scheduling feature) are committed directly to git history — there's no `.gitignore` in the repo at all, so compiled files and logs get tracked too. The environment is Python 3.6 (end-of-life since Dec 2021), and `requirements.txt` pulls one dependency via `git+git://github.com/gentnerlab/behav-analysis.git` — GitHub disabled the unauthenticated `git://` protocol years ago, so this dependency likely can't be installed fresh into a new environment without editing that line to `git+https://` or `git+ssh://` first.
+
+**Other things it does**, beyond the main status table: pulls a Google Calendar (via `calendar_utils.py`) to render a bird-duty schedule on the dashboard, and supports per-experimenter custom plots (`custom_plots.py` imports named plotting functions out of `custom_plotting/`, e.g. `custom_plotting/tims.py`, `custom_plotting/annas.py`) for anyone who wants a non-default view of their own bird's data.
+
+### 5.3 The panel_subject_behavior File
+
+The panel_subject_behavior file (located at /home/bird/opdat/panel_subject_behavior on the server) is the central configuration table for the whole system — both `allsummary.py` and `rpioperantctl` read it. It has one row per operant box with five whitespace-delimited columns:
 
 |            |                                                     |                                        |
 | ---------- | --------------------------------------------------- | -------------------------------------- |
 | **Column** | **Example**                                         | **Description**                        |
-| 1          | 3                                                   | Box number (panel ID)                  |
+| 1          | magpi03                                             | Box hostname (panel ID)                  |
 | 2          | 1                                                   | Enable flag: 1 = active, 0 = disabled  |
-| 3          | B1234                                               | Bird ID (subject identifier)           |
-| 4          | /home/bird/opdat/B1234                              | Full path to the bird’s data directory |
-| 5          | behave TwoAltChoiceExp -P 3 -S B1234 -c config.json | Full command to run the behavior       |
+| 3          | 1234                                                | Bird ID number (bare number, no "B" prefix) |
+| 4          | opdat/B\<3\>                                        | Data directory template — `<3>` is replaced with column 3's value |
+| 5          | behave -P \<1\> -S B\<3\> TwoAltChoiceExp           | Behavior command template — `<3>` and `<1>` (panel number) get substituted |
 
-Lines beginning with \# are treated as comments. The pyoperantctl script reads this file to know what should be running on each box. The rsync script reads it to know which clients to pull data from.
+Lines beginning with \# are treated as comments. A typical entry looks like:
 
-A typical entry looks like:
+> magpi03 1 1234 opdat/B\<3\> behave -P \<1\> -S B\<3\> TwoAltChoiceExp
 
-> 3 1 B1234 /home/bird/opdat/B1234 behave TwoAltChoiceExp -P 3 -S B1234 -c config.json
+After substitution, this resolves to a data directory of `opdat/B1234` and a command of `behave -P 1 -S B1234 TwoAltChoiceExp`. The last whitespace-separated token of column 5 (after substitution) is the actual behavior/protocol name — this is what both `allsummary.py` (to detect non-trial `Lights`/`shape` boxes) and `rpioperantctl` (to compare against `ps -ef` output) key off of, not the literal word "behave".
 
 ### 5.4 Firewall Requirements
 
-The MagPi server’s firewall (managed by CFEngine/SSCF) must allow the following inbound connections from the 192.168.1.0/24 subnet:
+The MagPi server's firewall (managed by CFEngine/SSCF) must allow the following inbound connections from the 192.168.1.0/24 subnet:
 
   - UDP on NTP port 123 — for time synchronization from clients
 
@@ -698,6 +794,8 @@ The MagPi server’s firewall (managed by CFEngine/SSCF) must allow the followin
   - TCP on SMTP port 25 — for clients (and the server itself) to relay error-notification email through the server (see Mail Relay above)
 
 These must be explicitly requested from SSCF. Without the NTP rule, clocks on clients will drift and timestamps will be unreliable. Without the SSH rule, clients cannot pull code updates from the server. Without the SMTP rule, mail relay attempts fail with a plain connection-refused error.
+
+The server's own network config (interfaces, routing) is managed via netplan with the NetworkManager renderer — `netplan-eno1`/`netplan-eno2` connections, config files under `/etc/netplan/`. Editing network settings live with `nmcli` doesn't stick for netplan-owned settings; changes have to go into the YAML file itself, then `sudo netplan generate && sudo netplan apply`.
 
 ## 6. Software Setup
 
