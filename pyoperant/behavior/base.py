@@ -15,6 +15,59 @@ def _log_except_hook(*exc_info):
     text = "".join(traceback.format_exception(*exc_info))
     logging.error("Unhandled exception: %s", text)
 
+
+EMAIL_OCCURRENCE_THRESHOLD = 3
+
+
+class _EmailOccurrenceFilter(logging.Filter):
+    """Suppresses repetitive, non-urgent email notifications so the
+    experimenter isn't overwhelmed by routine warnings/errors. Every
+    record still reaches the local log file regardless -- this filter is
+    only attached to the email handler, not the root logger.
+
+    Always lets a record through immediately:
+      - CRITICAL records (hardware failures via log_error_callback)
+      - Unhandled top-level exceptions (_log_except_hook above) -- these
+        may be the last thing the process ever logs if it's about to
+        crash, so they can't wait for a count threshold that assumes
+        there will be a "next occurrence"
+      - shape.py's block-progress messages, since the experimenter
+        wants those in real time to track a bird's shaping progress
+
+    Everything else (routine warnings/errors -- e.g. hopper hiccups)
+    only starts emailing once it's recurred EMAIL_OCCURRENCE_THRESHOLD
+    times in this process. Grouped by where in the code it was logged
+    from (module + function), not the exact message text, which often
+    varies with the specific error -- this answers "is this kind of
+    problem happening repeatedly," not "is this exact string repeating."
+    Once the threshold is hit, later occurrences of that same
+    module/function/level keep emailing too, not just the Nth one.
+
+    Occurrence-count only for now (no time-window/rolling escalation) --
+    can be refined later if a low-grade but persistent issue needs to
+    escalate before hitting the raw count.
+    """
+    ALWAYS_IMMEDIATE_FUNCS = frozenset([("base", "_log_except_hook")])
+
+    def __init__(self, threshold=EMAIL_OCCURRENCE_THRESHOLD):
+        super(_EmailOccurrenceFilter, self).__init__()
+        self.threshold = threshold
+        self._counts = {}
+
+    def filter(self, record):
+        if record.levelno >= logging.CRITICAL:
+            return True
+        if record.module == "shape":
+            return True
+        if (record.module, record.funcName) in self.ALWAYS_IMMEDIATE_FUNCS:
+            return True
+
+        key = (record.module, record.funcName, record.levelno)
+        count = self._counts.get(key, 0) + 1
+        self._counts[key] = count
+        return count >= self.threshold
+
+
 class BaseExp(object):
     """Base class for an experiment.
 
@@ -126,6 +179,7 @@ class BaseExp(object):
 
                 email_handler = handlers.SMTPHandler(**SMTP_CONFIG)
                 email_handler.setLevel(logging.WARNING)
+                email_handler.addFilter(_EmailOccurrenceFilter())
 
                 heading = '%s\n' % (self.parameters['subject'])
                 formatter = logging.Formatter(heading+'%(levelname)s at %(asctime)s:\n%(message)s')
