@@ -103,18 +103,35 @@ class BaseExp(object):
         self.log = logging.getLogger()
 
         if 'email' in self.parameters['log_handlers']:
-            from pyoperant.local import SMTP_CONFIG
-            from logging import handlers
-            SMTP_CONFIG['toaddrs'] = [self.parameters['experimenter']['email'],]
+            experimenter = self.parameters.get('experimenter')
+            experimenter_email = experimenter.get('email') if isinstance(experimenter, dict) else None
 
-            email_handler = handlers.SMTPHandler(**SMTP_CONFIG)
-            email_handler.setLevel(logging.WARNING)
+            if not experimenter_email or '@' not in experimenter_email:
+                # 'email' in log_handlers with no valid experimenter.email
+                # to send to used to be a hard crash here (KeyError) --
+                # experimenter.email is easy to leave unset when copying a
+                # config.json. Log locally and keep running instead of
+                # taking down the whole experiment over a notification
+                # setting.
+                self.log.warning(
+                    "'email' is in log_handlers but experimenter.email is "
+                    "missing or invalid in this subject's config.json -- "
+                    "email notifications are disabled for this session, "
+                    "logging to file only."
+                )
+            else:
+                from pyoperant.local import SMTP_CONFIG
+                from logging import handlers
+                SMTP_CONFIG['toaddrs'] = [experimenter_email,]
 
-            heading = '%s\n' % (self.parameters['subject'])
-            formatter = logging.Formatter(heading+'%(levelname)s at %(asctime)s:\n%(message)s')
-            email_handler.setFormatter(formatter)
+                email_handler = handlers.SMTPHandler(**SMTP_CONFIG)
+                email_handler.setLevel(logging.WARNING)
 
-            self.log.addHandler(email_handler)
+                heading = '%s\n' % (self.parameters['subject'])
+                formatter = logging.Formatter(heading+'%(levelname)s at %(asctime)s:\n%(message)s')
+                email_handler.setFormatter(formatter)
+
+                self.log.addHandler(email_handler)
 
     def check_light_schedule(self):
         """returns true if the lights should be on"""
