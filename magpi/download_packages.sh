@@ -14,8 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT_DIR="$SCRIPT_DIR/magpi_packages"
 DEB_DIR="$OUTPUT_DIR/deb"
 PIP_DIR="$OUTPUT_DIR/pip"
-REPOS_DIR="$OUTPUT_DIR/repos"
-TMP_DIR="$OUTPUT_DIR/tmp"
+KEYS_DIR="$OUTPUT_DIR/keys"
 DOCKER_IMAGE="magpi-builder:bookworm"
 
 echo "=== MagPi package downloader ==="
@@ -28,13 +27,32 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p "$DEB_DIR" "$PIP_DIR" "$REPOS_DIR" "$TMP_DIR"
+# pyoperant and glab_behaviors are no longer bundled here -- magpi_revd_setup.sh
+# clones them live from magpi.ucsd.edu during first boot instead (so a fix on
+# master is picked up by every board flashed after that point, and the repos
+# on the board are real, working git clones pointed at a remote the board can
+# actually reach -- see the "CLIENT-FLEET SSH KEY" check below for why this
+# needs a key that must already exist before this script can finish).
+if [ ! -f "$KEYS_DIR/id_client_fleet" ]; then
+  echo "ERROR: $KEYS_DIR/id_client_fleet not found."
+  echo "This is the shared private key every Rev D board uses to git-clone"
+  echo "from magpi.ucsd.edu during first boot. Generate it once with:"
+  echo ""
+  echo "  mkdir -p $KEYS_DIR"
+  echo "  ssh-keygen -t ed25519 -f $KEYS_DIR/id_client_fleet -N \"\" -C magpi-client-fleet"
+  echo ""
+  echo "Then add $KEYS_DIR/id_client_fleet.pub to bird@192.168.1.100's"
+  echo "~/.ssh/authorized_keys (one-time, on the server) before flashing any boards."
+  exit 1
+fi
+
+mkdir -p "$DEB_DIR" "$PIP_DIR"
 
 # -----------------------------------------------------------------------------
 # 0. Build (or reuse) a cached ARM Docker image with RPi repo pre-configured
 #    This saves ~3 min on re-runs by skipping apt-get update/install each time
 # -----------------------------------------------------------------------------
-echo "[0/6] Preparing ARM build environment..."
+echo "[0/3] Preparing ARM build environment..."
 
 if docker image inspect "$DOCKER_IMAGE" > /dev/null 2>&1; then
   echo "  -> $DOCKER_IMAGE already built, reusing"
@@ -65,7 +83,7 @@ fi
 #    never fetch a package added to DEB_PACKAGES after deb/ was first
 #    populated (force refresh: rm -rf magpi_packages/deb/).
 # -----------------------------------------------------------------------------
-echo "[1/6] Downloading .deb packages (ARM armhf)..."
+echo "[1/3] Downloading .deb packages (ARM armhf)..."
 
 DEB_PACKAGES=(
   python3-pip
@@ -125,7 +143,7 @@ fi
 #    install pre-built wheels without needing python3-dev headers.
 #    Skip individual packages if their wheel already exists.
 # -----------------------------------------------------------------------------
-echo "[2/6] Building Python wheels (ARM armhf)..."
+echo "[2/3] Building Python wheels (ARM armhf)..."
 
 PACKAGES=(
   setuptools
@@ -173,7 +191,7 @@ fi
 #    Uses --no-index so only our bundled wheels are available — if any dep is
 #    missing the install fails here, not on the bench.
 # -----------------------------------------------------------------------------
-echo "[3/6] Smoke-testing pip wheel installation (ARM armhf)..."
+echo "[3/3] Smoke-testing pip wheel installation (ARM armhf)..."
 
 docker run --rm \
   --platform linux/arm/v7 \
@@ -219,82 +237,22 @@ sys.exit(0 if ok else 1)
 echo "  -> Smoke test passed"
 
 # -----------------------------------------------------------------------------
-# 4. Clone git repositories
-# -----------------------------------------------------------------------------
-echo "[4/6] Cloning git repositories..."
-
-# pyoperant (public) — default branch (master), which is Python 3.
-# Python 2 is preserved on the python2-legacy branch for legacy users.
-if [ ! -d "$REPOS_DIR/pyoperant" ]; then
-  git clone git@github.com:gentnerlab/pyoperant.git "$REPOS_DIR/pyoperant"
-  echo "  -> pyoperant cloned"
-else
-  echo "  -> pyoperant already exists, pulling latest..."
-  git -C "$REPOS_DIR/pyoperant" fetch
-  # Reset hard so local patches (applied below) don't block the pull
-  git -C "$REPOS_DIR/pyoperant" reset --hard origin/master
-  echo "  -> pyoperant updated to $(git -C "$REPOS_DIR/pyoperant" rev-parse --short HEAD)"
-fi
-
-# py-behaviors (private) — default branch (master), which is Python 3.
-# Clone to tmp, extract glab_behaviors subfolder. Always re-fetched (this
-# clone is lightweight, unlike the .deb/wheel steps above) so a fix that
-# lands on py-behaviors' master doesn't go unnoticed on a repeat build.
-echo "  -> Cloning py-behaviors (private repo, requires SSH key)..."
-rm -rf "$TMP_DIR/py-behaviors"
-git clone git@github.com:gentnerlab/py-behaviors.git "$TMP_DIR/py-behaviors"
-if [ -d "$TMP_DIR/py-behaviors/glab_behaviors" ]; then
-  rm -rf "$REPOS_DIR/glab_behaviors"
-  cp -r "$TMP_DIR/py-behaviors/glab_behaviors" "$REPOS_DIR/glab_behaviors"
-  echo "  -> glab_behaviors extracted from py-behaviors"
-else
-  echo "WARNING: glab_behaviors subfolder not found in py-behaviors — check repo structure"
-fi
-rm -rf "$TMP_DIR/py-behaviors"
-
-# Patch default email in pyoperant
-sed -i '' "s/bradtheilman@gmail\.com/tgentner@ucsd.edu/g" \
-  "$REPOS_DIR/pyoperant/pyoperant/local_pi_revd.py" 2>/dev/null && \
-  echo "  -> Patched default email in local_pi_revd.py"
-
-# Patch /home/pi -> /home/bird in pyoperant configs
-sed -i '' "s|/home/pi/|/home/bird/|g" \
-  "$REPOS_DIR/pyoperant/pyoperant/local_pi_revd.py" 2>/dev/null && \
-  echo "  -> Patched home directory to /home/bird in local_pi_revd.py"
-
-# Fix glab_behaviors __init__.py for Python 3
-sed -i '' 's/^from \([a-zA-Z]\)/from .\1/' \
-  "$REPOS_DIR/glab_behaviors/__init__.py" 2>/dev/null && \
-  echo "  -> Patched glab_behaviors/__init__.py for Python 3"
-
-# -----------------------------------------------------------------------------
-# 5. Package repos as a tarball
-#    bootfs (the SD card partition prep_sdcard.sh writes to) is FAT32 — it
-#    can't store Unix permissions, symlinks, or git's packed object files.
-#    Copying the raw repos/ tree onto it (and later off it, onto the Pi's
-#    home directory) silently mangles executable bits, turns symlinks into
-#    regular files, and corrupts the git pack index via AppleDouble ._ sidecar
-#    files. Tar first so the payload crosses FAT32 as one opaque file.
-# -----------------------------------------------------------------------------
-echo "[5/6] Packaging repos for FAT32-safe transfer..."
-COPYFILE_DISABLE=1 tar -czf "$OUTPUT_DIR/repos.tar.gz" -C "$REPOS_DIR" .
-echo "  -> repos.tar.gz created ($(du -h "$OUTPUT_DIR/repos.tar.gz" | cut -f1))"
-
-# -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
 echo ""
 echo "=== Download complete ==="
 echo ""
 echo "Contents of $OUTPUT_DIR:"
-echo "  deb/        : $(ls "$DEB_DIR" | wc -l) packages"
-echo "  pip/        : $(ls "$PIP_DIR" | wc -l) wheels"
-echo "  repos.tar.gz: pyoperant, glab_behaviors (tarred for FAT32-safe transfer)"
+echo "  deb/  : $(ls "$DEB_DIR" | wc -l) packages"
+echo "  pip/  : $(ls "$PIP_DIR" | wc -l) wheels"
+echo "  keys/ : client-fleet SSH key (for live-cloning repos from magpi.ucsd.edu on first boot)"
+echo ""
+echo "pyoperant and glab_behaviors are NOT bundled here -- magpi_revd_setup.sh"
+echo "clones them live from magpi.ucsd.edu during first boot instead."
 echo ""
 echo "To force a full refresh of any section:"
 echo "  rm -rf $DEB_DIR   # re-download .deb packages"
 echo "  rm -rf $PIP_DIR   # rebuild pip wheels"
-echo "  rm -rf $REPOS_DIR # re-clone repos"
 echo "  docker rmi $DOCKER_IMAGE  # rebuild Docker image"
 echo ""
 echo "Next steps:"

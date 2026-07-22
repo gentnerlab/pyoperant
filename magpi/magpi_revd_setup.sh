@@ -282,40 +282,90 @@ amixer -c "$HIFI_CARD" sset Digital 100% 2>/dev/null && \
 echo "  -> ALSA configured"
 
 # -----------------------------------------------------------------------------
-# 8. PYOPERANT & GLAB_BEHAVIORS (offline from SD card)
+# 8. PYOPERANT & GLAB_BEHAVIORS (live clone from magpi.ucsd.edu)
 # -----------------------------------------------------------------------------
 echo "[8/12] Installing pyoperant and glab_behaviors..."
+echo "  This step clones live from magpi.ucsd.edu (192.168.1.100), not from"
+echo "  the SD card -- so a fix on master is picked up by every board set up"
+echo "  after that point. It needs the server up and reachable right now."
+echo "  This board is likely headless -- read every ERROR line below closely,"
+echo "  it's the only diagnostic surface you'll have (also saved to $LOG)."
 
-# Clean up any stale egg-links from previous installs
+MAGPI_SERVER=192.168.1.100
+CLIENT_FLEET_KEY="$HOME_DIR/.ssh/id_client_fleet"
+
+# --- 8a. Install the shared client-fleet private key -----------------------
+echo "  [8a] Installing client-fleet SSH key..."
+if [ ! -f "$PACKAGES_DIR/keys/id_client_fleet" ]; then
+  echo "ERROR: $PACKAGES_DIR/keys/id_client_fleet not found."
+  echo "This board's SD card was prepared without it -- re-run"
+  echo "download_packages.sh + prep_sdcard.sh on the Mac (both now check for"
+  echo "this key and will tell you how to generate it if it's missing)."
+  exit 1
+fi
+mkdir -p "$HOME_DIR/.ssh"
+cp "$PACKAGES_DIR/keys/id_client_fleet" "$CLIENT_FLEET_KEY"
+chmod 700 "$HOME_DIR/.ssh"
+chmod 600 "$CLIENT_FLEET_KEY"
+chown -R $MAGPI_USER:$MAGPI_USER "$HOME_DIR/.ssh"
+echo "    -> key installed at $CLIENT_FLEET_KEY"
+
+# --- 8b. Verify the server is actually reachable ----------------------------
+echo "  [8b] Checking magpi.ucsd.edu ($MAGPI_SERVER) is reachable..."
+if ! ping -c 2 -W 3 "$MAGPI_SERVER" > /dev/null 2>&1; then
+  echo "ERROR: $MAGPI_SERVER did not respond to ping."
+  echo "This board cannot reach the server over the network. Check:"
+  echo "  - Is the ethernet cable plugged in to the MagPi switch?"
+  echo "  - Is magpi.ucsd.edu (the server) actually powered on right now?"
+  echo "  - Did step [2/12] (static IP) above report success?"
+  echo "Fix connectivity, then re-run this script -- earlier steps are"
+  echo "idempotent and will skip what's already done."
+  exit 1
+fi
+echo "    -> $MAGPI_SERVER responds to ping"
+
+# --- 8c. Verify SSH auth with the client-fleet key --------------------------
+# Runs as root throughout this step (consistent with the rest of this script,
+# which runs entirely as root) -- the -i flag picks the identity explicitly,
+# so it doesn't matter which local user invokes ssh/git. Ownership is fixed
+# up with chown after each clone, same pattern the old tarball-extraction
+# code used.
+echo "  [8c] Verifying SSH auth to $MAGPI_SERVER..."
+SSH_OPTS="-i $CLIENT_FLEET_KEY -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME_DIR/.ssh/known_hosts"
+if ! ssh $SSH_OPTS "bird@$MAGPI_SERVER" "echo ok" > /tmp/ssh_check.out 2>&1; then
+  echo "ERROR: SSH to bird@$MAGPI_SERVER failed using the client-fleet key."
+  echo "Output was:"
+  sed 's/^/    /' /tmp/ssh_check.out
+  echo ""
+  echo "Most likely cause: this key's public half (id_client_fleet.pub) isn't"
+  echo "in bird@$MAGPI_SERVER's ~/.ssh/authorized_keys yet -- that's a"
+  echo "one-time server-side setup step, done once for the whole fleet, not"
+  echo "per board. Check with whoever set up magpi.ucsd.edu."
+  exit 1
+fi
+chown $MAGPI_USER:$MAGPI_USER "$HOME_DIR/.ssh/known_hosts" 2>/dev/null || true
+echo "    -> SSH auth OK"
+export GIT_SSH_COMMAND="ssh $SSH_OPTS"
+
+# --- 8d. Clean up any stale egg-links from previous installs ---------------
 find /usr -name "pyoperant.egg-link" -delete 2>/dev/null || true
 rm -rf "$HOME_DIR/pyoperant/pyoperant.egg-info" 2>/dev/null || true
 grep -v pyoperant /usr/lib/python3/dist-packages/easy-install.pth > /tmp/easy-install.pth 2>/dev/null && \
   mv /tmp/easy-install.pth /usr/lib/python3/dist-packages/easy-install.pth || true
 
-if [ ! -f "$PACKAGES_DIR/repos.tar.gz" ]; then
-  echo "ERROR: repos.tar.gz not found in $PACKAGES_DIR"
-  echo "Re-run download_packages.sh + prep_sdcard.sh on the Mac."
-  exit 1
-fi
-
-# bootfs (where $PACKAGES_DIR lives) is FAT32 — it can't hold git's packed
-# object files, symlinks, or executable bits intact. Extract the tarball
-# straight onto this filesystem (ext4) so those come through correctly,
-# instead of cp -r'ing an already-corrupted tree off the FAT32 partition.
-REPOS_EXTRACT=/tmp/magpi_repos_extract
-rm -rf "$REPOS_EXTRACT"
-mkdir -p "$REPOS_EXTRACT"
-tar -xzf "$PACKAGES_DIR/repos.tar.gz" -C "$REPOS_EXTRACT"
-
-if [ ! -d "$REPOS_EXTRACT/pyoperant" ]; then
-  echo "ERROR: pyoperant repo not found after extracting repos.tar.gz"
-  exit 1
-fi
-
-# Copy repos to home directory (skip if already installed)
-if [ ! -d "$HOME_DIR/pyoperant" ]; then
-  cp -r "$REPOS_EXTRACT/pyoperant" $HOME_DIR/pyoperant
-  chown -R $MAGPI_USER:$MAGPI_USER $HOME_DIR/pyoperant
+# --- 8e. Clone pyoperant ----------------------------------------------------
+echo "  [8e] Cloning pyoperant..."
+if [ -d "$HOME_DIR/pyoperant" ]; then
+  echo "    -> $HOME_DIR/pyoperant already exists, leaving it as-is"
+else
+  if ! git clone "bird@$MAGPI_SERVER:~/code/pyoperant" "$HOME_DIR/pyoperant"; then
+    echo "ERROR: git clone of pyoperant failed. See output above."
+    echo "Check that bird@$MAGPI_SERVER:~/code/pyoperant exists and is on"
+    echo "the right branch (should be master)."
+    exit 1
+  fi
+  chown -R $MAGPI_USER:$MAGPI_USER "$HOME_DIR/pyoperant"
+  echo "    -> pyoperant cloned ($(git -C "$HOME_DIR/pyoperant" rev-parse --short HEAD))"
 fi
 # setuptools must be importable before pip can do an editable install
 pip3 install --break-system-packages --no-index --no-build-isolation \
@@ -324,25 +374,44 @@ pip3 install --break-system-packages --no-index --no-build-isolation \
 pip3 install --break-system-packages --no-index --no-build-isolation \
   --find-links="$PACKAGES_DIR/pip" \
   -e $HOME_DIR/pyoperant
-echo "  -> pyoperant installed"
+echo "    -> pyoperant installed"
 
-if [ -d "$REPOS_EXTRACT/glab_behaviors" ]; then
-  if [ ! -d "$HOME_DIR/glab_behaviors" ]; then
-    cp -r "$REPOS_EXTRACT/glab_behaviors" $HOME_DIR/glab_behaviors
-    chown -R $MAGPI_USER:$MAGPI_USER $HOME_DIR/glab_behaviors
-  fi
-  # glab_behaviors has no setup.py — add parent dir to Python path via .pth file
-  echo "$HOME_DIR" > /usr/lib/python3/dist-packages/glab_behaviors.pth
-  # Empty __init__.py — Python 2 style imports cause errors in Python 3
-  : > "$HOME_DIR/glab_behaviors/__init__.py"
-  # Remove stray email file if present
-  rm -f "$HOME_DIR/glab_behaviors/magpi12@ucsd.edu"
-  echo "  -> glab_behaviors added to Python path"
+# --- 8f. Clone glab_behaviors (sparse checkout of py-behaviors) ------------
+# glab_behaviors is a subfolder of the private py-behaviors repo, not a repo
+# of its own -- a sparse checkout gives a real, working git clone (so local
+# edits are trackable/pushable going forward) while only materializing the
+# glab_behaviors/ subfolder on disk, same footprint as before.
+echo "  [8f] Cloning glab_behaviors (sparse checkout of py-behaviors)..."
+if [ -d "$HOME_DIR/py-behaviors" ]; then
+  echo "    -> $HOME_DIR/py-behaviors already exists, leaving it as-is"
 else
-  echo "WARNING: glab_behaviors not found — skipping"
+  if ! git clone --filter=blob:none --sparse \
+      "bird@$MAGPI_SERVER:~/code/py-behaviors" "$HOME_DIR/py-behaviors"; then
+    echo "ERROR: git clone of py-behaviors failed. See output above."
+    echo "Check that bird@$MAGPI_SERVER:~/code/py-behaviors exists and is on"
+    echo "the right branch (should be master)."
+    exit 1
+  fi
+  if ! git -C "$HOME_DIR/py-behaviors" sparse-checkout set glab_behaviors; then
+    echo "ERROR: sparse-checkout set glab_behaviors failed."
+    exit 1
+  fi
+  if [ ! -d "$HOME_DIR/py-behaviors/glab_behaviors" ]; then
+    echo "ERROR: glab_behaviors/ not present after sparse checkout -- check"
+    echo "that the glab_behaviors subfolder still exists in py-behaviors."
+    exit 1
+  fi
+  chown -R $MAGPI_USER:$MAGPI_USER "$HOME_DIR/py-behaviors"
+  echo "    -> py-behaviors cloned, sparse-checked-out to glab_behaviors/ only ($(git -C "$HOME_DIR/py-behaviors" rev-parse --short HEAD))"
 fi
 
-rm -rf "$REPOS_EXTRACT"
+if [ ! -L "$HOME_DIR/glab_behaviors" ]; then
+  ln -s "$HOME_DIR/py-behaviors/glab_behaviors" "$HOME_DIR/glab_behaviors"
+  chown -h $MAGPI_USER:$MAGPI_USER "$HOME_DIR/glab_behaviors"
+fi
+# glab_behaviors has no setup.py — add parent dir to Python path via .pth file
+echo "$HOME_DIR" > /usr/lib/python3/dist-packages/glab_behaviors.pth
+echo "    -> glab_behaviors symlinked to $HOME_DIR/glab_behaviors and added to Python path"
 
 # Install Python wheels
 if [ -d "$PACKAGES_DIR/pip" ] && [ "$(ls $PACKAGES_DIR/pip 2>/dev/null | wc -l)" -gt 0 ]; then

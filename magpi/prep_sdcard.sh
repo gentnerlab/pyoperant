@@ -53,21 +53,19 @@ if [ ! -d "$SCRIPT_DIR/magpi_packages" ]; then
   echo "Run download_packages.sh first."
   exit 1
 fi
-if [ ! -f "$SCRIPT_DIR/magpi_packages/repos.tar.gz" ]; then
-  echo "ERROR: magpi_packages/repos.tar.gz not found."
-  echo "Re-run download_packages.sh (it now tars repos/ before this script"
-  echo "copies it onto the FAT32 bootfs partition, which otherwise corrupts"
-  echo "git's pack files, drops symlinks, and mangles permissions)."
+if [ ! -f "$SCRIPT_DIR/magpi_packages/keys/id_client_fleet" ]; then
+  echo "ERROR: magpi_packages/keys/id_client_fleet not found."
+  echo "This board can't clone pyoperant/glab_behaviors from magpi.ucsd.edu"
+  echo "on first boot without it. Re-run download_packages.sh (it checks for"
+  echo "this key and prints setup instructions if it's missing)."
   exit 1
 fi
-# Ship deb/, pip/, and the repos tarball only — not the raw repos/ tree.
-# The raw tree would get its permissions/symlinks/git-pack-files mangled by
-# the FAT32 bootfs partition; the tarball crosses intact as opaque bytes.
 mkdir -p "$BOOTFS/magpi_packages"
 cp -r "$SCRIPT_DIR/magpi_packages/deb" "$BOOTFS/magpi_packages/"
 cp -r "$SCRIPT_DIR/magpi_packages/pip" "$BOOTFS/magpi_packages/"
-cp "$SCRIPT_DIR/magpi_packages/repos.tar.gz" "$BOOTFS/magpi_packages/"
-echo "  -> magpi_packages/ copied (repos shipped as repos.tar.gz)"
+mkdir -p "$BOOTFS/magpi_packages/keys"
+cp "$SCRIPT_DIR/magpi_packages/keys/id_client_fleet" "$BOOTFS/magpi_packages/keys/"
+echo "  -> magpi_packages/ copied (deb, pip, client-fleet key)"
 
 # -----------------------------------------------------------------------------
 # 2. Copy setup and test scripts
@@ -203,10 +201,10 @@ else
   MISSING=1
 fi
 
-if [ -f "$BOOTFS/magpi_packages/repos.tar.gz" ]; then
-  echo "  OK  magpi_packages/repos.tar.gz"
+if [ -f "$BOOTFS/magpi_packages/keys/id_client_fleet" ]; then
+  echo "  OK  magpi_packages/keys/id_client_fleet"
 else
-  echo "  MISSING  magpi_packages/repos.tar.gz"
+  echo "  MISSING  magpi_packages/keys/id_client_fleet"
   MISSING=1
 fi
 
