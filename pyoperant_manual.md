@@ -44,7 +44,7 @@ The lab currently uses PyOperant to control dozens of operant panels running sim
 
 ### 1.3 How This Manual is Organized
 
-This manual is divided into five main parts:
+This manual is organized into the following chapters:
 
   - Chapter 2 covers the architecture of PyOperant and how its layers fit together.
 
@@ -52,13 +52,13 @@ This manual is divided into five main parts:
 
   - Chapter 5 covers the network and server organization: how MagPi clients and the MagPi server relate to each other.
 
-  - Chapter 7 covers system setup and usage: flashing a new client, deploying code, setting up birds, and day-to-day monitoring.
-
   - Chapter 6 covers software setup: installing PyOperant and configuring your panel in local\_pi\_revd.py or local\_pi\_revc.py.
 
-  - Chapter 10 walks through writing your own behavioral experiment script step by step.
+  - Chapter 7 covers system setup and usage: flashing a new client, deploying code, setting up birds, and day-to-day monitoring.
 
   - Chapter 8 covers existing protocols in py-behaviors and how to run them. Chapter 9 covers running experiments, monitoring sessions, and troubleshooting common problems.
+
+  - Chapter 10 walks through writing your own behavioral experiment script step by step.
 
   - Chapter 11 covers analyzing behavioral data: the files PyOperant produces, and how to use the pyoperant.analysis and behav-analysis packages to load, visualize, and compute metrics from them.
 
@@ -189,7 +189,7 @@ Each IR beam sensor (peck port and hopper) connects to one channel of the IR bea
 
 How it works: the IR LED transmits a constant beam to an IR phototransistor. When the beam is clear, the transistor conducts, pulling the Schmitt trigger input low, and the output goes high. When the beam is broken (a peck), the transistor stops conducting, the input is pulled high by the 4.32 kΩ resistor, and the output goes low. This inverted, noise-cleaned signal is passed to a GPIO pin on the Raspberry Pi.
 
-Because the output is inverted, broken beam = low GPIO = logical 0. In software this is corrected by setting inverted=True on the relevant PeckPort or Hopper component (see Section 5.3).
+Because the output is inverted, broken beam = low GPIO = logical 0. In software this is corrected by setting inverted=True on the relevant PeckPort or Hopper component (see Section 6.3).
 
 The interface board supports 12 IR channels total: hopper, left, center, right, and 8 auxiliary channels (AUX\_IR\_1 through AUX\_IR\_8).
 
@@ -392,7 +392,7 @@ The lights chip (U1) on the RPiOperant board is configured for address 0x55 (0x4
 
 ### 3.7 Load Cell
 
-The RPiOperant Rev D board includes an HX711 24-bit load cell amplifier (M3) that connects to a strain gauge load cell mounted inside the operant box. The intended application is continuous weighing of food in the hopper, allowing the experiment to track consumption per trial or per session. Data and clock signals connect to GPIO17 and GPIO8 on the Raspberry Pi respectively. If load cell functionality is not needed, jumper JP1 disconnects the HX711 from the RPi to free those GPIO pins for other use. See Appendix C.7 for full HX711 electrical specifications.
+The RPiOperant Rev D board includes an HX711 24-bit load cell amplifier (M3) that connects to a strain gauge load cell mounted inside the operant box. The intended application is continuous weighing of food in the hopper, allowing the experiment to track consumption per trial or per session. Data and clock signals connect to GPIO17 and GPIO8 on the Raspberry Pi respectively. If load cell functionality is not needed, jumper JP1 disconnects the HX711 from the RPi to free those GPIO pins for other use. See Appendix B.7 for full HX711 electrical specifications.
 
 *TODO: This section needs expansion to cover physical load cell installation and mounting, wiring to the HX711 on the breakout board, software driver integration (GPIO bit-banging protocol), calibration procedure (tare and known-weight span calibration), and recommended Python libraries. A companion section on using load cell data during experiments (logging consumption, triggering events on weight threshold) will be added in Section 6 when the load cell workflow is finalized.*
 
@@ -438,7 +438,7 @@ The hopper IR sensor connects to the breakout board’s HOPPER IR connector with
 
 #### Tuning Servo Angles
 
-The exact angle values needed to raise and lower the hopper vary between panels due to differences in servo mounting and mechanical tolerances. These values must be tuned empirically for each panel and recorded in local\_pi\_revd.py as up\_angle and down\_angle. See Section 5.4 for the tuning procedure.
+The exact angle values needed to raise and lower the hopper vary between panels due to differences in servo mounting and mechanical tolerances. These values must be tuned empirically for each panel and recorded in local\_pi\_revd.py as up\_angle and down\_angle. See Section 6.4 for the tuning procedure.
 
 ### 4.3 Peck Ports
 
@@ -453,10 +453,10 @@ BCM pin assignments for peck port IR beams:
 |                  |              |                    |
 | ---------------- | ------------ | ------------------ |
 | **Port**         | **BCM GPIO** | **50-pin IDC Pin** |
-| Hopper IR        | GPIO5        | 7                  |
-| Left peck port   | GPIO6        | 20                 |
-| Center peck port | GPIO13       | 8                  |
-| Right peck port  | GPIO26       | 21                 |
+| Hopper IR        | GPIO5        | 19                 |
+| Left peck port   | GPIO6        | 18                 |
+| Center peck port | GPIO13       | 17                 |
+| Right peck port  | GPIO26       | 16                 |
 
 #### Cue LED
 
@@ -526,7 +526,7 @@ This section walks through connecting all components for a new or reconfigured p
 
 #### Step 5: Power On and Verify
 
-10. Apply power to the MagPi client. Both the green power-good LED should illuminate within a few seconds of power-up.
+10. Apply power to the MagPi client. The green power-good LED should illuminate within a few seconds of power-up.
 
 11. SSH into the MagPi client: ssh bird@192.168.1.XX
 
@@ -534,7 +534,7 @@ This section walks through connecting all components for a new or reconfigured p
 
 13. Run i2cdetect -y 1 and confirm two devices are visible: 0x55 (lights PCA9685) and 0x45 (servo PCA9685).
 
-14. Run python -c "from local\_pi import Pi1; b = Pi1(); b.test()" and watch each component cycle. Fix any failures before placing a bird in the panel.
+14. Run python3 scripts/test\_panel.py (it auto-detects the board revision from /etc/magpi\_revision) and watch each component cycle. Fix any failures before placing a bird in the panel.
 
 ## 5. Network and Server Organization
 
@@ -889,7 +889,7 @@ local.py reads this file and imports the correct config:
 
 If the file is missing or contains an unrecognized value, PyOperant raises a RuntimeError with a clear message before anything is driven, preventing hardware mismatches.
 
-> *This file must be set once on each MagPi client during initial setup. See Section 7.3 for the full setup procedure.*
+> *This file must be set once on each MagPi client during initial setup. See Section 7.1 for the full setup procedure.*
 
 #### What the Local Config Does
 
@@ -1131,9 +1131,9 @@ Run the following on the MagPi client (all from the bird user’s home directory
 
 33. Connect the 50-pin IDC ribbon cable and audio cable to the operant panel.
 
-34. Start Python and run the panel test:
+34. Run the panel test (it auto-detects the board revision from /etc/magpi\_revision):
 
-> python -c "from local\_pi import Pi1; b = Pi1(); b.test()"
+> python3 scripts/test\_panel.py
 
 All components should cycle without errors. Fix any failures before placing a bird.
 
@@ -1185,17 +1185,17 @@ Edit config.json to set the correct bird ID, experimenter, stimulus paths, and a
 
 43. If starting with shaping, set shape to 'block1' in config.json.
 
-44. On the MagPi server, open panel\_subject\_behavior and add or update the row for this box:
+44. On the MagPi server, open panel\_subject\_behavior and add or update the row for this box. Follow the exact column format from Section 5.3 — column 3 is a **bare** bird number (no `B` prefix; the tools prepend it), column 4 is the `opdat/B<3>` template, and the behavior/protocol name must be the **last** token of the command column (both `allsummary.py` and `rpioperantctl` identify the protocol from that final token):
 
 > vim \~/opdat/panel\_subject\_behavior
 > 
-> \# box enable birdID datadir command
+> \# panel enable birdID datadir command
 > 
-> XX 1 BXXXX /home/bird/opdat/BXXXX behave TwoAltChoiceExp -P XX -S BXXXX -c config.json
+> magpiXX 1 XXXX opdat/B\<3\> behave -P \<1\> -S B\<3\> TwoAltChoiceExp
 
-45. Run pyoperantctl to start the behavior:
+45. `rpioperantctl` will start the behavior on its next 5-minute cron cycle (Section 5.2). To apply immediately without waiting, run it by hand on the server:
 
-> pyoperantctl -s
+> /home/bird/code/rpioperantctl/rpioperantctl.py -s
 
 46. Verify it started correctly:
 
@@ -1207,15 +1207,15 @@ The house lights should be on and shaping block 1 (free hopper access every 30 s
 
 ### 7.4 Day-to-Day Monitoring
 
-From the MagPi server you can check all boxes at a glance using pyoperantctl with no arguments, which reports what is and isn’t running without making any changes:
+From the MagPi server you can check all boxes at a glance by running rpioperantctl with no action flags, which does a dry run — reporting what it would start or kill without changing anything:
 
-> pyoperantctl
+> /home/bird/code/rpioperantctl/rpioperantctl.py
 
 To follow a specific box’s log in real time:
 
 > ssh bird@192.168.1.XX 'tail -f \~/opdat/BXXXX/BXXXX.log'
 
-The all.summary file (updated every 16 minutes by the server’s cron job) gives a one-line status for every bird: trials run, feeds delivered, hopper failures, and the time of the last trial:
+The all.summary file (updated every 15 minutes by the server’s cron job) gives a one-line status for every bird: trials run, feeds delivered, hopper failures, and the time of the last trial:
 
 > cat \~/opdat/all.summary
 
@@ -1223,7 +1223,7 @@ The all.summary file (updated every 16 minutes by the server’s cron job) gives
 
 To push a code update to all active clients:
 
-47. Commit and push the change to the server’s local clone:
+47. Update the server’s local clone by pulling the change from GitHub onto the server (or commit it directly on the server):
 
 > cd \~/code/pyoperant && git pull origin master
 
@@ -1237,25 +1237,27 @@ Changes to behavior scripts in py-behaviors follow the same pattern. It is not n
 
 ### 7.6 Stopping and Restarting Experiments
 
-To stop all experiments across all boxes (for maintenance, cage cleaning, etc.):
+The `panel_subject_behavior` table is the source of truth (Section 5.2): the cleanest way to stop or start a box is to edit its enable flag and let `rpioperantctl` reconcile on its next 5-minute cron cycle. The commands below apply the same changes immediately from the MagPi server. Note that `-k` only kills processes the table says should **not** be running (wrong behavior, or a disabled panel) — it does not blindly kill everything, so "stopping" a box means first marking it disabled in the table.
 
-> pyoperantctl -k
+To stop all experiments across all boxes (for maintenance, cage cleaning, etc.), set every enable flag to 0 (or comment the rows out) in panel\_subject\_behavior, then run with `-k`:
 
-This sends SIGTERM to each behave process, which triggers session\_post and saves data before exiting.
+> /home/bird/code/rpioperantctl/rpioperantctl.py -k
 
-To disable a specific box without touching others, set the enable flag to 0 in panel\_subject\_behavior and run:
+`-k` sends SIGTERM to each behave process that shouldn't be running, which triggers session\_post and saves data before exiting.
 
-> pyoperantctl -k
+To disable a specific box without touching others, set its enable flag to 0 in panel\_subject\_behavior and run:
 
-To restart everything according to the panel\_subject\_behavior table:
+> /home/bird/code/rpioperantctl/rpioperantctl.py -k
 
-> pyoperantctl -s
+To (re)start everything according to the panel\_subject\_behavior table:
 
-To kill and restart in one step:
+> /home/bird/code/rpioperantctl/rpioperantctl.py -s
 
-> pyoperantctl -sk
+To kill stale processes and start correct ones in a single pass, combine both flags:
+
+> /home/bird/code/rpioperantctl/rpioperantctl.py -s -k
 > 
-> *Always allow a few seconds between -k and -s to give session\_post time to finish writing data. Running -sk too quickly on a box mid-trial may result in the last trial not being saved.*
+> *Give session\_post a moment to finish writing data on a box that was mid-trial before it is restarted. Also note the every-5-minute cron job runs with `-s` only (Section 5.2), a deliberate staged rollout — running `-k` by hand is how kills are enforced until that changes.*
 
 ## 8. Using Existing Protocols
 
@@ -1410,7 +1412,7 @@ On the clients, pull and reinstall:
 
 > cd \~/py-behaviors && git pull origin master && pip install -e .
 > 
-> *glab\_behaviors is currently Python 2 only and has not been tested on Python 3. All protocols use the same Python 2-only patterns as pyoperant itself. A coordinated Python 3 migration of both repos is planned.*
+> *glab\_behaviors has been migrated to Python 3 alongside pyoperant — every protocol in the package parses and imports cleanly under Python 3, and the package uses explicit relative imports in \_\_init\_\_.py. If you are adapting an older protocol that was written for the Python 2 codebase, apply the same fixes catalogued in Appendix C (print(), except ... as, range/input, relative imports) before adding it.*
 
 ## 9. Running Experiments and Troubleshooting
 
@@ -1488,7 +1490,7 @@ If no existing protocol fits, decide how much to build from scratch:
 
   - If your experiment has a fundamentally different structure (go/no-go, free operant, autoshaping), inherit from BaseExp and implement the trial loop yourself.
 
-See Chapter 9 for a full description of the protocols available in glab\_behaviors.
+See Chapter 8 for a full description of the protocols available in glab\_behaviors.
 
 ### 10.2 Experiment Structure
 
@@ -1855,7 +1857,7 @@ Additional columns can be added via add\_fields\_to\_save in the config. Because
 
 #### Summary DAT
 
-A plain-text file updated at the end of each session, named XXXX.summaryDAT. It contains counts of trials, feeds, and hopper failures for the current session. This is what the server’s all.summary aggregation script reads. Useful for a quick status check but does not contain trial-by-trial data.
+A plain-text file updated at the end of each session, named BXXXX.summaryDAT. It contains counts of trials, feeds, and hopper failures for the current session. This is what the server’s all.summary aggregation script reads. Useful for a quick status check but does not contain trial-by-trial data.
 
 #### Log File
 
@@ -2816,274 +2818,274 @@ Section numbers are given. Where a topic spans multiple sections the primary ref
 
 **A**
 
-ABCategory / ABCategory2 (protocol)7.6
+ABCategory / ABCategory2 (protocol) — 8
 
-address pins, PCA96853.3, 10.3
+address pins, PCA9685 — 3.6, B.3
 
-audio output — see HiFiBerry, PyAudio3.9, B.7
+audio output — see HiFiBerry, PyAudio — 3.2, 4.5, B.2
 
-AUX\_LED channels (U1)3.3
+AUX\_LED channels (U1) — 3.2
 
-AUX\_SERVO channels (U7)3.3
+AUX\_SERVO channels (U7) — 3.2
 
-auxiliary servo outputs (local\_pi\_revd.py)6.3
+auxiliary servo outputs (local\_pi\_revd.py) — 6.3
 
 **B**
 
-BaseExp (class)2.2, 7.2, 7.5
+BaseExp (class) — 2.2, 10.1, 10.5
 
-behave (command-line script)7.4, 10.2
+behave (command-line script) — 9.1, 10.4
 
-block\_design (config parameter)7.5
+block\_design (config parameter) — 10.5
 
-BooleanInput (hwio class)2.5, 6.3
+BooleanInput (hwio class) — 2.5, 6.3
 
-BooleanOutput (hwio class)2.5, 6.3
+BooleanOutput (hwio class) — 2.5, 6.3
 
-breakout board3.6
+breakout board — 4.1
 
-board revision detection — see /etc/magpi\_revision6.2
+board revision detection — see /etc/magpi\_revision — 6.2
 
 **C**
 
-cPickle — Python 3 migrationC.1, C.2
+cPickle — Python 3 migration — C.1, C.2
 
-classes (config parameter)7.5
+classes (config parameter) — 10.5
 
-components.py2.4, 10.1
+components.py — 2.4, 12.1
 
-config.json7.5
+config.json — 10.5
 
-correction\_trials (config parameter)7.5
+correction\_trials (config parameter) — 10.5
 
-cue light — see RGBLight2.4, 6.3
+cue light — see RGBLight — 2.4, 6.3
 
-cue\_probability (protocol)7.6
+cue\_probability (protocol) — 8
 
-CueSwitchExperiment (protocol)7.6
+CueSwitchExperiment (protocol) — 8
 
 **D**
 
-data files (CSV, log, summaryDAT)9.1
+data files (CSV, log, summaryDAT) — 11.1
 
-DATAPATH (config variable)6.2, 10.1
+DATAPATH (config variable) — 6.2
 
-debug (config parameter)7.5
+debug (config parameter) — 10.5
 
-DelayedMatch2 (protocol)7.6
+DelayedMatch2 (protocol) — 8
 
-down\_angle — see servo angle tuning6.4
+down\_angle — see servo angle tuning — 6.4
 
 **E**
 
-ephem (dependency)C.1
+ephem (dependency) — 6.1, C.1
 
-EvidenceAccumExperiment (protocol)7.6
+EvidenceAccumExperiment (protocol) — 8
 
-experiment\_path (config parameter)7.5
+experiment\_path (config parameter) — 10.5
 
-experimenter (config parameter)7.5
+experimenter (config parameter) — 10.5
 
 **F**
 
-feed() method (Hopper)2.4
+feed() method (Hopper) — 2.4
 
-FirstOrder (protocol)7.6
+FirstOrder (protocol) — 8
 
-food hopper — see Hopper3.4
+food hopper — see Hopper — 4.2
 
-free\_food\_schedule (config parameter)7.5
+free\_food\_schedule (config parameter) — 10.5
 
 **G**
 
-glab\_behaviors — see py-behaviors7.6
+glab\_behaviors — see py-behaviors — 8
 
-GPIO pin assignments (Rev C)6.3
+GPIO pin assignments (Rev C) — 6.3
 
-GPIO pin assignments (Rev D)3.5, 6.3
+GPIO pin assignments (Rev D) — 3.3, 6.3
 
 **H**
 
-HiFiBerry Amp2 (audio board)3.9, B.7
+HiFiBerry Amp2 (audio board) — 3.2, B.2
 
-HOPPER\_SERVO\_CHANNEL constant6.3
+HOPPER\_SERVO\_CHANNEL constant — 6.3
 
-HopperAlreadyUpError2.4, 8.3
+HopperAlreadyUpError — 2.4, 9.3
 
-HopperWontComeUpError2.4, 8.3
+HopperWontComeUpError — 2.4, 9.3
 
-HopperWontDropError2.4, 8.3
+HopperWontDropError — 2.4, 9.3
 
-Hopper (component class)2.4, 6.3
+Hopper (component class) — 2.4, 6.3
 
-house light — see LEDStripHouseLight2.4, 6.3
+house light — see LEDStripHouseLight — 2.4, 4.4, 6.3
 
-hwio.py2.5, 10.1
+hwio.py — 2.5, 12.1
 
 **I**
 
-I2C bus3.3
+I2C bus — 3.3
 
-i2cdetect8.3, 10.2
+i2cdetect — 9.3, 12.2
 
-idle\_poll\_interval (config parameter)7.5
+idle\_poll\_interval (config parameter) — 10.5
 
-intertrial\_min (config parameter)7.5
+intertrial\_min (config parameter) — 10.5
 
-inverted (parameter)3.5, 6.3
+inverted (parameter) — 3.2, 6.3
 
-IR beam sensor3.4, 3.5, B.5
+IR beam sensor — 3.2, 4.3, B.4
 
 **L**
 
-LEDStripHouseLight (component class)2.4, 6.3
+LEDStripHouseLight (component class) — 2.4, 4.4, 6.3
 
-light\_schedule (config parameter)7.5
+light\_schedule (config parameter) — 10.5
 
-local.py (router)2.3, 6.2, 10.1
+local.py (router) — 2.3, 6.2, 12.1
 
-local\_pi\_revc.py6.2, 6.3, 10.1
+local\_pi\_revc.py — 6.2, 6.3, 12.1
 
-local\_pi\_revd.py6.2, 6.3, 10.1
+local\_pi\_revd.py — 6.2, 6.3, 12.1
 
-log file8.2, 9.1
+log file — 9.2, 11.1
 
-log\_handlers (config parameter)7.5
+log\_handlers (config parameter) — 10.5
 
 **M**
 
-MagPi client (hardware)3.1, 3.2
+MagPi client (hardware) — 3.1, 3.2
 
-MagPi server4.1
+MagPi server — 5.2
 
-/etc/magpi\_revision (revision file)6.2
+/etc/magpi\_revision (revision file) — 6.2
 
-Molex KK 254 connectorsB.9
+Molex KK 254 connectors — B.9
 
 **N**
 
-network configuration4.2
+network configuration — 5.1
 
-no\_response\_correction\_trials (config parameter)7.5
+no\_response\_correction\_trials (config parameter) — 10.5
 
 **O**
 
-operant conditioning (concept)1.1
+operant conditioning (concept) — 1.1
 
-open() mode — Python 3 migrationC.1, C.2
+open() mode — Python 3 migration — C.1, C.2
 
 **P**
 
-panel\_name (config parameter)7.5
+panel\_name (config parameter) — 10.5
 
-panels.py / BasePanel2.3, 10.1
+panels.py / BasePanel — 2.3, 12.1
 
-PCA9685 (U1, lights chip)3.3, B.6
+PCA9685 (U1, lights chip) — 3.2, 3.6, B.3
 
-PCA9685 (U7, servo chip)3.3, B.6
+PCA9685 (U7, servo chip) — 3.2, 3.6, B.3
 
-peck port — see PeckPort3.5
+peck port — see PeckPort — 4.3
 
-PeckPort (component class)2.4, 6.3
+PeckPort (component class) — 2.4, 6.3
 
-pigpio / pigpiod3.2, 8.1, 10.2
+pigpio / pigpiod — 6.1, 9.1, 12.2
 
-print statements — Python 3 migrationC.1, C.2
+print statements — Python 3 migration — C.1, C.2
 
-PWMOutput (hwio class)2.5, 6.3
+PWMOutput (hwio class) — 2.5, 6.3
 
-py-behaviors repository7.6
+py-behaviors repository — 8
 
-Python 3 migrationAppendix C
+Python 3 migration — Appendix C
 
 **Q**
 
-queues.py (trial queue classes)10.1
+queues.py (trial queue classes) — 11.1, 12.1
 
 **R**
 
-raspi\_gpio\_.py (interface)2.5, 10.1
+raspi\_gpio\_.py (interface) — 2.5, 12.1
 
-RaspberryPiInterface (class)2.5, 6.2
+RaspberryPiInterface (class) — 2.5, 6.2
 
-reinforcement (config parameter)7.5
+reinforcement (config parameter) — 10.5
 
-reinforcement schedules7.5
+reinforcement schedules — 10.5
 
-reset() method2.3, 6.3
+reset() method — 2.3, 6.3
 
-response\_win (config parameter)7.5
+response\_win (config parameter) — 10.5
 
-Rev C board6.2, 6.3
+Rev C board — 6.2, 6.3
 
-Rev D board3.1, 6.2, 6.3
+Rev D board — 3.1, 6.2, 6.3
 
-RGBLight (component class)2.4, 6.3
+RGBLight (component class) — 2.4, 6.3
 
-rsync (data backup)4.3
+rsync (data backup) — 5.2
 
 **S**
 
-SameDifProbs (protocol)7.6
+SameDifProbs (protocol) — 8
 
-scripts/behave7.4, 10.1
+scripts/behave — 10.4, 12.1
 
-SecondOrder (protocol)7.6
+SecondOrder (protocol) — 8
 
-self.cue — see RGBLight6.3
+self.cue — see RGBLight — 6.3
 
-servo angle tuning6.4
+servo angle tuning — 6.4
 
-session\_post() method2.2, 7.2
+session\_post() method — 2.2, 10.2
 
-session\_pre() method2.2, 7.2
+session\_pre() method — 2.2, 10.2
 
-session\_schedule (config parameter)7.5
+session\_schedule (config parameter) — 10.5
 
-shape (config parameter)7.5
+shape (config parameter) — 10.5
 
-shaping protocols — see shape.py2.2, 10.1
+shaping protocols — see shape.py — 2.2, 12.1
 
-solenoid hopper (Rev C)6.2, 6.3
+solenoid hopper (Rev C) — 6.2, 6.3
 
-song\_recognition (protocol)7.6
+song\_recognition (protocol) — 8
 
-SSH access4.2, 5.3
+SSH access — 5.1, 5.2
 
-stim\_path (config parameter)7.5
+stim\_path (config parameter) — 10.5
 
-stims (config parameter)7.5
+stims (config parameter) — 10.5
 
-subject (config parameter)7.5
+subject (config parameter) — 10.5
 
-summaryDAT file9.1
+summaryDAT file — 11.1
 
 **T**
 
-test() method2.3, 6.5
+test() method — 2.3, 6.5
 
-50-pin IDC connector3.4
+50-pin IDC connector — 3.4
 
-TwoAltChoiceExp (class)2.2, 7.5, 10.1
+TwoAltChoiceExp (class) — 2.2, 8, 10.5
 
-two\_alt\_choice.py10.1
+two\_alt\_choice.py — 12.1
 
 **U**
 
-U1 (lights PCA9685)3.3
+U1 (lights PCA9685) — 3.2
 
-U7 (servo PCA9685)3.3
+U7 (servo PCA9685) — 3.2
 
-unicode() — Python 3 migrationC.1, C.2
+unicode() — Python 3 migration — C.1, C.2
 
-up\_angle — see servo angle tuning6.4
+up\_angle — see servo angle tuning — 6.4
 
 **W**
 
-write\_summary() method9.1
+write\_summary() method — 11.1
 
 **X**
 
-xrange — Python 3 migrationC.1, C.2
+xrange — Python 3 migration — C.1, C.2
 
-XY\_context (protocol)7.6
+XY\_context (protocol) — 8
