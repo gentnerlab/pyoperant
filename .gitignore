@@ -33,7 +33,6 @@ fabfile.py
 .DS_Store
 .claude/
 *.docx
-/pyoperant_manual.pdf
 ~$*
 /download_packages.sh
 /magpi_revd_setup.sh
