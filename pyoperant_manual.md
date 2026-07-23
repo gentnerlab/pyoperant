@@ -1,11 +1,3 @@
-# PyOperant Lab Manual
-
-#### Gentner Lab — University of California, San Diego
-
-*A guide to understanding, building, and running operant conditioning experiments*
-
----
-
 ## 1. Introduction
 
 Welcome to the lab. This manual will guide you through everything you need to know to use PyOperant — from understanding the concepts behind operant conditioning to wiring up hardware and writing your own experiment scripts.
@@ -180,7 +172,6 @@ The Rev D board uses a TPSM64404RCHR synchronous step-down module as its main po
 A power-good (PG) circuit monitors both the 3.3V and 5V rails using APX803L40 supervisors. The front panel green LED illuminates only when all rails are healthy. If the green LED does not light on power-up, do not proceed — check the input supply and connections.
 
 > *ALWAYS disconnect power to the MagPi client before working on it or any connected peripherals. The power supply is sensitive to short circuits. Never connect or disconnect the 50-pin IDC cable while powered.*
-> 
 > *Rev D replaced the earlier linear regulator design (7812 + 7833 + TIP42 transistors) with the switching regulator. The +24V rail and the red front panel LED from earlier revisions are deprecated and not present on Rev D boards.*
 
 #### IR Beam Interface
@@ -550,15 +541,13 @@ The RPiOperant network is a private LAN hosted on the MagPi server. The server h
 
 Each MagPi client is assigned a static IP address of 192.168.1.XX, where XX is the box number (e.g., box 3 has IP 192.168.1.3). This is normally configured when each client is intially setup (see section6) and can be changed in /etc/network/interfaces on each client:
 
-> auto eth0
->
-> iface eth0 inet static
->
-> address 192.168.1.XX
->
-> netmask 255.255.255.0
->
-> gateway 192.168.1.100
+```
+auto eth0
+iface eth0 inet static
+address 192.168.1.XX
+netmask 255.255.255.0
+gateway 192.168.1.100
+```
 
 Note: the `gateway` line is set for historical reasons but is not functional — `ip_forward` is disabled on the server and there are no NAT/MASQUERADE rules, so MagPi clients have no routed internet access. This is intentional, not a bug: it keeps the client subnet isolated. Anything a client needs from the outside world (code, time sync, mail relay) goes through a specific server-side service instead of general routing — see 5.2 below.
 
@@ -566,8 +555,10 @@ The server hostname is magpi (magpi.ucsd.edu)
 
 The hostname of each client is set to magpiXX (e.g., magpi03, see section 6). To log in to a client from the MagPi server or any machine on the LAN:
 
-> ssh bird@192.168.1.XX, or
-> ssh magpixx
+```
+ssh bird@192.168.1.XX, or
+ssh magpixx
+```
 
 Video cameras are on a separate subnet (192.168.2.0/24) managed through PoE switches. Each camera's IP is 192.168.2.1XX where XX is the box number.
 
@@ -594,17 +585,23 @@ The MagPi server is the git remote for all MagPi clients. The clients cannot rea
 
 To set up a repository on the server:
 
-> git clone git@github.com:gentnerlab/pyoperant.git \~/code/pyoperant
+```
+git clone git@github.com:gentnerlab/pyoperant.git ~/code/pyoperant
+```
 
 (Use the SSH remote form, `git@github.com:...`, not `https://...` — an HTTPS remote will just fail every push/pull with a credential prompt. All three server-side pipeline repos — `pyoperant`, `glab-common-py`, `rpioperantctl` — should be on SSH remotes; if `git remote -v` shows `https://github.com/...` for any of them, switch it with `git remote set-url origin git@github.com:gentnerlab/<repo>.git`.)
 
 To clone from the server onto a client (run on the client):
 
-> git clone bird@192.168.1.100:\~/code/pyoperant \~/pyoperant
+```
+git clone bird@192.168.1.100:~/code/pyoperant ~/pyoperant
+```
 
 To update a client after pushing changes to the server:
 
-> cd \~/pyoperant && git pull origin master
+```
+cd ~/pyoperant && git pull origin master
+```
 
 The same workflow applies to py-behaviors (the lab's private behavior repository) and any other code the clients need.
 
@@ -614,27 +611,34 @@ The MagPi clients have no on-board real-time clock. They synchronize their clock
 
 Time synchronization is configured in /etc/systemd/timesyncd.conf on each client:
 
-> NTP=time.ucsd.edu 192.168.1.100
+```
+NTP=time.ucsd.edu 192.168.1.100
+```
 
 Note: the `time.ucsd.edu` entry here is effectively dead weight — clients have no routed internet access (see 5.1), so only the `192.168.1.100` half actually resolves. Harmless, just not doing anything.
 
 On the server, NTP is provided by `ntpsec` (`/etc/ntpsec/ntp.conf`), synced upstream to `time.ucsd.edu`/`bigben.ucsd.edu`. The config includes a `restrict` line explicitly permitting query access from the whole MagPi subnet:
 
-> restrict 192.168.0.0 mask 255.255.0.0 nomodify notrap
+```
+restrict 192.168.0.0 mask 255.255.0.0 nomodify notrap
+```
 
 If clients ever show incorrect times after reboot, check `sudo systemctl status ntpsec` on the server first, then confirm the `restrict` line above is still present (it's CFEngine-managed like everything else on this box, so if it's disappeared, that's a CFEngine policy question for SSCF, not something to hand-edit back in permanently).
 
 To manually check that time is synchronized on a client:
 
-> date
->
-> timedatectl status
+```
+date
+timedatectl status
+```
 
 #### Data Aggregation (`allsummary.py`)
 
 Runs every 15 minutes via cron on the server:
 
-> */15 * * * * /home/bird/anaconda3/bin/python3 /home/bird/code/glab-common-py/glab_common/allsummary.py > /home/bird/allsummary.log 2>&1
+```
+*/15 * * * * /home/bird/anaconda3/bin/python3 /home/bird/code/glab-common-py/glab_common/allsummary.py > /home/bird/allsummary.log 2>&1
+```
 
 For every box marked enabled in `panel_subject_behavior` (5.3), it rsyncs that subject's own data folder from the client, then parses `.summaryDAT` and today's trial CSVs into one combined status file.
 
@@ -676,7 +680,9 @@ For every box marked enabled in `panel_subject_behavior` (5.3), it rsyncs that s
 
 Runs every 5 minutes via cron on the server:
 
-> */5 * * * * /home/bird/code/rpioperantctl/rpioperantctl.py -psb_loc=/home/bird/opdat/panel_subject_behavior -s
+```
+*/5 * * * * /home/bird/code/rpioperantctl/rpioperantctl.py -psb_loc=/home/bird/opdat/panel_subject_behavior -s
+```
 
 For every row in `panel_subject_behavior` (enabled or not), it SSHes into that panel, checks `ps -ef`, and reconciles: starts the correct behavior if the panel's enabled and it isn't running; kills it if disabled but running; kills it if the *wrong* behavior is running regardless of enabled state.
 
@@ -703,35 +709,33 @@ With no flags at all, it does a **dry run**, and prints what it would start/kill
 
 MagPi clients have no direct internet access, so PyOperant's error-notification emails (sent via `SMTPHandler` in `pyoperant/behavior/base.py`, using each subject's `experimenter.email` as the recipient) relay through the MagPi server rather than going out directly. Each client's local config file (`local_pi_revd.py`, `local_pi_revc.py`, etc.) already points at the server:
 
-> SMTP_CONFIG = {'mailhost': '192.168.1.100', ...}
+```
+SMTP_CONFIG = {'mailhost': '192.168.1.100', ...}
+```
 
 The server relays outbound through UCSD's mail infrastructure (`outbound.ucsd.edu`), which trusts the server's on-campus IP directly — no authentication is required anywhere in the chain, on the server or on any client.
 
 For this to work, the server's Postfix has to accept connections from the MagPi subnet, which is not the default:
 
-> inet_interfaces = all
->
-> mynetworks = 127.0.0.0/8, 192.168.1.0/24
+```
+inet_interfaces = all
+mynetworks = 127.0.0.0/8, 192.168.1.0/24
+```
 
 As noted at the top of this section, this is CFEngine-managed — request the network permission from SSCF rather than editing `main.cf` directly (a live edit not backed by a matching policy change gets silently reverted within minutes; this happened once). This was granted for the MagPi subnet in July 2026.
 
 To test the relay end-to-end without needing a client, connect directly to the server's LAN-facing address and walk through the SMTP conversation by hand — this exercises the same path a client's SMTP call would use:
 
-> nc 192.168.1.100 25
->
-> EHLO test-client
->
-> MAIL FROM:\<bird@magpi.ucsd.edu\>
->
-> RCPT TO:\<you@ucsd.edu\>
->
-> DATA
->
-> Subject: relay test
->
-> (blank line, then a body line, then a line with just a period)
->
-> QUIT
+```
+nc 192.168.1.100 25
+EHLO test-client
+MAIL FROM:<bird@magpi.ucsd.edu>
+RCPT TO:<you@ucsd.edu>
+DATA
+Subject: relay test
+(blank line, then a body line, then a line with just a period)
+QUIT
+```
 
 A 220 greeting and 250 responses to MAIL FROM/RCPT TO confirm the server is accepting the connection; the message actually arriving confirms the full outbound path.
 
@@ -760,11 +764,15 @@ The email subject line includes the sending box's hostname (e.g. `[pyoperant not
 
 Runs every 15 minutes via cron on the server, through a small wrapper that activates the right conda environment first:
 
-> */15 * * * * /home/bird/code/websitebehavior/daily_website.sh > /home/bird/code/websitebehavior/log.out 2>&1
+```
+*/15 * * * * /home/bird/code/websitebehavior/daily_website.sh > /home/bird/code/websitebehavior/log.out 2>&1
+```
 
 `daily_website.sh` just sets `PATH` to a dedicated conda env (`websiteupdate_36`) and runs `website_update_cron.py`. That script reads `all.summary` (Data Aggregation's output — this is why Data Aggregation has to run first, and why the two cron lines share the same 15-minute cadence) and `panel_subject_behavior`, renders per-bird plots and status tables, and writes a single `behav.php` file, which it then pushes off-box:
 
-> scp behav.php starling@psych-labs.ucsd.edu:/home/websites/gentnerlab/behavior/behav.php
+```
+scp behav.php starling@psych-labs.ucsd.edu:/home/websites/gentnerlab/behavior/behav.php
+```
 
 **The dashboard** is hosted on `psych-labs.ucsd.edu` (managed by sscf-psych), not magpi.ucsd.edu. The MagPi server only *generates* the page and pushes it to psych-labs; nothing about the dashboard itself runs on the MagPi server. This push requires its own SSH key trust from magpi.ucsd.edu to `starling@psych-labs.ucsd.edu`, independent of anything else in this chapter.
 
@@ -789,7 +797,9 @@ The panel_subject_behavior file (located at /home/bird/opdat/panel_subject_behav
 
 Lines beginning with \# are treated as comments. A typical entry looks like:
 
-> magpi03 1 1234 opdat/B\<3\> behave -P \<1\> -S B\<3\> TwoAltChoiceExp
+```
+magpi03 1 1234 opdat/B<3> behave -P <1> -S B<3> TwoAltChoiceExp
+```
 
 After substitution, this resolves to a data directory of `opdat/B1234` and a command of `behave -P 1 -S B1234 TwoAltChoiceExp`. The last whitespace-separated token of column 5 (after substitution) is the actual behavior/protocol name — this is what both `allsummary.py` (to detect non-trial `Lights`/`shape` boxes) and `rpioperantctl` (to compare against `ps -ef` output) key off of, not the literal word "behave".
 
@@ -819,39 +829,45 @@ PyOperant requires Python 3 and pigpio. The last Python 2.7-compatible release i
 
 Raspberry Pi OS (Bullseye or later) includes Python 3 by default. Verify before starting:
 
-> python3 --version
+```
+python3 --version
+```
 
 Install system dependencies. Note that the Python 3 package names differ from the Python 2 equivalents: use python3, python3-dev, and python3-pip instead of python and python-dev. The ephem package replaces pyephem:
 
-> sudo apt install python3 python3-dev python3-pip portaudio19-dev pigpio
-> 
-> pip3 install pyaudio ephem
+```
+sudo apt install python3 python3-dev python3-pip portaudio19-dev pigpio
+pip3 install pyaudio ephem
+```
 
 Start the pigpio daemon and enable it on boot:
 
-> sudo pigpiod
-> 
-> sudo systemctl enable pigpiod
+```
+sudo pigpiod
+sudo systemctl enable pigpiod
+```
 
 Clone the PyOperant repository from the MagPi server and install:
 
-> git clone bird@192.168.1.100:\~/code/pyoperant \~/pyoperant
-> 
-> cd \~/pyoperant && pip3 install -e .
+```
+git clone bird@192.168.1.100:~/code/pyoperant ~/pyoperant
+cd ~/pyoperant && pip3 install -e .
+```
 
 Do the same for py-behaviors:
 
-> git clone bird@192.168.1.100:\~/code/py-behaviors \~/py-behaviors
-> 
-> cd \~/py-behaviors && pip3 install -e .
+```
+git clone bird@192.168.1.100:~/code/py-behaviors ~/py-behaviors
+cd ~/py-behaviors && pip3 install -e .
+```
 
 Verify the installation:
 
-> python3 -c "import pyoperant; print('pyoperant ok')"
-> 
-> python3 -c "import pigpio; print('pigpio ok')"
-> 
-> python3 -c "import pyaudio; print('pyaudio ok')"
+```
+python3 -c "import pyoperant; print('pyoperant ok')"
+python3 -c "import pigpio; print('pigpio ok')"
+python3 -c "import pyaudio; print('pyaudio ok')"
+```
 
 The -e flag installs in editable mode, meaning changes to the source files take effect immediately without reinstalling. Use pip3 (not pip) throughout to ensure packages are installed for Python 3.
 
@@ -873,13 +889,12 @@ The file pyoperant/local.py reads socket.gethostname() and imports the matching 
 
 All MagPi clients have hostnames containing ‘magpi’ (e.g. magpi03, magpi14). Because both Rev C and Rev D boards use the same hostname pattern but have different hardware — Rev C has a solenoid-driven hopper, Rev D has a servo-driven hopper with a second PCA9685 chip — using the hostname alone to select config would be unreliable. Instead, each MagPi client has a plain-text file at /etc/magpi\_revision that explicitly declares its board version:
 
-> \# On a Rev D board:
-> 
-> echo 'revd' | sudo tee /etc/magpi\_revision
-> 
-> \# On a Rev C board:
-> 
-> echo 'revc' | sudo tee /etc/magpi\_revision
+```
+# On a Rev D board:
+echo 'revd' | sudo tee /etc/magpi_revision
+# On a Rev C board:
+echo 'revc' | sudo tee /etc/magpi_revision
+```
 
 local.py reads this file and imports the correct config:
 
@@ -911,86 +926,62 @@ Step 1: Define channel constants
 
 Both files declare channel assignments as named constants at the top. This is the only place GPIO pin or PCA9685 channel numbers appear — the panel class below refers to them by name.
 
-> \# Rev D (local\_pi\_revd.py)
-> 
-> INPUTS = \[5, 6, 13, 26, 23, 24, 25, 9, 11, 10\] \# Hopper IR, L/C/R IR, AUX IR 1-6
-> 
-> LIGHTS\_PCA9685\_ADDRESS = 0x55 \# U1: A0, A2, A4 pulled high
-> 
-> SERVO\_PCA9685\_ADDRESS = 0x45 \# U7: A0, A2 pulled high
-> 
-> HOPPER\_SERVO\_CHANNEL = 0 \# HOPPER\_CTL on U7 (PCA9685 at 0x45)
-> 
-> AUX\_SERVO\_OUTPUTS = \[1, 2, 3, 4\] \# AUX\_SERVO\_1-4 on U7
-> 
-> PWM\_OUTPUTS = \[0,1,2,3,4,5,6,7,8,9,10,13,14,15\] \# channels 11,12 not connected on Rev D
-> 
-> \# Rev C (local\_pi\_revc.py)
-> 
-> INPUTS = \[5, 6, 13, 26, 23, 24, 25, 9, 11, 10\] \# same as Rev D
-> 
-> OUTPUTS = \[16\] \# Hopper solenoid on GPIO 16
-> 
-> PWM\_OUTPUTS = \[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\] \# all 16 channels connected on Rev C
+```
+# Rev D (local_pi_revd.py)
+INPUTS = [5, 6, 13, 26, 23, 24, 25, 9, 11, 10] # Hopper IR, L/C/R IR, AUX IR 1-6
+LIGHTS_PCA9685_ADDRESS = 0x55 # U1: A0, A2, A4 pulled high
+SERVO_PCA9685_ADDRESS = 0x45 # U7: A0, A2 pulled high
+HOPPER_SERVO_CHANNEL = 0 # HOPPER_CTL on U7 (PCA9685 at 0x45)
+AUX_SERVO_OUTPUTS = [1, 2, 3, 4] # AUX_SERVO_1-4 on U7
+PWM_OUTPUTS = [0,1,2,3,4,5,6,7,8,9,10,13,14,15] # channels 11,12 not connected on Rev D
+# Rev C (local_pi_revc.py)
+INPUTS = [5, 6, 13, 26, 23, 24, 25, 9, 11, 10] # same as Rev D
+OUTPUTS = [16] # Hopper solenoid on GPIO 16
+PWM_OUTPUTS = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] # all 16 channels connected on Rev C
+```
 
 Step 2: Create the interface
 
-> self.interfaces\['raspi\_gpio\_'\] = raspi\_gpio\_.RaspberryPiInterface(device\_name='pi', lights\_address=LIGHTS\_PCA9685\_ADDRESS, \# Rev D: also pass servo\_address=SERVO\_PCA9685\_ADDRESS )
+```
+self.interfaces['raspi_gpio_'] = raspi_gpio_.RaspberryPiInterface(device_name='pi', lights_address=LIGHTS_PCA9685_ADDRESS, # Rev D: also pass servo_address=SERVO_PCA9685_ADDRESS )
+```
 
 On Rev D this initializes both PCA9685 chips: the lights chip (U1, 0x55, 1000 Hz) and the servo chip (U7, 0x45, 50 Hz). On Rev C only the lights chip is initialized.
 
 Step 3: Create hwio channel objects
 
-> \# Both revisions: IR inputs and PWM light outputs
-> 
-> for in\_chan in INPUTS:
-> 
-> self.inputs.append(hwio.BooleanInput(interface=raspi, params={'channel': in\_chan}))
-> 
-> for ch in PWM\_OUTPUTS:
-> 
-> self.pwm\_outputs.append(hwio.PWMOutput(interface=raspi, params={'channel': ch}))
-> 
-> \# Rev D only: servo output and auxiliary servo outputs
-> 
-> self.hopper\_servo = hwio.PWMOutput(interface=raspi,
-> 
-> params={'channel': HOPPER\_SERVO\_CHANNEL, 'servo': True})
-> 
-> self.aux\_servos = \[hwio.PWMOutput(interface=raspi, params={'channel': ch, 'servo': True})
-> 
-> for ch in AUX\_SERVO\_OUTPUTS\]
-> 
-> \# Rev C only: solenoid output
-> 
-> self.outputs = \[hwio.BooleanOutput(interface=raspi, params={'channel': 16})\]
+```
+# Both revisions: IR inputs and PWM light outputs
+for in_chan in INPUTS:
+self.inputs.append(hwio.BooleanInput(interface=raspi, params={'channel': in_chan}))
+for ch in PWM_OUTPUTS:
+self.pwm_outputs.append(hwio.PWMOutput(interface=raspi, params={'channel': ch}))
+# Rev D only: servo output and auxiliary servo outputs
+self.hopper_servo = hwio.PWMOutput(interface=raspi,
+params={'channel': HOPPER_SERVO_CHANNEL, 'servo': True})
+self.aux_servos = [hwio.PWMOutput(interface=raspi, params={'channel': ch, 'servo': True})
+for ch in AUX_SERVO_OUTPUTS]
+# Rev C only: solenoid output
+self.outputs = [hwio.BooleanOutput(interface=raspi, params={'channel': 16})]
+```
 
 Step 4: Assemble components
 
 Peck ports, house light, and RGB cue light are identical between revisions. Only the Hopper constructor differs:
 
-> \# Rev D: servo hopper
-> 
-> self.hopper = components.Hopper(IR=self.inputs\[0\], servo=self.hopper\_servo,
-> 
-> up\_angle=45, down\_angle=10, inverted=True)
-> 
-> \# Rev C: solenoid hopper
-> 
-> self.hopper = components.Hopper(IR=self.inputs\[0\], solenoid=self.outputs\[0\], inverted=True)
-> 
-> \# Both revisions: RGB cue light
-> 
-> \# Rev D indices 11/12/13 = channels 13/14/15 (channels 11,12 skipped in PWM\_OUTPUTS)
-> 
-> \# Rev C indices 13/14/15 = channels 13/14/15 (all channels present)
-> 
-> self.cue = components.RGBLight(red=self.pwm\_outputs\[-3\],
-> 
-> green=self.pwm\_outputs\[-2\],
-> 
-> blue=self.pwm\_outputs\[-1\], name='cue')
-> 
+```
+# Rev D: servo hopper
+self.hopper = components.Hopper(IR=self.inputs[0], servo=self.hopper_servo,
+up_angle=45, down_angle=10, inverted=True)
+# Rev C: solenoid hopper
+self.hopper = components.Hopper(IR=self.inputs[0], solenoid=self.outputs[0], inverted=True)
+# Both revisions: RGB cue light
+# Rev D indices 11/12/13 = channels 13/14/15 (channels 11,12 skipped in PWM_OUTPUTS)
+# Rev C indices 13/14/15 = channels 13/14/15 (all channels present)
+self.cue = components.RGBLight(red=self.pwm_outputs[-3],
+green=self.pwm_outputs[-2],
+blue=self.pwm_outputs[-1], name='cue')
+```
 > *The up\_angle and down\_angle values shown (45 and 10) are placeholders in degrees. These must be tuned empirically for each physical panel. See Section 6.4 for the tuning procedure.*
 
 ### 6.4 Tuning Servo Angles (Rev D only)
@@ -1003,27 +994,23 @@ The up\_angle and down\_angle values for the hopper servo must be determined emp
 
 The tuning script tune\_servo.py lives in the scripts/ directory of the pyoperant repository and is installed on the PATH automatically when you run pip install -e . After installation it can be invoked directly:
 
-> sudo pigpiod \# ensure pigpiod is running
-> 
-> python tune\_servo.py
+```
+sudo pigpiod # ensure pigpiod is running
+python tune_servo.py
+```
 
 The script connects to the servo chip and IR beam sensor and presents an interactive prompt. The available commands are:
 
-> \<number\> move servo to that angle in degrees (e.g. 45.0)
-> 
-> u move to current up\_angle
-> 
-> d move to current down\_angle
-> 
-> su set current angle as up\_angle
-> 
-> sd set current angle as down\_angle
-> 
-> i read IR beam status
-> 
-> f run a full feed cycle with the current angles
-> 
-> q quit and print final values
+```
+<number> move servo to that angle in degrees (e.g. 45.0)
+u move to current up_angle
+d move to current down_angle
+su set current angle as up_angle
+sd set current angle as down_angle
+i read IR beam status
+f run a full feed cycle with the current angles
+q quit and print final values
+```
 
 #### 6.4.2 Step-by-Step Tuning Procedure
 
@@ -1041,7 +1028,9 @@ The script connects to the servo chip and IR beam sensor and presents an interac
 
 Before running an experiment, always verify that the panel is working correctly. The test\_panel.py script auto-detects the board revision from /etc/magpi\_revision, initializes the panel, and runs a two-phase test (autonomous component check followed by interactive user confirmation):
 
-> python3 scripts/test\_panel.py
+```
+python3 scripts/test_panel.py
+```
 
 The script runs Phase 1 autonomously (house light, LEDs, hopper, speaker) then prompts you to confirm each component visually and verify IR beam detection. Fix any failures before proceeding.
 
@@ -1063,7 +1052,9 @@ A pre-made Raspbian Lite image with the base RPiOperant configuration is stored 
 
 18. Copy the image (replace /dev/sdX with your device):
 
-> sudo dd if=/mnt/cube/RPiOperantOS.img of=/dev/sdX bs=4M
+```
+sudo dd if=/mnt/cube/RPiOperantOS.img of=/dev/sdX bs=4M
+```
 
 19. Insert the SD card into the MagPi client.
 
@@ -1083,15 +1074,13 @@ Assume the new box number is XX (e.g., 03, 14). Boot the Pi with it connected to
 
 25. Set the static IP address: sudo vim /etc/network/interfaces
 
-> auto eth0
-> 
-> iface eth0 inet static
-> 
-> address 192.168.1.XX
-> 
-> netmask 255.255.255.0
-> 
-> gateway 192.168.1.100
+```
+auto eth0
+iface eth0 inet static
+address 192.168.1.XX
+netmask 255.255.255.0
+gateway 192.168.1.100
+```
 
 26. Reboot. The box is now accessible at 192.168.1.XX.
 
@@ -1103,27 +1092,31 @@ Run the following on the MagPi client (all from the bird user’s home directory
 
 28. Remove any stale pyoperant clone and reclone from the server:
 
-> rm -rf \~/pyoperant
-> 
-> git clone bird@192.168.1.100:\~/code/pyoperant \~/pyoperant
+```
+rm -rf ~/pyoperant
+git clone bird@192.168.1.100:~/code/pyoperant ~/pyoperant
+```
 
 29. Install in editable mode:
 
-> cd \~/pyoperant && pip install -e .
+```
+cd ~/pyoperant && pip install -e .
+```
 
 30. Do the same for py-behaviors:
 
-> rm -rf \~/py-behaviors
-> 
-> git clone bird@192.168.1.100:\~/code/py-behaviors \~/py-behaviors
-> 
-> cd \~/py-behaviors && pip install -e .
+```
+rm -rf ~/py-behaviors
+git clone bird@192.168.1.100:~/code/py-behaviors ~/py-behaviors
+cd ~/py-behaviors && pip install -e .
+```
 
 31. Start the pigpio daemon and add it to startup:
 
-> sudo pigpiod
-> 
-> sudo systemctl enable pigpiod
+```
+sudo pigpiod
+sudo systemctl enable pigpiod
+```
 
 #### Verifying the Hardware
 
@@ -1133,7 +1126,9 @@ Run the following on the MagPi client (all from the bird user’s home directory
 
 34. Run the panel test (it auto-detects the board revision from /etc/magpi\_revision):
 
-> python3 scripts/test\_panel.py
+```
+python3 scripts/test_panel.py
+```
 
 All components should cycle without errors. Fix any failures before placing a bird.
 
@@ -1143,21 +1138,28 @@ Suppose your behavior class is called MyBehav and lives in the file my\_behav.py
 
 35. Copy the behavior script into py-behaviors:
 
-> cp \~/my\_behav.py \~/code/py-behaviors/glab\_behaviors/my\_behav.py
+```
+cp ~/my_behav.py ~/code/py-behaviors/glab_behaviors/my_behav.py
+```
 
 36. Register it in the package \_\_init\_\_.py:
 
-> echo 'from my\_behav import MyBehav' \>\> \~/code/py-behaviors/glab\_behaviors/\_\_init\_\_.py
+```
+echo 'from my_behav import MyBehav' >> ~/code/py-behaviors/glab_behaviors/__init__.py
+```
 
 37. Copy your default configuration file:
 
-> cp \~/my\_config.json \~/code/py-behaviors/example\_configs/
+```
+cp ~/my_config.json ~/code/py-behaviors/example_configs/
+```
 
 38. Commit and push to GitHub master:
 
-> cd \~/code/py-behaviors
-> 
-> git add -A && git commit -m 'Add MyBehav' && git push origin master
+```
+cd ~/code/py-behaviors
+git add -A && git commit -m 'Add MyBehav' && git push origin master
+```
 
 Clients will pick up the change the next time they run git pull origin master.
 
@@ -1169,17 +1171,22 @@ Make sure the panel hardware (cage, lights, hopper) is in place and the panel te
 
 40. Verify pyoperant and py-behaviors are up to date:
 
-> cd \~/pyoperant && git pull origin master
-> 
-> cd \~/py-behaviors && git pull origin master
+```
+cd ~/pyoperant && git pull origin master
+cd ~/py-behaviors && git pull origin master
+```
 
 41. Create the bird’s data directory:
 
-> mkdir -p \~/opdat/BXXXX/Stimuli
+```
+mkdir -p ~/opdat/BXXXX/Stimuli
+```
 
 42. Copy the config file and stimuli into the bird’s folder:
 
-> cp \~/py-behaviors/example\_configs/my\_config.json \~/opdat/BXXXX/config.json
+```
+cp ~/py-behaviors/example_configs/my_config.json ~/opdat/BXXXX/config.json
+```
 
 Edit config.json to set the correct bird ID, experimenter, stimulus paths, and any behavior-specific parameters.
 
@@ -1187,21 +1194,24 @@ Edit config.json to set the correct bird ID, experimenter, stimulus paths, and a
 
 44. On the MagPi server, open panel\_subject\_behavior and add or update the row for this box. Follow the exact column format from Section 5.3 — column 3 is a **bare** bird number (no `B` prefix; the tools prepend it), column 4 is the `opdat/B<3>` template, and the behavior/protocol name must be the **last** token of the command column (both `allsummary.py` and `rpioperantctl` identify the protocol from that final token):
 
-> vim \~/opdat/panel\_subject\_behavior
-> 
-> \# panel enable birdID datadir command
-> 
-> magpiXX 1 XXXX opdat/B\<3\> behave -P \<1\> -S B\<3\> TwoAltChoiceExp
+```
+vim ~/opdat/panel_subject_behavior
+# panel enable birdID datadir command
+magpiXX 1 XXXX opdat/B<3> behave -P <1> -S B<3> TwoAltChoiceExp
+```
 
 45. `rpioperantctl` will start the behavior on its next 5-minute cron cycle (Section 5.2). To apply immediately without waiting, run it by hand on the server:
 
-> /home/bird/code/rpioperantctl/rpioperantctl.py -s
+```
+/home/bird/code/rpioperantctl/rpioperantctl.py -s
+```
 
 46. Verify it started correctly:
 
-> ssh bird@192.168.1.XX
-> 
-> tail -f \~/opdat/BXXXX/BXXXX.log
+```
+ssh bird@192.168.1.XX
+tail -f ~/opdat/BXXXX/BXXXX.log
+```
 
 The house lights should be on and shaping block 1 (free hopper access every 30 seconds) should begin. If you see errors in the log, check the config file and hardware before proceeding.
 
@@ -1209,15 +1219,21 @@ The house lights should be on and shaping block 1 (free hopper access every 30 s
 
 From the MagPi server you can check all boxes at a glance by running rpioperantctl with no action flags, which does a dry run — reporting what it would start or kill without changing anything:
 
-> /home/bird/code/rpioperantctl/rpioperantctl.py
+```
+/home/bird/code/rpioperantctl/rpioperantctl.py
+```
 
 To follow a specific box’s log in real time:
 
-> ssh bird@192.168.1.XX 'tail -f \~/opdat/BXXXX/BXXXX.log'
+```
+ssh bird@192.168.1.XX 'tail -f ~/opdat/BXXXX/BXXXX.log'
+```
 
 The all.summary file (updated every 15 minutes by the server’s cron job) gives a one-line status for every bird: trials run, feeds delivered, hopper failures, and the time of the last trial:
 
-> cat \~/opdat/all.summary
+```
+cat ~/opdat/all.summary
+```
 
 ### 7.5 Updating Code on Clients
 
@@ -1225,13 +1241,16 @@ To push a code update to all active clients:
 
 47. Update the server’s local clone by pulling the change from GitHub onto the server (or commit it directly on the server):
 
-> cd \~/code/pyoperant && git pull origin master
+```
+cd ~/code/pyoperant && git pull origin master
+```
 
 48. SSH into each client and pull:
 
-> ssh bird@192.168.1.XX
-> 
-> cd \~/pyoperant && git pull origin master && pip install -e .
+```
+ssh bird@192.168.1.XX
+cd ~/pyoperant && git pull origin master && pip install -e .
+```
 
 Changes to behavior scripts in py-behaviors follow the same pattern. It is not necessary to restart a running experiment to pick up Python changes, but changes to local\_pi\_revd.py, local\_pi\_revc.py, or raspi\_gpio\_.py require restarting PyOperant.
 
@@ -1241,22 +1260,29 @@ The `panel_subject_behavior` table is the source of truth (Section 5.2): the cle
 
 To stop all experiments across all boxes (for maintenance, cage cleaning, etc.), set every enable flag to 0 (or comment the rows out) in panel\_subject\_behavior, then run with `-k`:
 
-> /home/bird/code/rpioperantctl/rpioperantctl.py -k
+```
+/home/bird/code/rpioperantctl/rpioperantctl.py -k
+```
 
 `-k` sends SIGTERM to each behave process that shouldn't be running, which triggers session\_post and saves data before exiting.
 
 To disable a specific box without touching others, set its enable flag to 0 in panel\_subject\_behavior and run:
 
-> /home/bird/code/rpioperantctl/rpioperantctl.py -k
+```
+/home/bird/code/rpioperantctl/rpioperantctl.py -k
+```
 
 To (re)start everything according to the panel\_subject\_behavior table:
 
-> /home/bird/code/rpioperantctl/rpioperantctl.py -s
+```
+/home/bird/code/rpioperantctl/rpioperantctl.py -s
+```
 
 To kill stale processes and start correct ones in a single pass, combine both flags:
 
-> /home/bird/code/rpioperantctl/rpioperantctl.py -s -k
-> 
+```
+/home/bird/code/rpioperantctl/rpioperantctl.py -s -k
+```
 > *Give session\_post a moment to finish writing data on a box that was mid-trial before it is restarted. Also note the every-5-minute cron job runs with `-s` only (Section 5.2), a deliberate staged rollout — running `-k` by hand is how kills are enforced until that changes.*
 
 ## 8. Using Existing Protocols
@@ -1265,15 +1291,17 @@ The lab maintains a private repository of behavioral protocols called py-behavio
 
 The repository is located at:
 
-> \~/code/py-behaviors \# on the MagPi server
-> 
-> \~/py-behaviors \# on each MagPi client
+```
+~/code/py-behaviors # on the MagPi server
+~/py-behaviors # on each MagPi client
+```
 
 To install or update on a client:
 
-> cd \~/py-behaviors && git pull origin master
-> 
-> pip install -e .
+```
+cd ~/py-behaviors && git pull origin master
+pip install -e .
+```
 
 #### Available Protocols
 
@@ -1330,71 +1358,45 @@ This means all glab\_behaviors protocols use the same config.json parameters as 
 
 To run Basic\_2AC on bird B1234 from box 1:
 
-> behave Basic\_2AC -P 1 -S B1234 -c config.json
+```
+behave Basic_2AC -P 1 -S B1234 -c config.json
+```
 
 A minimal config.json for Basic\_2AC looks like this:
 
-> {
-> 
-> "experimenter": {"name": "Your Name", "email": "yourname@ucsd.edu"},
-> 
-> "subject": "B1234",
-> 
-> "panel\_name": "1",
-> 
-> "experiment\_path": "/home/pi/opdat/B1234",
-> 
-> "stim\_path": "/home/pi/opdat/B1234/stimuli",
-> 
-> "light\_schedule": "sun",
-> 
-> "response\_win": 5.0,
-> 
-> "intertrial\_min": 5.0,
-> 
-> "correction\_trials": true,
-> 
-> "shape": false,
-> 
-> "debug": false,
-> 
-> "log\_handlers": \["email"\],
-> 
-> "current\_available\_motifs": 10,
-> 
-> "left\_stims": {"0": "A01.wav", "1": "A02.wav"},
-> 
-> "right\_stims": {"0": "B01.wav", "1": "B02.wav"},
-> 
-> "category\_conditions": \[
-> 
-> {"class": "L"},
-> 
-> {"class": "R"}
-> 
-> \],
-> 
-> "stims": {},
-> 
-> "classes": {
-> 
-> "L": {"component": "left", "reward\_value": 2.0, "punish\_value": 10.0},
-> 
-> "R": {"component": "right", "reward\_value": 2.0, "punish\_value": 10.0}
-> 
-> },
-> 
-> "block\_design": {
-> 
-> "blocks": {"default": {"queue": "block", "conditions": \[\]}},
-> 
-> "order": \["default"\]
-> 
-> },
-> 
-> "reinforcement": {"schedule": "percent\_reinf", "prob": 0.4, "secondary": true}
-> 
-> }
+```
+{
+"experimenter": {"name": "Your Name", "email": "yourname@ucsd.edu"},
+"subject": "B1234",
+"panel_name": "1",
+"experiment_path": "/home/pi/opdat/B1234",
+"stim_path": "/home/pi/opdat/B1234/stimuli",
+"light_schedule": "sun",
+"response_win": 5.0,
+"intertrial_min": 5.0,
+"correction_trials": true,
+"shape": false,
+"debug": false,
+"log_handlers": ["email"],
+"current_available_motifs": 10,
+"left_stims": {"0": "A01.wav", "1": "A02.wav"},
+"right_stims": {"0": "B01.wav", "1": "B02.wav"},
+"category_conditions": [
+{"class": "L"},
+{"class": "R"}
+],
+"stims": {},
+"classes": {
+"L": {"component": "left", "reward_value": 2.0, "punish_value": 10.0},
+"R": {"component": "right", "reward_value": 2.0, "punish_value": 10.0}
+},
+"block_design": {
+"blocks": {"default": {"queue": "block", "conditions": []}},
+"order": ["default"]
+},
+"reinforcement": {"schedule": "percent_reinf", "prob": 0.4, "secondary": true}
+}
+```
 
 #### Writing a New Protocol for the Repository
 
@@ -1410,8 +1412,9 @@ When you write a new protocol that others in the lab will use, add it to py-beha
 
 On the clients, pull and reinstall:
 
-> cd \~/py-behaviors && git pull origin master && pip install -e .
-> 
+```
+cd ~/py-behaviors && git pull origin master && pip install -e .
+```
 > *glab\_behaviors has been migrated to Python 3 alongside pyoperant — every protocol in the package parses and imports cleanly under Python 3, and the package uses explicit relative imports in \_\_init\_\_.py. If you are adapting an older protocol that was written for the Python 2 codebase, apply the same fixes catalogued in Appendix C (print(), except ... as, range/input, relative imports) before adding it.*
 
 ## 9. Running Experiments and Troubleshooting
@@ -1440,7 +1443,9 @@ See Section 10.4 for a full description of the behave command arguments and Sect
 
 PyOperant logs trial-by-trial output to a log file in the subject’s experiment\_path. Follow it in real time:
 
-> tail -f /home/pi/opdat/bird42/bird42.log
+```
+tail -f /home/pi/opdat/bird42/bird42.log
+```
 
 If the log goes silent for more than a few minutes, check whether the subject is still active and whether any hardware errors have been raised.
 
@@ -1507,129 +1512,75 @@ See Chapter 8 for a full description of the protocols available in glab\_behavio
 
 File: go\_nogo.py
 
-> import datetime, random, logging
-> 
-> from pyoperant.behavior.base import BaseExp
-> 
-> from pyoperant import utils
-> 
-> logger = logging.getLogger(\_\_name\_\_)
-> 
-> class GoNogo(BaseExp):
-> 
-> def \_\_init\_\_(self, panel, subject, go\_stims, nogo\_stims,
-> 
-> reward\_dur=2.0, timeout\_dur=10.0, \*\*kwargs):
-> 
-> super(GoNogo, self).\_\_init\_\_(panel=panel, subject=subject, \*\*kwargs)
-> 
-> self.go\_stims = go\_stims
-> 
-> self.nogo\_stims = nogo\_stims
-> 
-> self.reward\_dur = reward\_dur
-> 
-> self.timeout\_dur = timeout\_dur
-> 
-> self.trials = \[\]
-> 
-> def session\_pre(self):
-> 
-> self.session\_start = datetime.datetime.now()
-> 
-> self.panel.reset()
-> 
-> self.panel.house\_light.on()
-> 
-> return 'main'
-> 
-> def session\_main(self):
-> 
-> if self.\_check\_session\_end():
-> 
-> return 'post'
-> 
-> self.run\_trial()
-> 
-> return 'main'
-> 
-> def run\_trial(self):
-> 
-> is\_go = random.random() \> 0.5
-> 
-> wav = random.choice(self.go\_stims if is\_go else self.nogo\_stims)
-> 
-> self.panel.center.on()
-> 
-> peck\_time = self.panel.center.poll()
-> 
-> self.panel.center.off()
-> 
-> self.panel.speaker.queue(wav)
-> 
-> self.panel.speaker.play()
-> 
-> response = self.panel.center.poll(timeout=3.0)
-> 
-> if is\_go and response is not None:
-> 
-> self.panel.hopper.feed(dur=self.reward\_dur)
-> 
-> outcome = 'hit'
-> 
-> elif not is\_go and response is None:
-> 
-> outcome = 'correct\_rejection'
-> 
-> elif is\_go and response is None:
-> 
-> outcome = 'miss'
-> 
-> else:
-> 
-> self.panel.house\_light.timeout(dur=self.timeout\_dur)
-> 
-> outcome = 'false\_alarm'
-> 
-> self.trials.append({'time': peck\_time, 'stimulus': wav,
-> 
-> 'is\_go': is\_go, 'outcome': outcome})
-> 
-> logger.info('Trial outcome: %s' % outcome)
-> 
-> def session\_post(self):
-> 
-> self.panel.reset()
-> 
-> logger.info('Session complete. %d trials run.' % len(self.trials))
-> 
-> self.\_save\_data()
-> 
-> def \_check\_session\_end(self):
-> 
-> elapsed = datetime.datetime.now() - self.session\_start
-> 
-> return elapsed.total\_seconds() \> 7200
-> 
-> def \_save\_data(self):
-> 
-> import csv, os
-> 
-> outfile = os.path.join(self.parameters\['experiment\_path'\], 'trials.csv')
-> 
-> with open(outfile, 'wb') as f:
-> 
-> writer = csv.DictWriter(f, fieldnames=self.trials\[0\].keys())
-> 
-> writer.writeheader()
-> 
-> writer.writerows(self.trials)
+```
+import datetime, random, logging
+from pyoperant.behavior.base import BaseExp
+from pyoperant import utils
+logger = logging.getLogger(__name__)
+class GoNogo(BaseExp):
+def __init__(self, panel, subject, go_stims, nogo_stims,
+reward_dur=2.0, timeout_dur=10.0, **kwargs):
+super(GoNogo, self).__init__(panel=panel, subject=subject, **kwargs)
+self.go_stims = go_stims
+self.nogo_stims = nogo_stims
+self.reward_dur = reward_dur
+self.timeout_dur = timeout_dur
+self.trials = []
+def session_pre(self):
+self.session_start = datetime.datetime.now()
+self.panel.reset()
+self.panel.house_light.on()
+return 'main'
+def session_main(self):
+if self._check_session_end():
+return 'post'
+self.run_trial()
+return 'main'
+def run_trial(self):
+is_go = random.random() > 0.5
+wav = random.choice(self.go_stims if is_go else self.nogo_stims)
+self.panel.center.on()
+peck_time = self.panel.center.poll()
+self.panel.center.off()
+self.panel.speaker.queue(wav)
+self.panel.speaker.play()
+response = self.panel.center.poll(timeout=3.0)
+if is_go and response is not None:
+self.panel.hopper.feed(dur=self.reward_dur)
+outcome = 'hit'
+elif not is_go and response is None:
+outcome = 'correct_rejection'
+elif is_go and response is None:
+outcome = 'miss'
+else:
+self.panel.house_light.timeout(dur=self.timeout_dur)
+outcome = 'false_alarm'
+self.trials.append({'time': peck_time, 'stimulus': wav,
+'is_go': is_go, 'outcome': outcome})
+logger.info('Trial outcome: %s' % outcome)
+def session_post(self):
+self.panel.reset()
+logger.info('Session complete. %d trials run.' % len(self.trials))
+self._save_data()
+def _check_session_end(self):
+elapsed = datetime.datetime.now() - self.session_start
+return elapsed.total_seconds() > 7200
+def _save_data(self):
+import csv, os
+outfile = os.path.join(self.parameters['experiment_path'], 'trials.csv')
+with open(outfile, 'wb') as f:
+writer = csv.DictWriter(f, fieldnames=self.trials[0].keys())
+writer.writeheader()
+writer.writerows(self.trials)
+```
 
 ### 10.4 Running the Experiment
 
 Once your behavior script and config.json are in place, run the experiment from the command line using the behave entry point:
 
-> behave GoNogo -P 1 -S bird42 -c config.json
+```
+behave GoNogo -P 1 -S bird42 -c config.json
+```
 
 The arguments are:
 
@@ -1647,11 +1598,11 @@ Every experiment is configured by a JSON file — typically named config.json an
 
 The file is written once per subject (or once per experimental condition change) and lives alongside the data it produces:
 
-> /home/pi/opdat/B1234/config.json
-> 
-> /home/pi/opdat/B1234/B1234.log
-> 
-> /home/pi/opdat/B1234/B1234\_trialdata\_20260401120000.csv
+```
+/home/pi/opdat/B1234/config.json
+/home/pi/opdat/B1234/B1234.log
+/home/pi/opdat/B1234/B1234_trialdata_20260401120000.csv
+```
 
 #### Parameters Accepted by All Experiments (BaseExp)
 
@@ -1732,93 +1683,52 @@ Controls how trials are ordered across sessions. If omitted, all stimulus classe
 
 Below is a complete config.json for a two-alternative choice auditory discrimination task, matching the style of the example configs in the py-behaviors repository:
 
-> {
-> 
-> "experimenter": {
-> 
-> "name": "Your Name",
-> 
-> "email": "yourname@ucsd.edu"
-> 
-> },
-> 
-> "subject": "B1234",
-> 
-> "panel\_name": "1",
-> 
-> "experiment\_path": "/home/pi/opdat/B1234",
-> 
-> "stim\_path": "/home/pi/opdat/B1234/stimuli",
-> 
-> "name": "Starling vs Finch discrimination",
-> 
-> "description": "Two-alternative choice, v1",
-> 
-> "debug": false,
-> 
-> "log\_handlers": \["email"\],
-> 
-> "light\_schedule": "sun",
-> 
-> "response\_win": 5.0,
-> 
-> "intertrial\_min": 5.0,
-> 
-> "correction\_trials": true,
-> 
-> "shape": false,
-> 
-> "stims": {
-> 
-> "starling": "starling.wav",
-> 
-> "finch": "finch.wav"
-> 
-> },
-> 
-> "classes": {
-> 
-> "L": {"component": "left", "reward\_value": 2.0, "punish\_value": 5.0},
-> 
-> "R": {"component": "right", "reward\_value": 2.0, "punish\_value": 5.0}
-> 
-> },
-> 
-> "block\_design": {
-> 
-> "blocks": {
-> 
-> "default": {
-> 
-> "queue": "random",
-> 
-> "conditions": \[
-> 
-> {"class": "L", "stim\_name": "starling"},
-> 
-> {"class": "R", "stim\_name": "finch"}
-> 
-> \]
-> 
-> }
-> 
-> },
-> 
-> "order": \["default"\]
-> 
-> },
-> 
-> "reinforcement": {
-> 
-> "schedule": "percent\_reinf",
-> 
-> "prob": 0.5,
-> 
-> "secondary": true
-> 
-> }
-> 
-> }
+```
+{
+"experimenter": {
+"name": "Your Name",
+"email": "yourname@ucsd.edu"
+},
+"subject": "B1234",
+"panel_name": "1",
+"experiment_path": "/home/pi/opdat/B1234",
+"stim_path": "/home/pi/opdat/B1234/stimuli",
+"name": "Starling vs Finch discrimination",
+"description": "Two-alternative choice, v1",
+"debug": false,
+"log_handlers": ["email"],
+"light_schedule": "sun",
+"response_win": 5.0,
+"intertrial_min": 5.0,
+"correction_trials": true,
+"shape": false,
+"stims": {
+"starling": "starling.wav",
+"finch": "finch.wav"
+},
+"classes": {
+"L": {"component": "left", "reward_value": 2.0, "punish_value": 5.0},
+"R": {"component": "right", "reward_value": 2.0, "punish_value": 5.0}
+},
+"block_design": {
+"blocks": {
+"default": {
+"queue": "random",
+"conditions": [
+{"class": "L", "stim_name": "starling"},
+{"class": "R", "stim_name": "finch"}
+]
+}
+},
+"order": ["default"]
+},
+"reinforcement": {
+"schedule": "percent_reinf",
+"prob": 0.5,
+"secondary": true
+}
+}
+```
 
 When behave loads this file, every key becomes available inside the behavior class as self.parameters\['key'\]. The subject, panel\_name, and experiment\_path keys are consumed by BaseExp directly and do not need to be passed on the command line if they are present in the config file.
 
@@ -1834,7 +1744,9 @@ Each experiment produces several files, all written to the bird’s experiment d
 
 The primary data file. For TwoAltChoiceExp, a new CSV is created at the start of each run of the behave script, named:
 
-> BXXXX\_trialdata\_YYYYMMDDHHMMSS.csv
+```
+BXXXX_trialdata_YYYYMMDDHHMMSS.csv
+```
 
 Each row is one trial. The default columns are:
 
@@ -1885,43 +1797,35 @@ The pyoperant.analysis module (pyoperant/analysis.py) provides functions for com
 
 #### Building a Confusion Matrix
 
-> from pyoperant.analysis import create\_conf\_matrix, Performance
-> 
-> import numpy as np
-> 
-> expected = np.array(\[0, 0, 1, 1, 0, 1\]) \# true class indices
-> 
-> predicted = np.array(\[0, 1, 1, 0, 0, 1\]) \# bird's response indices
-> 
-> cm = create\_conf\_matrix(expected, predicted)
-> 
-> \# cm\[i, j\] = number of trials where true class was i, response was j
+```
+from pyoperant.analysis import create_conf_matrix, Performance
+import numpy as np
+expected = np.array([0, 0, 1, 1, 0, 1]) # true class indices
+predicted = np.array([0, 1, 1, 0, 0, 1]) # bird's response indices
+cm = create_conf_matrix(expected, predicted)
+# cm[i, j] = number of trials where true class was i, response was j
+```
 
 #### The Performance Class
 
-> perf = Performance(expected, predicted)
-> 
-> perf.acc() \# fraction correct
-> 
-> perf.acc\_ci() \# 95% confidence interval (beta distribution)
-> 
-> perf.dprime() \# d-prime (2-class tasks only)
-> 
-> perf.mcc() \# Matthews correlation coefficient (2-class tasks only)
-> 
+```
+perf = Performance(expected, predicted)
+perf.acc() # fraction correct
+perf.acc_ci() # 95% confidence interval (beta distribution)
+perf.dprime() # d-prime (2-class tasks only)
+perf.mcc() # Matthews correlation coefficient (2-class tasks only)
+```
 > *dprime() and mcc() return False if the confusion matrix has more than two classes. For tasks with more than two alternatives, use acc() only.*
 
 #### Standalone Functions
 
-> from pyoperant.analysis import dprime, acc, acc\_ci, mcc
-> 
-> dp = dprime(cm) \# d-prime
-> 
-> a = acc(cm) \# fraction correct
-> 
-> ci = acc\_ci(cm) \# (lower, upper) confidence interval
-> 
-> m = mcc(cm) \# Matthews correlation coefficient
+```
+from pyoperant.analysis import dprime, acc, acc_ci, mcc
+dp = dprime(cm) # d-prime
+a = acc(cm) # fraction correct
+ci = acc_ci(cm) # (lower, upper) confidence interval
+m = mcc(cm) # Matthews correlation coefficient
+```
 
 ### 11.4 The behav-analysis Package
 
@@ -1929,13 +1833,12 @@ The behav-analysis package (github.com/gentnerlab/behav-analysis) is the primary
 
 Install it on your analysis machine:
 
-> git clone https://github.com/gentnerlab/behav-analysis.git
-> 
-> cd behav-analysis
-> 
-> pip install -r requirements.txt
-> 
-> pip install -e .
+```
+git clone https://github.com/gentnerlab/behav-analysis.git
+cd behav-analysis
+pip install -r requirements.txt
+pip install -e .
+```
 
 The package has three modules:
 
@@ -1950,15 +1853,13 @@ The package has three modules:
 
 The central function is load\_data\_pandas(), which loads all data files for a list of subjects and returns a dict mapping subject ID to a pandas DataFrame with a datetime index:
 
-> from behav import loading
-> 
-> subjects = ('B1178', 'B1186', 'B1049')
-> 
-> data\_path = '/mnt/cube/RawData/Zog/' \# top-level data folder
-> 
-> behav\_data = loading.load\_data\_pandas(subjects, data\_path)
-> 
-> \# behav\_data\['B1178'\] is a DataFrame with all trials for B1178
+```
+from behav import loading
+subjects = ('B1178', 'B1186', 'B1049')
+data_path = '/mnt/cube/RawData/Zog/' # top-level data folder
+behav_data = loading.load_data_pandas(subjects, data_path)
+# behav_data['B1178'] is a DataFrame with all trials for B1178
+```
 
 The function handles three file formats automatically, detecting which is present by filename pattern:
 
@@ -1978,51 +1879,52 @@ The utils module provides several frequently-needed helpers:
 
 filter\_normal\_trials(df) — the most commonly used filter. Removes correction trials and no-response trials, leaving only normal trials where the bird made a response. Call this before any performance calculation:
 
-> from behav import utils
-> 
-> df\_clean = utils.filter\_normal\_trials(behav\_data\['B1178'\])
+```
+from behav import utils
+df_clean = utils.filter_normal_trials(behav_data['B1178'])
+```
 
 filter\_recent\_days(df, num\_days) — slices the DataFrame to the most recent num\_days of data relative to today:
 
-> df\_recent = utils.filter\_recent\_days(behav\_data\['B1178'\], num\_days=7)
+```
+df_recent = utils.filter_recent_days(behav_data['B1178'], num_days=7)
+```
 
 extract\_filename(df, target='stim\_name') — parses the full stimulus path in the stimulus column and adds a new column containing just the filename without extension. Useful for grouping trials by stimulus identity rather than full path:
 
-> utils.extract\_filename(df\_clean) \# adds 'stim\_name' column in-place
+```
+utils.extract_filename(df_clean) # adds 'stim_name' column in-place
+```
 
 binomial\_ci(x, N, CL=95.0) — exact binomial confidence interval (Clopper-Pearson). Returns (lower, upper) bounds. Handles edge cases (x=0 or x=N) correctly:
 
-> lower, upper = utils.binomial\_ci(73, 100) \# 73 correct out of 100 trials
+```
+lower, upper = utils.binomial_ci(73, 100) # 73 correct out of 100 trials
+```
 
 stars(p) — converts a p-value to an R-style significance string ('\*\*\*', '\*\*', '\*', '.', 'n.s.'):
 
-> utils.stars(0.003) \# returns '\*\*'
+```
+utils.stars(0.003) # returns '**'
+```
 
 #### behav.plotting
 
 All plotting functions use matplotlib and seaborn and return the figure object so it can be saved or further modified. The standard analysis workflow from the lab notebook is:
 
-> import matplotlib.pyplot as plt
-> 
-> from behav import plotting, utils, loading
-> 
-> import seaborn as sns
-> 
-> subjects = ('B1178', 'B1186')
-> 
-> behav\_data = loading.load\_data\_pandas(subjects, '/mnt/cube/RawData/Zog/')
-> 
-> for subj, data in behav\_data.items():
-> 
-> plotting.plot\_filtered\_performance\_calendar(subj, data, num\_days=20)
-> 
-> plotting.plot\_ci\_accuracy(subj, data)
-> 
-> plotting.plot\_daily\_accuracy(subj, data, x\_axis='trial\_num')
-> 
-> plotting.plot\_trial\_feeds(behav\_data)
-> 
-> plt.show()
+```
+import matplotlib.pyplot as plt
+from behav import plotting, utils, loading
+import seaborn as sns
+subjects = ('B1178', 'B1186')
+behav_data = loading.load_data_pandas(subjects, '/mnt/cube/RawData/Zog/')
+for subj, data in behav_data.items():
+plotting.plot_filtered_performance_calendar(subj, data, num_days=20)
+plotting.plot_ci_accuracy(subj, data)
+plotting.plot_daily_accuracy(subj, data, x_axis='trial_num')
+plotting.plot_trial_feeds(behav_data)
+plt.show()
+```
 
 The individual plotting functions are:
 
@@ -2042,55 +1944,33 @@ The individual plotting functions are:
 
 The following is a complete example combining both packages, matching the pattern used in the lab’s analysis notebook:
 
-> import numpy as np
-> 
-> import matplotlib.pyplot as plt
-> 
-> from behav import loading, utils, plotting
-> 
-> from pyoperant.analysis import Performance
-> 
-> \# 1. Load data
-> 
-> subjects = ('B1178', 'B1186')
-> 
-> behav\_data = loading.load\_data\_pandas(subjects, '/mnt/cube/RawData/Zog/')
-> 
-> \# 2. Plot recent overview for each bird
-> 
-> for subj, df in behav\_data.items():
-> 
-> plotting.plot\_filtered\_performance\_calendar(subj, df, num\_days=14)
-> 
-> plotting.plot\_ci\_accuracy(subj, df, day\_lim=14)
-> 
-> \# 3. Compute summary metrics for each bird
-> 
-> class\_map = {'L': 0, 'R': 1}
-> 
-> resp\_map = {'left': 0, 'right': 1, 'L': 0, 'R': 1}
-> 
-> for subj, df in behav\_data.items():
-> 
-> df\_clean = utils.filter\_normal\_trials(utils.filter\_recent\_days(df, 7))
-> 
-> expected = df\_clean\['class\_'\].map(class\_map).dropna().astype(int)
-> 
-> predicted = df\_clean\['response'\].map(resp\_map).dropna().astype(int)
-> 
-> idx = expected.index.intersection(predicted.index)
-> 
-> perf = Performance(expected\[idx\].values, predicted\[idx\].values)
-> 
-> print('%s n=%d acc=%.2f d-prime=%.2f' % (
-> 
-> subj, len(idx), perf.acc(), perf.dprime()))
-> 
-> \# 4. Multi-bird trial/feed summary
-> 
-> plotting.plot\_trial\_feeds(behav\_data, num\_days=14)
-> 
-> plt.show()
+```
+import numpy as np
+import matplotlib.pyplot as plt
+from behav import loading, utils, plotting
+from pyoperant.analysis import Performance
+# 1. Load data
+subjects = ('B1178', 'B1186')
+behav_data = loading.load_data_pandas(subjects, '/mnt/cube/RawData/Zog/')
+# 2. Plot recent overview for each bird
+for subj, df in behav_data.items():
+plotting.plot_filtered_performance_calendar(subj, df, num_days=14)
+plotting.plot_ci_accuracy(subj, df, day_lim=14)
+# 3. Compute summary metrics for each bird
+class_map = {'L': 0, 'R': 1}
+resp_map = {'left': 0, 'right': 1, 'L': 0, 'R': 1}
+for subj, df in behav_data.items():
+df_clean = utils.filter_normal_trials(utils.filter_recent_days(df, 7))
+expected = df_clean['class_'].map(class_map).dropna().astype(int)
+predicted = df_clean['response'].map(resp_map).dropna().astype(int)
+idx = expected.index.intersection(predicted.index)
+perf = Performance(expected[idx].values, predicted[idx].values)
+print('%s n=%d acc=%.2f d-prime=%.2f' % (
+subj, len(idx), perf.acc(), perf.dprime()))
+# 4. Multi-bird trial/feed summary
+plotting.plot_trial_feeds(behav_data, num_days=14)
+plt.show()
+```
 
 ### 11.6 Limitations and Further Analysis
 
@@ -2360,7 +2240,6 @@ Official datasheet: hifiberry.com/docs/data-sheets/datasheet-amp2/
 | L/R channel bridging                     | Not supported                                                       |
 
 > *The MagPi client uses a 12 V supply. With 4 Ω speakers at 12 V the typical output per channel is 14 W, which is more than sufficient for the small speakers used inside the sound isolation chambers.*
-> 
 > *The speaker connector polarity on the Amp2 is reversed on one channel compared to the older Amp+. Always check the PCB silkscreen markings when connecting speakers.*
 
 ### B.3 NXP PCA9685 16-Channel PWM Controller
@@ -2395,7 +2274,9 @@ Official datasheet: nxp.com/docs/en/data-sheet/PCA9685.pdf
 
 The PWM output frequency is set by writing a prescale value to the PRE\_SCALE register. The formula is:
 
-> prescale = round(osc\_clock / (4096 \* update\_rate)) - 1
+```
+prescale = round(osc_clock / (4096 * update_rate)) - 1
+```
 
 where osc\_clock is 25 MHz and update\_rate is the desired frequency in Hz. Examples:
 
@@ -2465,7 +2346,7 @@ Official datasheet: ti.com/product/TPSM64404
 | Output current (each channel)       | 2 A continuous                                            |
 | Total output current                | 4 A (2 A per channel, both channels independent)          |
 | Switching frequency                 | 600 kHz typical                                           |
-| Efficiency                          | Up to ∲95% typical (dependent on VIN/VOUT ratio and load) |
+| Efficiency                          | Up to ≈95% typical (dependent on VIN/VOUT ratio and load) |
 | Output 1 (board config)             | \+12 V (house lights via SQ2364EES MOSFET driver)         |
 | Output 2 (board config)             | \+6 V (servo supply via 50-pin IDC pin 4)                 |
 | Protections                         | Overcurrent, overtemperature, undervoltage lockout (UVLO) |
@@ -2528,7 +2409,6 @@ Official datasheet: cdn.sparkfun.com/datasheets/Sensors/ForceFlex/hx711\_english
 | Operating temperature                         | −40 to +85 °C                                                          |
 
 > *The gain and active channel are selected by the number of clock pulses sent per conversion cycle: 25 pulses = Channel A gain 128; 26 pulses = Channel B gain 32; 27 pulses = Channel A gain 64. The pyoperant codebase uses Channel A at gain 128 (the default 25-pulse mode).*
-> 
 > *Power-down is triggered by holding PD\_SCK high for more than 60 μs. The chip resets and re-reads the RATE pin on wake-up, so power cycling the HX711 via GPIO8 is the cleanest way to reset it after a communication error.*
 
 ### B.8 GoBilda 2000-0025-0002 Dual Mode Servo (Hopper Actuator)
@@ -2568,7 +2448,7 @@ Product page: gobilda.com/2000-series-dual-mode-servo-25-2-torque/
 
 #### Position Mode Pulse Width Reference
 
-In position mode the servo shaft angle is proportional to the PWM pulse width. The full 300° travel spans 500â–2500 μs (a 2000 μs range), giving 0.150° per microsecond.
+In position mode the servo shaft angle is proportional to the PWM pulse width. The full 300° travel spans 500–2500 μs (a 2000 μs range), giving 0.150° per microsecond.
 
 |                      |                                |                                                |
 | -------------------- | ------------------------------ | ---------------------------------------------- |
@@ -2581,17 +2461,18 @@ In position mode the servo shaft angle is proportional to the PWM pulse width. T
 
 The PCA9685 duty cycle value written to the register is calculated from the pulse width:
 
-> counts = round(pulse\_us / 20000 \* 4096) \# at 50 Hz, period = 20000 us
+```
+counts = round(pulse_us / 20000 * 4096) # at 50 Hz, period = 20000 us
+```
 
 Examples: 500 μs → counts = 102; 1500 μs → counts = 307; 2500 μs → counts = 512.
 
 > *The actual hopper up\_angle and down\_angle values are calibrated per panel in local\_pi\_revd.py and will differ from the table above. The table gives the full range of safe travel. Never command a pulse width below 500 μs or above 2500 μs — these are the hardware limits of the potentiometer feedback and may damage the gear train if exceeded.*
-> 
 > *The servo operates in position mode by default. Continuous rotation mode requires the goBILDA 3102-0001-0001 Dual Mode Servo Programr to toggle; do not use the continuous-mode PWM range (900–2100 μs) in position mode as the center point (1500 μs) will be interpreted as stop rather than center position.*
 
-### B.9 Molex KK 254 (.100″) Connector Part Numbers
+### B.9 Molex KK 254 (.100") Connector Part Numbers
 
-The RPiOperant panel wiring uses Molex KK 254 series (.100″ / 2.54 mm pitch) connectors throughout. These are single-row, wire-to-board connectors with a polarising key and friction latch. The female housing crimps onto the wire harness; the male pin header is soldered to the PCB. Crimp terminals accept 22–28 AWG wire.
+The RPiOperant panel wiring uses Molex KK 254 series (.100" / 2.54 mm pitch) connectors throughout. These are single-row, wire-to-board connectors with a polarising key and friction latch. The female housing crimps onto the wire harness; the male pin header is soldered to the PCB. Crimp terminals accept 22–28 AWG wire.
 
 |                            |              |                       |                                       |
 | -------------------------- | ------------ | --------------------- | ------------------------------------- |
@@ -2638,25 +2519,18 @@ Note: pyoperant/local\_vogel.py already uses print(...) with parentheses — no 
 
 #### Relative imports in pyoperant/behavior/\_\_init\_\_.py
 
-> \# Before
-> 
-> from two\_alt\_choice import \*
-> 
-> from lights import \*
-> 
-> from place\_pref import PlacePrefExp
-> 
-> from place\_pref\_24hr import PlacePrefExp24hr
-> 
-> \# After
-> 
-> from .two\_alt\_choice import \*
-> 
-> from .lights import \*
-> 
-> from .place\_pref import PlacePrefExp
-> 
-> from .place\_pref\_24hr import PlacePrefExp24hr
+```
+# Before
+from two_alt_choice import *
+from lights import *
+from place_pref import PlacePrefExp
+from place_pref_24hr import PlacePrefExp24hr
+# After
+from .two_alt_choice import *
+from .lights import *
+from .place_pref import PlacePrefExp
+from .place_pref_24hr import PlacePrefExp24hr
+```
 
 ### C.2 Phase 3 — Built-ins and stdlib
 
@@ -2684,35 +2558,32 @@ Simple global find-and-replace of xrange with range in both files.
 
 pyoperant/queues.py line 3:
 
-> \# Before
-> 
-> import cPickle as pickle
-> 
-> \# After
-> 
-> import pickle
+```
+# Before
+import cPickle as pickle
+# After
+import pickle
+```
 
 pyoperant/behavior/text\_markov.py line 17:
 
-> \# Before
-> 
-> import cPickle
-> 
-> \# After
-> 
-> import pickle as cPickle \# preserves all downstream cPickle.load/dump calls
+```
+# Before
+import cPickle
+# After
+import pickle as cPickle # preserves all downstream cPickle.load/dump calls
+```
 
 #### basestring → str
 
 pyoperant/utils.py line 150:
 
-> \# Before
-> 
-> if isinstance(command, basestring):
-> 
-> \# After
-> 
-> if isinstance(command, str):
+```
+# Before
+if isinstance(command, basestring):
+# After
+if isinstance(command, str):
+```
 
 ### C.3 Phase 4 — Behavior changes requiring care
 
@@ -2720,97 +2591,64 @@ pyoperant/utils.py line 150:
 
 The check\_cmdline\_params function used the Python 2-only two-argument form of str.translate to strip non-digit characters. Replace the entire function and remove import string from the top of utils.py:
 
-> \# Before
-> 
-> def check\_cmdline\_params(parameters, cmd\_line):
-> 
-> allchars = string.maketrans('','')
-> 
-> nodigs = allchars.translate(allchars, string.digits)
-> 
-> if not ('box' not in cmd\_line or cmd\_line\['box'\] == int(
-> 
-> parameters\['panel\_name'\].encode('ascii','ignore').translate(allchars, nodigs))):
-> 
-> print "box number doesn't match config and command line"
-> 
-> return False
-> 
-> if not ('subj' not in cmd\_line or int(
-> 
-> cmd\_line\['subj'\].encode('ascii','ignore').translate(allchars, nodigs)) ==
-> 
-> int(parameters\['subject'\].encode('ascii','ignore').translate(allchars, nodigs))):
-> 
-> print "subject number doesn't match config and command line"
-> 
-> return False
-> 
-> return True
-> 
-> \# After
-> 
-> def check\_cmdline\_params(parameters, cmd\_line):
-> 
-> def digits\_only(s):
-> 
-> return ''.join(c for c in s if c.isdigit())
-> 
-> if not ('box' not in cmd\_line or cmd\_line\['box'\] == int(digits\_only(parameters\['panel\_name'\]))):
-> 
-> print("box number doesn't match config and command line")
-> 
-> return False
-> 
-> if not ('subj' not in cmd\_line or
-> 
-> int(digits\_only(cmd\_line\['subj'\])) == int(digits\_only(parameters\['subject'\]))):
-> 
-> print("subject number doesn't match config and command line")
-> 
-> return False
-> 
-> return True
+```
+# Before
+def check_cmdline_params(parameters, cmd_line):
+allchars = string.maketrans('','')
+nodigs = allchars.translate(allchars, string.digits)
+if not ('box' not in cmd_line or cmd_line['box'] == int(
+parameters['panel_name'].encode('ascii','ignore').translate(allchars, nodigs))):
+print "box number doesn't match config and command line"
+return False
+if not ('subj' not in cmd_line or int(
+cmd_line['subj'].encode('ascii','ignore').translate(allchars, nodigs)) ==
+int(parameters['subject'].encode('ascii','ignore').translate(allchars, nodigs))):
+print "subject number doesn't match config and command line"
+return False
+return True
+# After
+def check_cmdline_params(parameters, cmd_line):
+def digits_only(s):
+return ''.join(c for c in s if c.isdigit())
+if not ('box' not in cmd_line or cmd_line['box'] == int(digits_only(parameters['panel_name']))):
+print("box number doesn't match config and command line")
+return False
+if not ('subj' not in cmd_line or
+int(digits_only(cmd_line['subj'])) == int(digits_only(parameters['subject']))):
+print("subject number doesn't match config and command line")
+return False
+return True
+```
 
 #### dict.items() indexing in pyoperant/behavior/three\_ac\_matching.py
 
 In Python 3, dict.items() returns a view, not a list, so it cannot be indexed directly.
 
-> \# Before (line 35)
-> 
-> motif\_names, motif\_files = zip(\*\[self.parameters\['stims'\].items()\[mid\] for mid in mids\])
-> 
-> \# After
-> 
-> motif\_names, motif\_files = zip(\*\[list(self.parameters\['stims'\].items())\[mid\] for mid in mids\])
+```
+# Before (line 35)
+motif_names, motif_files = zip(*[self.parameters['stims'].items()[mid] for mid in mids])
+# After
+motif_names, motif_files = zip(*[list(self.parameters['stims'].items())[mid] for mid in mids])
+```
 
 #### unicode() calls in pyoperant/behavior/text\_markov.py
 
 All strings are unicode by default in Python 3. Replace all unicode("...", "utf-8") calls with plain string literals (lines 103–124):
 
-> \# Before
-> 
-> stim\_dict\[unicode("class", "utf-8")\] = ...
-> 
-> stim\_dict\[unicode("stim\_name", "utf-8")\] = ...
-> 
-> stim\_dict\[unicode("seq", "utf-8")\] = ...
-> 
-> stim\_dict\[unicode("order", "utf-8")\] = ...
-> 
-> stim\_dict\[unicode("syll\_time\_lens", "utf-8")\] = ...
-> 
-> \# After
-> 
-> stim\_dict\["class"\] = ...
-> 
-> stim\_dict\["stim\_name"\] = ...
-> 
-> stim\_dict\["seq"\] = ...
-> 
-> stim\_dict\["order"\] = ...
-> 
-> stim\_dict\["syll\_time\_lens"\] = ...
+```
+# Before
+stim_dict[unicode("class", "utf-8")] = ...
+stim_dict[unicode("stim_name", "utf-8")] = ...
+stim_dict[unicode("seq", "utf-8")] = ...
+stim_dict[unicode("order", "utf-8")] = ...
+stim_dict[unicode("syll_time_lens", "utf-8")] = ...
+# After
+stim_dict["class"] = ...
+stim_dict["stim_name"] = ...
+stim_dict["seq"] = ...
+stim_dict["order"] = ...
+stim_dict["syll_time_lens"] = ...
+```
 
 ## Appendix D: Index
 

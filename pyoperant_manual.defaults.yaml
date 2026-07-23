@@ -1,0 +1,34 @@
+# pandoc defaults for the PyOperant Lab Manual PDF build.
+#   build with:  pandoc pyoperant_manual.md -d pyoperant_manual.defaults.yaml -o pyoperant_manual.pdf
+#   or simply:   make pdf
+from: gfm
+to: pdf
+pdf-engine: tectonic
+standalone: true
+toc: true
+toc-depth: 3
+number-sections: false          # headings are already hand-numbered (1, 1.1, …)
+listings: true                  # render fenced code via the listings package
+
+filters:
+  - pyoperant_manual.tablewidths.lua   # proportional, wrapping table columns
+
+include-in-header:
+  - pyoperant_manual.head.tex
+
+metadata:
+  title: "PyOperant Lab Manual"
+  subtitle: "A guide to understanding, building, and running operant conditioning experiments"
+  author: "Gentner Lab — University of California, San Diego"
+  date: "July 2026"
+
+variables:
+  documentclass: article
+  fontsize: 11pt
+  classoption:
+    - titlepage                 # \maketitle becomes a dedicated title page
+  geometry: margin=1in
+  colorlinks: true
+  linkcolor: RoyalBlue
+  urlcolor: RoyalBlue
+  toccolor: black
