@@ -676,7 +676,7 @@ For every box marked enabled in `panel_subject_behavior` (5.3), it rsyncs that s
 
 Runs every 5 minutes via cron on the server:
 
-> */5 * * * * /home/bird/code/rpioperantctl/rpioperantctl.py -psb_loc=/home/bird/opdat/panel_subject_behavior -s -k
+> */5 * * * * /home/bird/code/rpioperantctl/rpioperantctl.py -psb_loc=/home/bird/opdat/panel_subject_behavior -s
 
 For every row in `panel_subject_behavior` (enabled or not), it SSHes into that panel, checks `ps -ef`, and reconciles: starts the correct behavior if the panel's enabled and it isn't running; kills it if disabled but running; kills it if the *wrong* behavior is running regardless of enabled state.
 
@@ -695,7 +695,7 @@ For every row in `panel_subject_behavior` (enabled or not), it SSHes into that p
 
 With no flags at all, it does a **dry run**, and prints what it would start/kill without doing either. The `panel_stim_excludes` write (see below) happens on every run regardless of `-s`/`-k`.
 
-**Note** The crontab `rpioperantctl` call should run generally with both `-s` and `-k`. Without both flags, a single magpi can end up running the wrong behavior, or multiple behaviors simultaneously — both fighting over the same hardware. `-k` fixes that, but it isn't entirely fail-safe.  A typo or bad edit in `panel_subject_behavior` picked up by cron can kill a currently-running, legitimate experiment. Keep this in mind when editing the file live — see the note above on why the file has to stay the accurate source of truth.
+**Note** The crontab currently runs `-s` only, not `-k` — this is a deliberate, staged rollout, not an oversight. Without `-k`, a panel that ends up running the wrong behavior (its config changed but the old process was never manually killed) gets a *second*, correct-behavior process started alongside the still-running wrong one — both fighting over the same hardware. The decision to eventually add `-k` has been made; it's being held back specifically until everyone has updated their own entries in `panel_subject_behavior`, since `-k` isn't fail-safe the way `-s` is — a stale or inconsistent entry could get an actively-running, legitimate experiment killed the moment `-k` starts enforcing it. Check the live crontab (`crontab -l`) rather than assuming either state before making changes here.
 
 **Stim-exclude resolution.** While it's already SSHed into each panel for the process check, `rpioperantctl` also reads that subject's `config.json` to resolve their real `stim_path` (explicit, or pyoperant's own default of `<experiment_path>/stims`), and writes the result to `panel_stim_excludes` (tab-separated: panel, subject, exclude-path-relative-to-the-subject's-own-folder) for `allsummary.py` to consume — this avoids `allsummary.py` needing its own separate SSH connection to redo the same lookup every 15 minutes.
 
