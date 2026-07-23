@@ -37,8 +37,12 @@
   \fancyfoot[C]{\thepage}%
   \renewcommand{\headrulewidth}{0pt}%
 }
-% carry the current section (chapter) title into the right-hand running head
-\renewcommand{\sectionmark}[1]{\markboth{#1}{}}
+% In this document the top body heading level (## chapters) maps to
+% \subsection. Start each chapter on a fresh page, and carry the chapter
+% title into the right-hand running head.
+\let\origsubsection\subsection
+\renewcommand{\subsection}{\clearpage\origsubsection}
+\renewcommand{\subsectionmark}[1]{\markboth{#1}{}}
 
 % --- Tables: clean academic, avoid margin overflow -------------------------
 % pandoc renders pipe tables as longtable; render them a touch smaller with
