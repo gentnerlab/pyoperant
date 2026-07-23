@@ -14,6 +14,8 @@ setup(
     python_requires='>=3.9',
     scripts=[
         'scripts/behave',
+        # Deprecated stub (kept so `pyoperantctl` points users at rpioperantctl
+        # on the MagPi server); the legacy Perl controller has been retired.
         'scripts/pyoperantctl',
         'scripts/mutate_config_file',
         'scripts/tune_servo.py',
