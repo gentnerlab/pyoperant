@@ -88,13 +88,33 @@ class FakeCue(object):
         self.calls.append("off")
 
 
+class FakeHopper(object):
+    """Stands in for a components.Hopper. `actuator` is 'servo' or
+    'solenoid', mirroring the real Hopper's `_actuator` attribute that
+    lights.py's Lights._free_food branches on."""
+
+    def __init__(self, actuator="servo"):
+        self._actuator = actuator
+        self.calls = []
+
+    def up(self):
+        self.calls.append("up")
+
+    def down(self):
+        self.calls.append("down")
+
+    def reward(self, value=1.0):
+        self.calls.append(("reward", value))
+        return dt.datetime.now()
+
+
 class FakePanel(panels.BasePanel):
     """Minimal stand-in for a real hardware Panel -- enough to satisfy
     BaseExp/TwoAltChoiceExp/Shaper without touching any GPIO/serial/audio
     hardware. Subclasses panels.BasePanel because shape.Shaper.__init__
     asserts isinstance(panel, panels.BasePanel)."""
 
-    def __init__(self):
+    def __init__(self, hopper_actuator="servo"):
         super(FakePanel, self).__init__()
         self.house_light = FakeLight()
         self.left = FakePort("left")
@@ -102,6 +122,7 @@ class FakePanel(panels.BasePanel):
         self.right = FakePort("right")
         self.speaker = FakeSpeaker()
         self.cue = FakeCue()
+        self.hopper = FakeHopper(actuator=hopper_actuator)
         self.reset_calls = 0
         self.reward_calls = []
         self.punish_calls = []
