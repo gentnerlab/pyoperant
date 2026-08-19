@@ -1,5 +1,5 @@
 {
-    "comments": "Minimal smoke-test config for Lights -- only needs BaseExp-level params, no stims/classes.",
+    "comments": "Minimal smoke-test config for Lights -- only needs BaseExp-level params, no stims/classes. free_food_schedule is independent of light_schedule -- it doesn't have to match; omit it entirely to disable free feeding.",
     "experimenter": {
         "name": "smoke test",
         "email": "tgentner@ucsd.edu"
@@ -8,5 +8,6 @@
     "debug": true,
     "log_handlers": [],
     "light_schedule": [["00:00", "23:59"]],
+    "free_food_schedule": [["00:00", "23:59"]],
     "shape": null
 }

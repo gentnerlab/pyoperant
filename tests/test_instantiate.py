@@ -136,6 +136,62 @@ class TestLights(unittest.TestCase):
                     type(e).__name__, e))
             self.assertEqual(panel.reset_calls, 1)
 
+    def test_Lights_free_food_during_idle(self):
+        """free_food_schedule should trigger the free-food state directly
+        from _run_idle, without needing check_session_schedule() -- see
+        lights.py's _run_idle override.
+
+        Note: doesn't drive exp._free_food() itself -- with an always-on
+        schedule its inner wait/food/checker loop (base.py) never exits,
+        by design (it's meant to keep cycling for as long as the schedule
+        window is open). deliver_free_food() is the actual reward-delivery
+        primitive that loop calls each pass, so exercise that directly."""
+        config = _load_config("Lights")
+        config["free_food_schedule"] = [["00:00", "23:59"]]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            exp = Lights(panel=panel, **config)
+            self.assertEqual(exp._run_idle(), 'free_food_block')
+
+            exp.deliver_free_food(10, 'checker')()
+            self.assertEqual(panel.reward_calls, [10])
+
+    def test_Lights_free_food_servo_continuous(self):
+        """Servo hopper: _free_food should raise once, hold while the
+        schedule stays open, then lower once -- not cycle like the
+        solenoid path does."""
+        config = _load_config("Lights")
+        config["free_food_schedule"] = [["00:00", "23:59"]]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel(hopper_actuator="servo")
+            exp = Lights(panel=panel, **config)
+
+            with patch("pyoperant.utils.wait"), \
+                 patch.object(exp, "_check_free_food_block", side_effect=[True, False]):
+                self.assertEqual(exp._free_food(), 'idle')
+
+            self.assertEqual(panel.hopper.calls, ["up", "down"])
+
+    def test_Lights_free_food_solenoid_cycles(self):
+        """Solenoid hopper: _free_food should fall through to BaseExp's
+        existing cycling behavior (feed via panel.reward each pass)
+        unchanged -- the hopper is never held continuously up."""
+        config = _load_config("Lights")
+        config["free_food_schedule"] = [["00:00", "23:59"]]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel(hopper_actuator="solenoid")
+            exp = Lights(panel=panel, **config)
+
+            with patch("pyoperant.utils.wait"), \
+                 patch("pyoperant.utils.check_time", return_value=False):
+                self.assertEqual(exp._free_food(), 'idle')
+
+            self.assertEqual(panel.reward_calls, [10])
+            self.assertEqual(panel.hopper.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()
