@@ -28,6 +28,16 @@ _BEHAVIOR_MODULES = [
     "pyoperant.behavior.three_ac_matching",
 ]
 
+_SONG_RECORDING_MODULES = [
+    "pyoperant.song_recording",
+    "pyoperant.song_recording._pcm",
+    "pyoperant.song_recording.features",
+    "pyoperant.song_recording.gate",
+    "pyoperant.song_recording.smoother",
+    "pyoperant.song_recording.noise_model",
+    "pyoperant.song_recording.monitor",
+]
+
 
 def _stub_hardware_modules():
     for name in _HARDWARE_MODULES:
@@ -58,6 +68,21 @@ def _make_test(modname):
 for _modname in _BEHAVIOR_MODULES:
     _test_name = "test_" + _modname.replace(".", "_")
     setattr(TestBehaviorImports, _test_name, _make_test(_modname))
+
+
+class TestSongRecordingImports(unittest.TestCase):
+    """pyaudio is stubbed the same way as for TestBehaviorImports above --
+    song_recording's capture layer (monitor.py, noise_model.py via _pcm.py)
+    imports pyaudio for its format constants, but none of these modules
+    need real audio hardware just to import."""
+    @classmethod
+    def setUpClass(cls):
+        _stub_hardware_modules()
+
+
+for _modname in _SONG_RECORDING_MODULES:
+    _test_name = "test_" + _modname.replace(".", "_")
+    setattr(TestSongRecordingImports, _test_name, _make_test(_modname))
 
 
 if __name__ == "__main__":

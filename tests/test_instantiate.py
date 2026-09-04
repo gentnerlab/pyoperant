@@ -45,6 +45,15 @@ if "serial" not in sys.modules:
     except ImportError:
         sys.modules["serial"] = MagicMock()
 
+# lights.py's song_recording path lazily imports pyoperant.song_recording,
+# whose capture-layer modules import pyaudio for format constants (see
+# pyoperant.song_recording._pcm) -- not installed on a dev machine either.
+if "pyaudio" not in sys.modules:
+    try:
+        import pyaudio  # noqa: F401
+    except ImportError:
+        sys.modules["pyaudio"] = MagicMock()
+
 from fixtures import (  # noqa: E402
     FakePanel,
     prepare_experiment_dirs,
@@ -191,6 +200,82 @@ class TestLights(unittest.TestCase):
 
             self.assertEqual(panel.reward_calls, [10])
             self.assertEqual(panel.hopper.calls, [])
+
+    def test_Lights_recording_enabled_routes_to_session(self):
+        """song_recording.enabled=True should route _run_idle into the
+        normal BaseExp session state (session_pre/main/post), where the
+        monitor thread lives -- see lights.py's _run_idle override. This
+        is the fix for the bug where _run_idle could never reach 'session'
+        for Lights at all (neither the free-food override nor, before it,
+        BaseExp's own check_session_schedule()-gated branch, since Lights
+        never overrides check_session_schedule). Lights.json's own default
+        free_food_schedule is always-on (see e50aff6), so it's cleared here
+        -- otherwise free food would take priority and mask this branch;
+        that interaction is covered separately below."""
+        config = _load_config("Lights")
+        config.pop("free_food_schedule", None)
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            exp = Lights(panel=panel, **config)
+            self.assertEqual(exp._run_idle(), 'session')
+
+    def test_Lights_recording_disabled_stays_idle(self):
+        """Without song_recording in config, _run_idle must behave exactly
+        as before -- zero regression for existing non-recording Lights
+        boxes. Lights.json's own default free_food_schedule is always-on
+        (see e50aff6), so it's cleared here to isolate the branch under
+        test; that interaction is covered separately below."""
+        config = _load_config("Lights")
+        config.pop("free_food_schedule", None)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            exp = Lights(panel=panel, **config)
+            with patch("pyoperant.utils.wait"):
+                self.assertEqual(exp._run_idle(), 'idle')
+
+    def test_Lights_free_food_takes_priority_over_recording(self):
+        """When both free_food_schedule and song_recording are active at
+        once, free food wins -- same precedence _run_idle documents."""
+        config = _load_config("Lights")
+        config["free_food_schedule"] = [["00:00", "23:59"]]
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            exp = Lights(panel=panel, **config)
+            self.assertEqual(exp._run_idle(), 'free_food_block')
+
+    def test_Lights_session_pre_skips_gracefully_without_microphone(self):
+        """FakePanel has no .microphone -- session_pre() (building the
+        detection pipeline and starting the monitor thread) must degrade
+        gracefully, not crash: Lights has to keep controlling the light
+        schedule regardless of whether a panel even has a mic configured
+        (e.g. a Rev C board, or any panel where song_recording just isn't
+        wired up yet)."""
+        config = _load_config("Lights")
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            self.assertFalse(hasattr(panel, "microphone"))
+            exp = Lights(panel=panel, **config)
+            try:
+                self.assertEqual(exp.session_pre(), 'main')
+            except Exception as e:
+                self.fail("session_pre() should degrade gracefully without "
+                          "a microphone, not raise: {}: {}".format(
+                              type(e).__name__, e))
+            self.assertIsNone(exp._monitor_thread)
+
+            try:
+                self.assertIsNone(exp.session_post())
+            except Exception as e:
+                self.fail("session_post() should be a no-op when the "
+                          "monitor thread never started: {}: {}".format(
+                              type(e).__name__, e))
 
 
 if __name__ == "__main__":

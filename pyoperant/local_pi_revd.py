@@ -23,6 +23,13 @@ import time
 LIGHTS_PCA9685_ADDRESS = 0x55  # U1: A0, A2, A4 pulled high
 SERVO_PCA9685_ADDRESS  = 0x45  # U7: A0, A2 pulled high
 
+# USB microphone (for pyoperant.song_recording, enabled via a bird's
+# config.json -- see pyoperant.behavior.lights). Substring match against
+# PortAudio device names, not an exact match or index -- run
+# `python3 -m pyoperant.song_recording.monitor --list-devices` on this
+# board to confirm the exact string a given mic reports.
+AUDIO_INPUT_DEVICE = 'UMIK-1'
+
 INPUTS = [5,   # Hopper IR
           6,   # Left IR
           13,  # Center IR
@@ -103,6 +110,15 @@ class PiPanel(panels.BasePanel):
                                                   params={'channel': ch, 'servo': True}))
 
         self.speaker = hwio.AudioOutput(interface=self.interfaces['pyaudio'])
+
+        # Microphone — shares the panel's existing PyAudioInterface/PortAudio
+        # context with the speaker rather than opening a second one. Used
+        # by pyoperant.song_recording when song_recording is enabled in a
+        # bird's config.json; harmless/unused otherwise.
+        self.microphone = hwio.AudioInput(interface=self.interfaces['pyaudio'],
+                                          params={'device_name': AUDIO_INPUT_DEVICE,
+                                                  'sample_rate': 48000,
+                                                  'channels': 1})
 
         # assemble inputs into components
         # pwm_outputs indices: 0=HOUSELIGHT_R, 1=G, 2=B, 3=W,

@@ -174,4 +174,72 @@ class PWMOutput(BaseIO):
         self.write(new_val)
         return new_val
 
+class AudioInput(BaseIO):
+    """Class which holds information about an audio input device (e.g. a
+    USB microphone) and abstracts the methods of recording from it.
+
+    Keyword arguments:
+    interface -- Interface() instance. Must have the method
+        '_open_input_stream' (see PyAudioInterface._open_input_stream).
+        Typically the panel's existing PyAudioInterface instance -- the
+        same one used for the speaker's AudioOutput -- rather than a
+        second, standalone one, so mic and speaker share one PortAudio
+        context per panel.
+    params -- dictionary of keyword:value pairs:
+        device_name -- substring to match against input-capable device
+            names (default: None, meaning "let the interface pick its own
+            default input device").
+        sample_rate -- Hz (default 44100).
+        channels -- requested channel count (default 1); the interface may
+            fall back to the device's actual channel count if this isn't
+            supported.
+
+    Methods:
+    open_stream(chunk_size, callback=None) -- opens the input stream.
+        With callback: non-blocking mode, audio arrives via the callback.
+        Without: blocking mode, read via read(). Either way, the format
+        actually negotiated is recorded on this object afterward as
+        .sample_format / .sample_width / .channels_opened.
+    read(n_frames) -- blocking read of n_frames from the currently open
+        stream. Returns raw bytes -- decoding to a numeric array (e.g.
+        numpy) is deliberately left to the caller (pyoperant.song_recording),
+        keeping this hardware-abstraction module free of that dependency.
+    close() -- stops and closes the currently open stream.
+    """
+    def __init__(self, interface=None, params={}, *args, **kwargs):
+        super(AudioInput, self).__init__(interface=interface, params=params, *args, **kwargs)
+
+        assert hasattr(self.interface, '_open_input_stream')
+        self.device_name = params.get('device_name', None)
+        self.sample_rate = params.get('sample_rate', 44100)
+        self.channels = params.get('channels', 1)
+
+        self._stream = None
+        self.sample_format = None
+        self.sample_width = None
+        self.channels_opened = None
+
+    def open_stream(self, chunk_size=1024, callback=None):
+        (self._stream, self.sample_format,
+         self.sample_width, self.channels_opened) = self.interface._open_input_stream(
+            sample_rate=self.sample_rate,
+            channels=self.channels,
+            chunk_size=chunk_size,
+            device_name=self.device_name,
+            callback=callback,
+        )
+        return self._stream
+
+    def read(self, n_frames, exception_on_overflow=False):
+        return self._stream.read(n_frames, exception_on_overflow=exception_on_overflow)
+
+    def close(self):
+        if self._stream is not None:
+            try:
+                self._stream.stop_stream()
+            except Exception:
+                pass
+            self._stream.close()
+            self._stream = None
+
 
