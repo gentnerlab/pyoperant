@@ -45,6 +45,35 @@ now; revisit once the corpus-driven feature work (a more robust harmonicity
 estimate than today's live `harmonic_ratio`, see the starsong-feature-
 analysis project) lands in the live gate, which should make this gate
 sharper without changing the surrounding state machine.
+
+Device-loss detection and recovery
+------------------------------------
+Confirmed live, 2026-09-09 (see project_vocal_recorder memory): unplugging
+and replugging a USB mic mid-session leaves the previously-open PyAudio
+stream silently dead -- no exception, no error, the audio callback simply
+stops firing, and the monitor thread was observed spinning CPU
+unproductively (12% -> 51%) rather than either recovering or erroring out.
+Undetected, this means a transient USB reset during weeks of unattended
+real deployment silently stops all recording until someone happens to
+notice.
+
+`run()`'s main loop now tracks how long it's been since a real chunk was
+last pulled off the audio queue. Past `device_watchdog_timeout` seconds of
+silence, it declares the device lost (logged at `error`, not `warning` --
+this is a real problem, and `error`/`critical` are what the existing
+SMTPHandler-on-root-logger mechanism, see the "MagPi server" reference,
+turns into an email to the experimenter for free, no new alerting plumbing
+needed) and attempts to close and reopen the stream. Reopening re-resolves
+the device by name from scratch (the same `_find_device_index` substring
+match cold-start already uses), so a replugged device landing at a new
+PortAudio index is handled the same way it already is at startup. Retries
+use capped exponential backoff (`device_reconnect_backoff_initial` up to
+`device_reconnect_backoff_max`) rather than a tight loop, since the
+observed failure mode was itself a busy-spin -- hammering a still-missing
+device immediately would just recreate that problem. A successful
+`open_stream()` call is NOT by itself treated as recovery (it can succeed
+against the wrong/fallback device without erroring) -- only an actual
+chunk arriving again clears the lost state and resets the backoff.
 """
 
 from __future__ import annotations
@@ -56,6 +85,7 @@ import datetime
 import logging
 import queue
 import threading
+import time
 import wave
 from pathlib import Path
 from typing import Optional
@@ -81,6 +111,10 @@ DEFAULT_CONFIG = {
     "precursor_max_duration": 3.0,   # episode must be no longer than this to qualify
     "precursor_min_score":    0.55,  # ...and confidently scored (base gate.threshold is 0.45)
     "precursor_grace_period": 8.0,   # extended hangover granted instead of post_roll
+    # Device-loss detection and recovery -- see module docstring.
+    "device_watchdog_timeout":         5.0,   # seconds of silence before declaring the device lost
+    "device_reconnect_backoff_initial": 1.0,  # seconds before the first reconnect retry
+    "device_reconnect_backoff_max":     30.0, # cap on retry backoff growth
     "output_dir":        "recordings",
     "log_csv":           "detections.csv",
 }
@@ -179,6 +213,14 @@ class SongMonitor:
         self._precursor_extended    = False
         self._clip_buffer: list[np.ndarray] = []
 
+        # Device-loss watchdog state -- see module docstring. Initialized
+        # here (not just in run()) so _check_device_health()/_on_chunk_received()
+        # are directly callable/testable without first calling run().
+        self._last_chunk_at            = time.monotonic()
+        self._device_lost              = False
+        self._reconnect_backoff        = self.cfg["device_reconnect_backoff_initial"]
+        self._next_reconnect_attempt_at = 0.0
+
         Path(self.cfg["output_dir"]).mkdir(parents=True, exist_ok=True)
         self._out_dir = Path(self.cfg["output_dir"])
         self._det_log = DetectionLog(self.cfg["log_csv"])
@@ -218,13 +260,15 @@ class SongMonitor:
         )
 
         self.audio_input.open_stream(chunk_size=self._chunk_len, callback=_audio_callback)
+        self._last_chunk_at = time.monotonic()
         try:
             while not self._should_stop():
                 try:
                     chunk = self._audio_q.get(timeout=0.5)
+                    self._on_chunk_received()
                     self._process(chunk)
                 except queue.Empty:
-                    pass
+                    self._check_device_health(_audio_callback)
         except KeyboardInterrupt:
             log.info("Monitor stopped by KeyboardInterrupt.")
         finally:
@@ -234,6 +278,68 @@ class SongMonitor:
 
     def _should_stop(self) -> bool:
         return self.stop_event is not None and self.stop_event.is_set()
+
+    # ------------------------------------------------------------------
+    # Device-loss detection and recovery -- see module docstring.
+    # ------------------------------------------------------------------
+
+    def _on_chunk_received(self):
+        """Call from run()'s main loop every time a real chunk is pulled off
+        the queue -- i.e. the stream is demonstrably alive. Clears any
+        device-loss state left over from a prior reconnect attempt."""
+        self._last_chunk_at = time.monotonic()
+        if self._device_lost:
+            log.info("Audio device recovered — resuming normal monitoring.")
+            self._device_lost = False
+            self._reconnect_backoff = self.cfg["device_reconnect_backoff_initial"]
+
+    def _check_device_health(self, callback, now: float | None = None):
+        """Call from run()'s main loop whenever the audio queue has been
+        empty for a poll interval. `now` is injectable so this is directly
+        unit-testable without real sleeps; real usage always omits it
+        (uses the real clock).
+        """
+        if now is None:
+            now = time.monotonic()
+        silent_for = now - self._last_chunk_at
+        if silent_for < self.cfg["device_watchdog_timeout"]:
+            return
+
+        if not self._device_lost:
+            self._device_lost = True
+            self._reconnect_backoff = self.cfg["device_reconnect_backoff_initial"]
+            self._next_reconnect_attempt_at = now
+            log.error(
+                "No audio received for %.1fs — audio device appears to have "
+                "disconnected. Attempting to reconnect.", silent_for,
+            )
+
+        if now < self._next_reconnect_attempt_at:
+            return  # still waiting out the backoff from the last attempt
+
+        try:
+            self.audio_input.close()
+        except Exception:
+            log.exception("Error closing stream during reconnect attempt")
+
+        try:
+            self.audio_input.open_stream(chunk_size=self._chunk_len, callback=callback)
+            # Reopening without an exception does NOT by itself mean data is
+            # flowing again (it can silently succeed against the wrong/
+            # fallback device) -- _last_chunk_at is deliberately left alone,
+            # so continued silence re-triggers this check (same backoff, not
+            # a growing one from this branch) rather than being mistaken for
+            # confirmed recovery. Only a real chunk arriving in run()'s main
+            # loop (_on_chunk_received) actually clears _device_lost.
+            log.info("Audio stream reopened — waiting to confirm data is flowing again.")
+        except Exception as exc:
+            log.warning("Reconnect attempt failed (%s); retrying in %.1fs.",
+                        exc, self._reconnect_backoff)
+
+        self._next_reconnect_attempt_at = now + self._reconnect_backoff
+        self._reconnect_backoff = min(
+            self._reconnect_backoff * 2, self.cfg["device_reconnect_backoff_max"]
+        )
 
     # ------------------------------------------------------------------
     # Per-chunk processing
@@ -443,6 +549,136 @@ def self_test():
     ]
     for desc, ok in checks:
         print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
+
+    _self_test_device_watchdog()
+
+
+class _FakeAudioInputWatchdog:
+    """Stands in for a real AudioInput in the device-watchdog self-test --
+    lets the test control exactly when open_stream()/close() succeed or
+    raise, without needing a real microphone. fail_open_times=N means the
+    first N open_stream() calls raise (simulating a still-unplugged
+    device); calls after that succeed."""
+
+    def __init__(self, fail_open_times=0):
+        self.close_calls = 0
+        self.open_calls = 0
+        self.fail_open_times = fail_open_times
+
+    def close(self):
+        self.close_calls += 1
+
+    def open_stream(self, chunk_size, callback):
+        self.open_calls += 1
+        if self.open_calls <= self.fail_open_times:
+            raise RuntimeError("simulated device not present")
+
+
+class _ListLogHandler(logging.Handler):
+    """Collects log records into a list so the self-test can assert on
+    exactly what was logged (e.g. the device-loss ERROR firing once, not
+    once per poll) instead of just eyeballing printed output."""
+
+    def __init__(self):
+        super().__init__()
+        self.records = []
+
+    def emit(self, record):
+        self.records.append(record)
+
+
+def _self_test_device_watchdog():
+    """Synthetic device-loss/recovery scenarios (see module docstring's
+    'Device-loss detection and recovery' section) -- no real hardware, no
+    real sleeps. Drives _check_device_health()/_on_chunk_received()
+    directly with an injected fake clock."""
+    print("\n=== Device-loss watchdog self-test ===")
+
+    cfg = {
+        "output_dir": None, "log_csv": None,  # unused -- we bypass __init__'s dirs below
+        "device_watchdog_timeout": 5.0,
+        "device_reconnect_backoff_initial": 1.0,
+        "device_reconnect_backoff_max": 8.0,
+    }
+
+    def make_monitor(fail_open_times=0):
+        import tempfile
+        from pathlib import Path as _Path
+        tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_watchdog_selftest_"))
+        real_cfg = {**cfg, "output_dir": str(tmp_dir), "log_csv": str(tmp_dir / "detections.csv")}
+        fake_audio = _FakeAudioInputWatchdog(fail_open_times=fail_open_times)
+        m = SongMonitor(real_cfg, audio_input=fake_audio,
+                         gate=_FakeGate([]), extractor=object(),
+                         smoother=__import__(
+                             "pyoperant.song_recording.smoother", fromlist=["CombinedSmoother"]
+                         ).CombinedSmoother.from_config_dict({}))
+        return m, fake_audio
+
+    handler = _ListLogHandler()
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    try:
+        # --- Scenario A: silence under the timeout -> no action at all ---
+        m, fake = make_monitor()
+        m._last_chunk_at = 0.0
+        handler.records.clear()
+        m._check_device_health(callback=None, now=2.0)  # < 5.0s timeout
+        a_ok = (fake.close_calls == 0 and fake.open_calls == 0
+                and not m._device_lost and len(handler.records) == 0)
+        print(f"  [{'OK' if a_ok else 'FAIL'}] A: under timeout -> no reconnect attempt, "
+              f"no log (close={fake.close_calls} open={fake.open_calls} "
+              f"device_lost={m._device_lost} records={len(handler.records)})")
+
+        # --- Scenario B: timeout crossed, reconnect succeeds immediately,
+        # but device_lost stays True until a real chunk actually arrives ---
+        m, fake = make_monitor(fail_open_times=0)
+        m._last_chunk_at = 0.0
+        handler.records.clear()
+        m._check_device_health(callback=None, now=5.5)
+        n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
+        b_ok = (fake.close_calls == 1 and fake.open_calls == 1
+                and m._device_lost is True and n_errors == 1)
+        print(f"  [{'OK' if b_ok else 'FAIL'}] B: timeout crossed -> one reconnect attempt, "
+              f"exactly one ERROR logged, still 'lost' until confirmed "
+              f"(close={fake.close_calls} open={fake.open_calls} errors={n_errors})")
+
+        # Confirm recovery via a real chunk arriving.
+        m._on_chunk_received()
+        b2_ok = (m._device_lost is False
+                  and m._reconnect_backoff == cfg["device_reconnect_backoff_initial"])
+        print(f"  [{'OK' if b2_ok else 'FAIL'}] B2: chunk arrival clears device_lost "
+              f"and resets backoff (device_lost={m._device_lost} "
+              f"backoff={m._reconnect_backoff})")
+
+        # --- Scenario C: repeated silence while already 'lost' does NOT
+        # re-log the ERROR or re-attempt before the backoff elapses ---
+        m, fake = make_monitor(fail_open_times=0)
+        m._last_chunk_at = 0.0
+        handler.records.clear()
+        m._check_device_health(callback=None, now=5.5)   # first detection + attempt
+        m._check_device_health(callback=None, now=5.8)   # still within backoff -> no-op
+        n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
+        c_ok = (fake.open_calls == 1 and n_errors == 1)
+        print(f"  [{'OK' if c_ok else 'FAIL'}] C: no duplicate ERROR/attempt while still "
+              f"within backoff (open_calls={fake.open_calls} errors={n_errors})")
+
+        # --- Scenario D: reconnect keeps failing -> backoff grows, capped ---
+        m, fake = make_monitor(fail_open_times=10)  # never succeeds within this test
+        m._last_chunk_at = 0.0
+        backoffs = []
+        t = 5.5
+        m._check_device_health(callback=None, now=t)
+        for _ in range(5):
+            backoffs.append(m._reconnect_backoff)
+            t = m._next_reconnect_attempt_at + 0.01  # just past the gate
+            m._check_device_health(callback=None, now=t)
+        d_ok = (backoffs == sorted(backoffs)  # non-decreasing
+                and backoffs[-1] <= cfg["device_reconnect_backoff_max"]
+                and max(backoffs) == cfg["device_reconnect_backoff_max"])
+        print(f"  [{'OK' if d_ok else 'FAIL'}] D: backoff grows and caps at "
+              f"{cfg['device_reconnect_backoff_max']}s (sequence={backoffs})")
+    finally:
+        log.removeHandler(handler)
 
 
 # ---------------------------------------------------------------------------

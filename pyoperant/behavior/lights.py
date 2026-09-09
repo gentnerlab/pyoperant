@@ -506,6 +506,9 @@ class Lights(base.BaseExp):
             'precursor_max_duration': mon.get('precursor_max_duration', 3.0),
             'precursor_min_score':    mon.get('precursor_min_score', 0.55),
             'precursor_grace_period': mon.get('precursor_grace_period', 8.0),
+            'device_watchdog_timeout':          mon.get('device_watchdog_timeout', 5.0),
+            'device_reconnect_backoff_initial': mon.get('device_reconnect_backoff_initial', 1.0),
+            'device_reconnect_backoff_max':      mon.get('device_reconnect_backoff_max', 30.0),
             'output_dir':        self._output_dir(),
             'log_csv':           self._log_csv_path(),
         }
