@@ -31,6 +31,7 @@ import numpy as np
 
 from pyoperant.song_recording.features import AudioFeatures, FeatureExtractor
 from pyoperant.song_recording.noise_model import NoiseModelGateConfig
+from pyoperant.song_recording.variability import RollingVariabilityTracker, VariabilityConfig
 
 log = logging.getLogger(__name__)
 
@@ -47,11 +48,25 @@ class GateConfig:
     # Hard band-energy floor — rejects pure low-frequency sources
     min_band_energy_ratio: float = 0.10
 
-    # Weighted score feature weights (should sum to 1.0)
-    weight_flatness:  float = 0.35
-    weight_onset:     float = 0.25
-    weight_harmonic:  float = 0.25
-    weight_band:      float = 0.15
+    # Weighted score feature weights (should sum to 1.0).
+    # weight_variability added 2026-09-08 on real evidence -- a causal,
+    # short-window (0.5-2.0s) rolling variability signal (see
+    # pyoperant.song_recording.variability) scored mean AUC 0.82 against
+    # the lab's real 54-bird curated corpus, matching or beating every
+    # legacy feature here including the best of them (harmonic_ratio,
+    # 0.756). The other four weights are shaved down PROPORTIONALLY
+    # (multiplied by 0.8, preserving their relative weighting exactly as
+    # before) to make room -- a deliberately mechanical, conservative
+    # redistribution. A fuller re-tuning of the legacy four using the same
+    # real evidence is a separate, not-yet-made decision (see
+    # project_vocal_recorder memory) -- don't read these specific values
+    # as a considered opinion on flatness/onset/harmonic/band individually,
+    # only on making room for the new, validated term.
+    weight_flatness:     float = 0.28
+    weight_onset:        float = 0.20
+    weight_harmonic:     float = 0.20
+    weight_band:         float = 0.12
+    weight_variability:  float = 0.20
 
     # Weighted score threshold
     threshold: float = 0.45
@@ -62,7 +77,8 @@ class GateConfig:
 
     def __post_init__(self):
         total = (self.weight_flatness + self.weight_onset
-                 + self.weight_harmonic + self.weight_band)
+                 + self.weight_harmonic + self.weight_band
+                 + self.weight_variability)
         if not np.isclose(total, 1.0, atol=0.01):
             log.warning("GateConfig weights sum to %.3f, not 1.0.", total)
 
@@ -76,6 +92,7 @@ class GateConfig:
             weight_onset          = d.get("weight_onset",          cls.weight_onset),
             weight_harmonic       = d.get("weight_harmonic",       cls.weight_harmonic),
             weight_band           = d.get("weight_band",           cls.weight_band),
+            weight_variability    = d.get("weight_variability",    cls.weight_variability),
             threshold             = d.get("threshold",             cls.threshold),
             freq_low              = cfg.get("freq_low",            cls.freq_low),
             freq_high             = cfg.get("freq_high",           cls.freq_high),
@@ -97,6 +114,7 @@ class GateResult:
     sub_onset:      float = 0.0
     sub_harmonic:   float = 0.0
     sub_band:       float = 0.0
+    sub_variability: float = 0.0    # from RollingVariabilityTracker, see variability.py
 
     def __repr__(self) -> str:
         nm = f"snr={self.snr_score:.2f}" if self.noise_model_ok else "no-model"
@@ -106,7 +124,8 @@ class GateResult:
             f"flat={self.sub_flatness:.2f} "
             f"onset={self.sub_onset:.2f} "
             f"harm={self.sub_harmonic:.2f} "
-            f"band={self.sub_band:.2f})"
+            f"band={self.sub_band:.2f} "
+            f"var={self.sub_variability:.2f})"
         )
 
 
@@ -127,6 +146,7 @@ class SongGate:
         config:                  GateConfig | None = None,
         noise_model:             "NoiseModel | None" = None,
         noise_model_gate_config: NoiseModelGateConfig | None = None,
+        variability_config:      VariabilityConfig | None = None,
     ):
         self.config = config or GateConfig()
         self.noise_model = noise_model
@@ -135,6 +155,10 @@ class SongGate:
         # previous version of this gate did that and silently ignored
         # whatever snr_score_threshold was actually configured.
         self.noise_model_gate_config = noise_model_gate_config or NoiseModelGateConfig()
+        # One tracker per gate instance -- it's genuinely stateful across
+        # the whole session's stream of chunks (unlike score(), which stays
+        # a pure function of its arguments). See variability.py.
+        self.variability_tracker = RollingVariabilityTracker(variability_config)
         if noise_model is not None:
             log.info("SongGate: noise model loaded — %s", noise_model.summary())
         else:
@@ -160,8 +184,9 @@ class SongGate:
 
     def score(
         self,
-        features:  AudioFeatures,
-        magnitude: np.ndarray | None = None,
+        features:          AudioFeatures,
+        magnitude:         np.ndarray | None = None,
+        variability_score: float = 0.0,
     ) -> GateResult:
         """
         Score a chunk given pre-extracted features.
@@ -171,6 +196,13 @@ class SongGate:
         features  : from FeatureExtractor.extract()
         magnitude : rfft magnitude (needed for noise-model gate).
                     If None, falls back to fixed RMS floor for stage 1.
+        variability_score : from RollingVariabilityTracker.update(), called
+                    by evaluate() -- pass explicitly (like magnitude) rather
+                    than have score() reach into gate state, so this stays
+                    a plain function of its arguments and is easy to test
+                    directly with a fixed value, no tracker/history needed.
+                    Defaults to 0.0 (neutral/no-signal) for direct score()
+                    calls that don't go through evaluate().
         """
         cfg            = self.config
         snr_score      = 0.0
@@ -203,25 +235,28 @@ class SongGate:
         sub_onset = 1.0 - features.onset_sharpness
         sub_harm  = features.harmonic_ratio
         sub_band  = features.band_energy_ratio
+        sub_var   = float(np.clip(variability_score, 0.0, 1.0))
 
         weighted = float(np.clip(
-            cfg.weight_flatness  * sub_flat  +
-            cfg.weight_onset     * sub_onset +
-            cfg.weight_harmonic  * sub_harm  +
-            cfg.weight_band      * sub_band,
+            cfg.weight_flatness    * sub_flat  +
+            cfg.weight_onset       * sub_onset +
+            cfg.weight_harmonic    * sub_harm  +
+            cfg.weight_band        * sub_band  +
+            cfg.weight_variability * sub_var,
             0.0, 1.0,
         ))
 
         return GateResult(
-            passed         = weighted >= cfg.threshold,
-            score          = weighted,
-            features       = features,
-            snr_score      = snr_score,
-            noise_model_ok = noise_model_ok,
-            sub_flatness   = sub_flat,
-            sub_onset      = sub_onset,
-            sub_harmonic   = sub_harm,
-            sub_band       = sub_band,
+            passed          = weighted >= cfg.threshold,
+            score           = weighted,
+            features        = features,
+            snr_score       = snr_score,
+            noise_model_ok  = noise_model_ok,
+            sub_flatness    = sub_flat,
+            sub_onset       = sub_onset,
+            sub_harmonic    = sub_harm,
+            sub_band        = sub_band,
+            sub_variability = sub_var,
         )
 
     def evaluate(
@@ -243,9 +278,19 @@ class SongGate:
             onset_sharpness   = extractor.compute_onset_sharpness(chunk),
             harmonic_ratio    = extractor.compute_harmonic_ratio(magnitude),
             band_energy_ratio = extractor.compute_band_energy_ratio(magnitude),
+            spectral_centroid = extractor.compute_spectral_centroid(magnitude),
         )
 
-        return self.score(features, magnitude=magnitude)
+        # Update the rolling variability tracker every chunk (even ones that
+        # will fail stage 1/the band-energy floor below) so its window
+        # reflects the real, continuous audio stream rather than only the
+        # chunks that happened to pass earlier gates.
+        variability_score = self.variability_tracker.update({
+            "band_energy_ratio": features.band_energy_ratio,
+            "spectral_centroid": features.spectral_centroid,
+        })
+
+        return self.score(features, magnitude=magnitude, variability_score=variability_score)
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +310,7 @@ def make_gate_from_config(
     """
     gate_cfg    = GateConfig.from_config_dict(cfg)
     nm_gate_cfg = NoiseModelGateConfig.from_config_dict(cfg)
+    var_cfg     = VariabilityConfig.from_config_dict(cfg)
     extractor = FeatureExtractor(
         sample_rate = cfg.get("sample_rate", 44100),
         freq_low    = cfg.get("freq_low",    1000),
@@ -281,7 +327,8 @@ def make_gate_from_config(
             except Exception as exc:
                 log.warning("Could not auto-load noise model from %s: %s", model_path, exc)
 
-    gate = SongGate(gate_cfg, noise_model=noise_model, noise_model_gate_config=nm_gate_cfg)
+    gate = SongGate(gate_cfg, noise_model=noise_model, noise_model_gate_config=nm_gate_cfg,
+                    variability_config=var_cfg)
     return gate, extractor
 
 
@@ -343,3 +390,53 @@ if __name__ == "__main__":
     print("\nNote: 'Noise 3x floor' should fail WITH model (below SNR threshold)")
     print("but may pass WITHOUT model (above fixed RMS floor).")
     print("This is the key improvement: adaptive rejection of chamber-specific noise.")
+
+    # ── Variability integration check ───────────────────────────────────
+    # The cases above are each a single, isolated chunk -- fine for the
+    # other features, but variability needs a SEQUENCE to say anything
+    # (see variability.py's own self-test for the tracker in isolation).
+    # This checks the full evaluate() wiring end-to-end: a real gate
+    # instance, fed a real sequence, should show its variability sub-score
+    # ramp up as the rolling window fills on a modulated ("song-like")
+    # amplitude-modulated tone, and stay low on a steady tone at the same
+    # average loudness/frequency.
+    print("\n=== Variability sub-score over a sequence (end-to-end evaluate() check) ===")
+    gate_var = SongGate(GateConfig(threshold=0.45))
+    extractor_var = FeatureExtractor(sample_rate=sr)
+    tone_3k   = (0.06 * np.sin(2 * np.pi * 3000 * t)).astype(np.float32)
+    lowfreq   = (0.06 * np.sin(2 * np.pi * 200 * t)).astype(np.float32)  # OUT of [freq_low,freq_high]
+
+    # Note: amplitude modulation alone does NOT move band_energy_ratio or
+    # spectral_centroid (scaling every bin together changes neither the
+    # in-band/out-of-band energy RATIO nor the weighted-mean frequency) --
+    # the signal has to actually change SHAPE. Mixing in a fixed-frequency
+    # out-of-band component at a varying relative amplitude swings
+    # band_energy_ratio while barely moving spectral_centroid (confirmed:
+    # pure tone centroid=3000.0003Hz, tone+lowfreq mix centroid=3000.0005Hz).
+    print("Modulated mix (in-band tone + swinging out-of-band component, "
+          "band_energy_ratio should swing):")
+    for i in range(25):
+        mix = 0.5 + 0.45 * np.sin(i * 0.8)  # 0.05..0.95, swings the out-of-band fraction
+        chunk = (tone_3k + mix * lowfreq).astype(np.float32)
+        r = gate_var.evaluate(chunk, extractor_var)
+        if i in (1, 5, 10, 20, 24):
+            print(f"  chunk {i:2d}: band_energy_ratio={r.features.band_energy_ratio:.3f} "
+                  f"score={r.score:.3f} sub_variability={r.sub_variability:.3f}")
+
+    print("Steady mix (same components, constant proportion, no modulation):")
+    gate_var2 = SongGate(GateConfig(threshold=0.45))
+    for i in range(25):
+        chunk = (tone_3k + 0.5 * lowfreq).astype(np.float32)
+        r = gate_var2.evaluate(chunk, extractor_var)
+        if i in (1, 5, 10, 20, 24):
+            print(f"  chunk {i:2d}: band_energy_ratio={r.features.band_energy_ratio:.3f} "
+                  f"score={r.score:.3f} sub_variability={r.sub_variability:.3f}")
+
+    print("\nExpected: the modulated mix's sub_variability should climb well above the "
+          "steady mix's -- note the steady case settles at 0.5, not 0: with zero "
+          "measured variability, band_energy_ratio's own sub-score is 0 (no signal) "
+          "but spectral_centroid's is 1 (inverted -- see variability.py, its "
+          "invert=True means LOW variability scores HIGH), and the combined score is "
+          "their mean. Confirms the tracker is really wired into evaluate()'s "
+          "per-chunk hot path, not just working in variability.py's own isolated "
+          "self-test.")

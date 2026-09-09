@@ -34,6 +34,7 @@ _SONG_RECORDING_MODULES = [
     "pyoperant.song_recording.features",
     "pyoperant.song_recording.gate",
     "pyoperant.song_recording.smoother",
+    "pyoperant.song_recording.variability",
     "pyoperant.song_recording.noise_model",
     "pyoperant.song_recording.monitor",
 ]

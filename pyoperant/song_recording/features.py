@@ -18,6 +18,14 @@ harmonic_ratio      Fraction of energy that aligns with harmonics of the
                     (birdsong); low = aperiodic noise.
 band_energy_ratio   Legacy feature kept for reference: fraction of total
                     spectral energy in the bird-vocalization band.
+spectral_centroid   Magnitude-weighted mean frequency of the band-limited
+                    spectrum, in Hz (not normalized -- unlike the other
+                    features here, this is a genuinely different unit, and
+                    on its own it's a weak feature; see
+                    pyoperant.song_recording.variability, which tracks how
+                    much it MOVES from chunk to chunk -- that turned out to
+                    be a much stronger real-corpus signal than its
+                    instantaneous value, see project_vocal_recorder memory).
 
 All values are normalised to [0, 1] or near-[0, 1] ranges so they can be
 combined with simple weights.
@@ -45,6 +53,7 @@ class AudioFeatures:
     onset_sharpness: float    # 0.0 – 1.0  (higher = more impulsive)
     harmonic_ratio: float     # 0.0 – 1.0  (higher = more harmonic)
     band_energy_ratio: float  # 0.0 – 1.0  (higher = more energy in band)
+    spectral_centroid: float  # Hz -- NOT normalized, see class docstring above
 
     def as_array(self) -> np.ndarray:
         return np.array([
@@ -53,6 +62,7 @@ class AudioFeatures:
             self.onset_sharpness,
             self.harmonic_ratio,
             self.band_energy_ratio,
+            self.spectral_centroid,
         ], dtype=np.float32)
 
     def __repr__(self) -> str:
@@ -62,7 +72,8 @@ class AudioFeatures:
             f"flatness={self.spectral_flatness:.4f}, "
             f"onset={self.onset_sharpness:.4f}, "
             f"harmonic={self.harmonic_ratio:.4f}, "
-            f"band={self.band_energy_ratio:.4f})"
+            f"band={self.band_energy_ratio:.4f}, "
+            f"centroid={self.spectral_centroid:.0f}Hz)"
         )
 
 
@@ -239,6 +250,16 @@ class FeatureExtractor:
         band = magnitude[self._band_mask].sum()
         return float(np.clip(band / total, 0.0, 1.0))
 
+    def compute_spectral_centroid(self, magnitude: np.ndarray) -> float:
+        """Magnitude-weighted mean frequency of the band-limited spectrum,
+        in Hz. Cheap -- reuses the same rfft magnitude every other
+        frequency-domain feature already needs, just one more weighted
+        sum over it."""
+        band_mag = magnitude[self._band_mask]
+        band_freqs = self._freqs[self._band_mask]
+        total = band_mag.sum() + 1e-12
+        return float((band_freqs * band_mag).sum() / total)
+
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
@@ -267,6 +288,7 @@ class FeatureExtractor:
         onset = self.compute_onset_sharpness(chunk)
         harmonic = self.compute_harmonic_ratio(magnitude)
         band = self.compute_band_energy_ratio(magnitude)
+        centroid = self.compute_spectral_centroid(magnitude)
 
         return AudioFeatures(
             rms=rms,
@@ -274,6 +296,7 @@ class FeatureExtractor:
             onset_sharpness=onset,
             harmonic_ratio=harmonic,
             band_energy_ratio=band,
+            spectral_centroid=centroid,
         )
 
 

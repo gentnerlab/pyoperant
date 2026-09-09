@@ -436,6 +436,7 @@ class Lights(base.BaseExp):
             'gate':           sr.get('gate', {}),
             'frame_smoother': sr.get('frame_smoother', {}),
             'score_smoother': sr.get('score_smoother', {}),
+            'variability':    sr.get('variability', {}),
             'noise_model':    dict(sr.get('noise_model', {}),
                                     model_path=self._noise_model_path()),
         }
