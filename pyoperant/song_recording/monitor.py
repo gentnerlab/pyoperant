@@ -17,6 +17,34 @@ SongMonitor itself always needs a real audio_input handed to it (built from
 a live panel) -- there's no standalone recording-loop mode here, unlike an
 earlier prototype of this module that opened its own ad hoc audio stream
 from a device index/config file.
+
+Song-precursor grace period
+----------------------------
+Motivated by a real finding from the lab's own labeled corpus (see
+project_vocal_recorder memory): short, high-scoring vocalizations -- e.g. a
+contact-type whistle -- sometimes precede a full song bout after a gap
+longer than the standard post_roll hangover, and sometimes don't precede
+anything at all. Context, not the chunk alone, decides which. Ordinarily,
+once a detection episode releases (the smoother's vote drops), the clip
+closes `post_roll` seconds later. If that just-released episode was BOTH
+short (<= `precursor_max_duration`) and confidently scored
+(peak gate score >= `precursor_min_score`), the monitor instead grants one
+longer `precursor_grace_period` before closing -- long enough to bridge the
+gap if real song follows. If it does, the episode re-triggers within the
+grace window and the whole thing (whistle + gap + song) is saved as ONE
+continuous clip, matching how the corpus itself represents a bout. If
+nothing follows, the clip closes after the grace period with just the
+short vocalization in it -- still saved, not discarded, since it may be a
+real (if brief) not-song vocalization worth having on file.
+
+This is a duration+score heuristic, not a real "is this a whistle"
+classifier -- deliberately so, since it's meant to generalize across birds/
+chambers, not key off one bird's acoustic signature. `gate_result.score`
+(the existing weighted composite) stands in for "confidently vocal" for
+now; revisit once the corpus-driven feature work (a more robust harmonicity
+estimate than today's live `harmonic_ratio`, see the starsong-feature-
+analysis project) lands in the live gate, which should make this gate
+sharper without changing the surrounding state machine.
 """
 
 from __future__ import annotations
@@ -49,6 +77,10 @@ DEFAULT_CONFIG = {
     "pre_roll":          1.0,
     "post_roll":         2.0,
     "min_clip_duration": 0.5,
+    # Song-precursor grace period -- see module docstring.
+    "precursor_max_duration": 3.0,   # episode must be no longer than this to qualify
+    "precursor_min_score":    0.55,  # ...and confidently scored (base gate.threshold is 0.45)
+    "precursor_grace_period": 8.0,   # extended hangover granted instead of post_roll
     "output_dir":        "recordings",
     "log_csv":           "detections.csv",
 }
@@ -60,7 +92,7 @@ DEFAULT_CONFIG = {
 
 class DetectionLog:
     FIELDS = ["timestamp", "filename", "duration_s", "rms",
-              "gate_score", "snr_score"]
+              "gate_score", "snr_score", "precursor_extended"]
 
     def __init__(self, csv_path: str):
         Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
@@ -116,7 +148,18 @@ class SongMonitor:
         self._extractor  = extractor
         self._smoother   = smoother
 
-        if self._gate is None or self._extractor is None:
+        if (self._gate is None) != (self._extractor is None):
+            # A caller supplying only one of the two almost certainly meant
+            # to supply both -- silently rebuilding a fresh pair from cfg
+            # (the old `or` check) would discard whichever one they DID
+            # pass without any indication, e.g. a custom test gate quietly
+            # replaced by a real one built from cfg.
+            raise ValueError(
+                "SongMonitor: gate and extractor must be supplied together "
+                "or not at all (got gate=%r, extractor=%r)"
+                % (self._gate, self._extractor)
+            )
+        if self._gate is None:
             self._build_pipeline()
         if self._smoother is None:
             self._build_smoother()
@@ -126,8 +169,14 @@ class SongMonitor:
         self._chunk_len      = int(sr * dur)
         self._pre_buffer     = collections.deque(maxlen=int(self.cfg["pre_roll"] / dur))
         self._post_chunks    = int(self.cfg["post_roll"] / dur)
+        self._precursor_grace_chunks = int(self.cfg["precursor_grace_period"] / dur)
         self._recording      = False
         self._post_countdown = 0
+        # Per-episode state for the precursor-grace decision (see module
+        # docstring) -- reset whenever a new episode starts (below).
+        self._episode_active_chunks = 0    # chunks while the smoother was actually triggered
+        self._episode_peak_score    = 0.0
+        self._precursor_extended    = False
         self._clip_buffer: list[np.ndarray] = []
 
         Path(self.cfg["output_dir"]).mkdir(parents=True, exist_ok=True)
@@ -204,16 +253,43 @@ class SongMonitor:
                 )
                 self._recording   = True
                 self._clip_buffer = list(self._pre_buffer)
+                self._episode_active_chunks = 0
+                self._episode_peak_score    = 0.0
+                self._precursor_extended    = False
             self._clip_buffer.append(chunk)
+            self._episode_active_chunks += 1
+            self._episode_peak_score = max(self._episode_peak_score, gate_result.score)
+            # Actively triggered -> always the normal post_roll tail. A
+            # precursor grace period (below) is only ever granted at the
+            # moment of release, and re-triggering (e.g. real song arriving
+            # after a precursor whistle) resets it back to normal here --
+            # exactly what lets a precursor+song sequence merge into one
+            # continuous clip instead of re-extending indefinitely.
             self._post_countdown = self._post_chunks
 
         elif self._recording:
             self._clip_buffer.append(chunk)
             self._post_countdown -= 1
             if self._post_countdown <= 0:
-                self._recording = False
-                self._save_clip(gate_result)
-                self._clip_buffer = []
+                episode_duration_s = self._episode_active_chunks * self.cfg["chunk_duration"]
+                if (not self._precursor_extended
+                        and episode_duration_s <= self.cfg["precursor_max_duration"]
+                        and self._episode_peak_score >= self.cfg["precursor_min_score"]):
+                    # Short but confidently-scored episode -- possible song
+                    # precursor (see module docstring). Grant one extended
+                    # grace window instead of closing now.
+                    self._precursor_extended = True
+                    self._post_countdown = self._precursor_grace_chunks
+                    log.info(
+                        "Possible song precursor (dur=%.2fs, peak_score=%.3f) — "
+                        "extending grace to %.1fs before closing clip",
+                        episode_duration_s, self._episode_peak_score,
+                        self.cfg["precursor_grace_period"],
+                    )
+                else:
+                    self._recording = False
+                    self._save_clip(gate_result)
+                    self._clip_buffer = []
 
         self._pre_buffer.append(chunk)
 
@@ -252,7 +328,121 @@ class SongMonitor:
             rms        = round(float(gate_result.features.rms), 5),
             gate_score = round(float(gate_result.score), 4),
             snr_score  = round(float(gate_result.snr_score), 4),
+            precursor_extended = self._precursor_extended,
         )
+
+
+# ---------------------------------------------------------------------------
+# Self-test: precursor-grace state machine, synthetic gate sequences only
+# (no hardware/microphone needed) -- matches the self-test convention every
+# other module in this subpackage already follows.
+# ---------------------------------------------------------------------------
+
+class _FakeGate:
+    """Feeds a pre-built (passed, score) sequence straight into the
+    smoother, standing in for a real SongGate.evaluate() call so these
+    scenarios exercise SongMonitor's real _process()/_save_clip() state
+    machine without needing real audio or a real gate."""
+
+    def __init__(self, sequence):
+        self._seq = list(sequence)
+        self._i = 0
+
+    def evaluate(self, chunk, extractor):
+        import types
+        passed, score = self._seq[self._i]
+        self._i += 1
+        return types.SimpleNamespace(
+            passed=passed, score=score, snr_score=0.0,
+            features=types.SimpleNamespace(rms=0.01),
+        )
+
+
+def _run_precursor_scenario(name: str, sequence, tmp_dir):
+    """Runs one synthetic (passed, score) sequence through a fresh
+    SongMonitor and reports every clip it saved."""
+    import tempfile
+    cfg = {
+        "output_dir": str(tmp_dir / name),
+        "log_csv":    str(tmp_dir / name / "detections.csv"),
+    }
+    from pyoperant.song_recording.smoother import CombinedSmoother
+    monitor = SongMonitor(
+        cfg, audio_input=None,
+        # extractor must be non-None too, or __init__'s "gate is None or
+        # extractor is None" check rebuilds a REAL gate/extractor pair from
+        # cfg and silently discards our fake gate.
+        gate=_FakeGate(sequence), extractor=object(),
+        smoother=CombinedSmoother.from_config_dict({}),
+    )
+
+    saved = []
+    real_save_clip = monitor._save_clip
+
+    def spy_save_clip(gate_result):
+        n_chunks = len(monitor._clip_buffer)
+        was_extended = monitor._precursor_extended
+        real_save_clip(gate_result)
+        saved.append({
+            "duration_s": round(n_chunks * monitor.cfg["chunk_duration"], 2),
+            "precursor_extended": was_extended,
+        })
+
+    monitor._save_clip = spy_save_clip
+
+    chunk = np.zeros(monitor._chunk_len, dtype=np.float32)
+    for _ in range(len(sequence)):
+        monitor._process(chunk)
+
+    print(f"\n=== {name} ({len(sequence)} chunks fed) ===")
+    if not saved:
+        print("  (no clip saved -- still open at end of sequence)")
+    for c in saved:
+        print(f"  saved clip: duration={c['duration_s']:.1f}s  "
+              f"precursor_extended={c['precursor_extended']}")
+    return saved
+
+
+def self_test():
+    """Three synthetic scenarios demonstrating the precursor-grace state
+    machine (see module docstring): a short, confidently-scored episode
+    with nothing following it, the same kind of episode followed by a
+    longer one within the grace window (should merge into ONE clip), and
+    a short but LOW-scored episode (should NOT get the extended grace)."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_selftest_"))
+    print(f"(writing throwaway clips/CSVs to {tmp_dir})")
+
+    priming = [(False, 0.05)] * 15
+    whistle_high = [(True, 0.75)] * 8    # short, confident -> should qualify
+    whistle_low  = [(True, 0.48)] * 8    # short, marginal   -> should NOT qualify
+    song         = [(True, 0.80)] * 15   # a longer, later "real song" episode
+    gap_short    = [(False, 0.05)] * 30  # long enough to release + expire post_roll,
+                                          # short enough to stay inside the grace window
+    tail         = [(False, 0.05)] * 115 # long enough to release, expire post_roll,
+                                          # AND exhaust the full grace period
+
+    scenario_a = priming + whistle_high + tail
+    scenario_b = priming + whistle_high + gap_short + song + tail
+    scenario_c = priming + whistle_low + tail
+
+    a = _run_precursor_scenario("A_precursor_alone", scenario_a, tmp_dir)
+    b = _run_precursor_scenario("B_precursor_then_song", scenario_b, tmp_dir)
+    c = _run_precursor_scenario("C_low_score_blip", scenario_c, tmp_dir)
+
+    print("\n=== Expected vs. actual ===")
+    checks = [
+        ("A: exactly one clip, precursor_extended=True",
+         len(a) == 1 and a[0]["precursor_extended"] is True),
+        ("B: exactly ONE merged clip (not two), precursor_extended=True",
+         len(b) == 1 and b[0]["precursor_extended"] is True),
+        ("C: exactly one clip, precursor_extended=False (low score blocked it)",
+         len(c) == 1 and c[0]["precursor_extended"] is False),
+    ]
+    for desc, ok in checks:
+        print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
 
 
 # ---------------------------------------------------------------------------
@@ -293,14 +483,22 @@ def main():
         help="List PortAudio devices and exit (use to find the right "
              "AUDIO_INPUT_DEVICE substring for local_pi_revd.py)",
     )
+    parser.add_argument(
+        "--self-test", action="store_true",
+        help="Run the precursor-grace state-machine self-test on synthetic "
+             "gate sequences and exit -- no hardware/microphone needed.",
+    )
     args = parser.parse_args()
 
     if args.list_devices:
         list_devices()
         return
+    if args.self_test:
+        self_test()
+        return
 
-    parser.error("nothing to do -- pass --list-devices, or run song recording "
-                 "via `behave Lights` with song_recording.enabled in config.json")
+    parser.error("nothing to do -- pass --list-devices or --self-test, or run song "
+                 "recording via `behave Lights` with song_recording.enabled in config.json")
 
 
 if __name__ == "__main__":

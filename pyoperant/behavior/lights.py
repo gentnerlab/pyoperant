@@ -502,6 +502,9 @@ class Lights(base.BaseExp):
             'pre_roll':          mon.get('pre_roll', 1.0),
             'post_roll':         mon.get('post_roll', 2.0),
             'min_clip_duration': mon.get('min_clip_duration', 0.5),
+            'precursor_max_duration': mon.get('precursor_max_duration', 3.0),
+            'precursor_min_score':    mon.get('precursor_min_score', 0.55),
+            'precursor_grace_period': mon.get('precursor_grace_period', 8.0),
             'output_dir':        self._output_dir(),
             'log_csv':           self._log_csv_path(),
         }
