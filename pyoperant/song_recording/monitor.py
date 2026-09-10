@@ -90,19 +90,38 @@ at the ALSA/kernel level between callbacks.
 PyAudio exposes no direct "suggested latency" knob on Linux/ALSA (checked
 the installed binding directly -- `input_host_api_specific_stream_info` is
 CoreAudio/WASAPI/ASIO-only), so the only real lever is `frames_per_buffer`
-itself: requesting a bigger block per PortAudio callback gives ALSA more
-periods/more total buffered audio in flight, at the cost of a larger chunk
-of raw bytes delivered per callback. `capture_chunk_multiplier` (default 3)
-controls how many logical `chunk_duration` chunks are requested per
-callback (e.g. 300ms of PortAudio buffering instead of 100ms) --
-`_on_capture_block()` immediately splits whatever arrives back into exact
-`chunk_duration`-length pieces (carrying any leftover samples across
-callbacks) before queuing, so the gate/smoother/precursor-grace state
-machine downstream -- all of which assume every queued chunk is exactly
-one `chunk_duration` long -- needs no changes. Trade-off: up to roughly
-`(capture_chunk_multiplier - 1) * chunk_duration` of added worst-case
-latency before the last sub-chunk in a block reaches the gate (~200ms at
-the default), negligible against `pre_roll`/`precursor_grace_period`.
+itself: requesting a bigger block per PortAudio callback was the obvious
+lever to try -- more total buffered audio in flight per callback, at the
+cost of a larger chunk of raw bytes delivered each time.
+`capture_chunk_multiplier` controls how many logical `chunk_duration`
+chunks are requested per callback; `_on_capture_block()` immediately
+splits whatever arrives back into exact `chunk_duration`-length pieces
+(carrying any leftover samples across callbacks) before queuing, so the
+gate/smoother/precursor-grace state machine downstream -- all of which
+assume every queued chunk is exactly one `chunk_duration` long -- needs no
+changes regardless of the multiplier's value.
+
+**Tried at 3 (300ms), measured live on B1474, 2026-09-10 -- made it worse,
+not better.** The intuitive "bigger buffer = more headroom" reasoning
+turned out backwards for this specific USB Audio Class 1.0 device/Pi
+driver combination: a controlled A/B (clean single-process, idle-system,
+5 minutes each way) measured *zero* overflow warnings at multiplier=1
+versus roughly one every 20-40s at multiplier=3 -- a ~10-20x regression
+from the original ~1/8min baseline this was meant to fix. Root mechanism
+unconfirmed (never chased further once the numbers settled it -- plausibly
+this ALSA/USB-audio driver allocates a roughly fixed total ring-buffer
+capacity divided into periods sized by whatever `frames_per_buffer` you
+request, so a *larger* requested period can mean *fewer* periods fit,
+shrinking rather than growing the real headroom before the whole ring
+overflows). Lesson worth keeping: the earlier verification only checked
+whether `open()` succeeds at a given buffer size, never the *sustained*
+overflow rate under real running conditions -- those are different
+questions, and only the live, controlled, extended measurement caught
+this. Default is back to 1 (no behavior change from before this whole
+investigation) until a *measured*, not reasoned-from-first-principles,
+case for a different value shows up. The knob and the splitting
+infrastructure stay -- both correct and harmless at multiplier=1 -- in
+case that measurement happens later.
 """
 
 from __future__ import annotations
@@ -131,11 +150,15 @@ DEFAULT_CONFIG = {
     "sample_rate":       48000,
     "channels":          1,
     "chunk_duration":    0.1,
-    # Capture buffering headroom -- see module docstring. Requests
-    # capture_chunk_multiplier logical chunks per PortAudio callback
-    # (more ALSA-side buffering headroom) and splits them back into exact
-    # chunk_duration pieces before anything downstream sees them.
-    "capture_chunk_multiplier": 3,
+    # Capture buffering headroom -- see module docstring's "Capture
+    # buffering headroom" section. Requests capture_chunk_multiplier
+    # logical chunks per PortAudio callback, splitting them back into
+    # exact chunk_duration pieces before anything downstream sees them.
+    # Default is 1 (no-op, matches pre-2026-09 behavior exactly) -- a
+    # larger value was tried and measured WORSE on real hardware, not
+    # better; don't raise this without a live, controlled, sustained-rate
+    # measurement first, not just an open()-succeeds check.
+    "capture_chunk_multiplier": 1,
     "freq_low":          1000,
     "freq_high":         10000,
     "pre_roll":          1.0,

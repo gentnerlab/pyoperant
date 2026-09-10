@@ -512,7 +512,7 @@ class Lights(base.BaseExp):
         flat_cfg = {
             'sample_rate':       mon.get('sample_rate', 48000),
             'chunk_duration':    mon.get('chunk_duration', 0.1),
-            'capture_chunk_multiplier': mon.get('capture_chunk_multiplier', 3),
+            'capture_chunk_multiplier': mon.get('capture_chunk_multiplier', 1),
             'freq_low':          mon.get('freq_low',  1000),
             'freq_high':         mon.get('freq_high', 10000),
             'pre_roll':          mon.get('pre_roll', 1.0),
