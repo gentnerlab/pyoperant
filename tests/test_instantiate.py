@@ -277,6 +277,42 @@ class TestLights(unittest.TestCase):
                           "monitor thread never started: {}: {}".format(
                               type(e).__name__, e))
 
+    def test_emergency_shutdown_noop_without_monitor(self):
+        """emergency_shutdown() (called from scripts/behave's SIGTERM/
+        SIGINT handler -- see its module docstring) must be a safe no-op
+        when the monitor was never started, same as session_post() above --
+        it can fire from ANY state, including before session_pre() ever
+        ran."""
+        config = _load_config("Lights")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            exp = Lights(panel=panel, **config)
+            try:
+                exp.emergency_shutdown()
+            except Exception as e:
+                self.fail("emergency_shutdown() should be a no-op when the "
+                          "monitor thread never started: {}: {}".format(
+                              type(e).__name__, e))
+
+    def test_emergency_shutdown_stops_running_monitor(self):
+        """The actual fix: emergency_shutdown() must stop a LIVE monitor
+        thread, not just no-op -- this is what a bare sys.exit() from the
+        old clean() handler skipped entirely (daemon thread, no chance to
+        run its own cleanup), which is what let a killed process leave the
+        USB-audio device wedged (see project_vocal_recorder memory,
+        2026-09-10). Delegates to _stop_monitor(), already exercised by
+        session_post() elsewhere -- just confirm emergency_shutdown()
+        actually calls it."""
+        config = _load_config("Lights")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            exp = Lights(panel=panel, **config)
+            with patch.object(exp, "_stop_monitor") as mock_stop:
+                exp.emergency_shutdown()
+            mock_stop.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

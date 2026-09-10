@@ -285,6 +285,20 @@ class Lights(base.BaseExp):
         self._stop_monitor()
         return None
 
+    def emergency_shutdown(self):
+        """Called from scripts/behave's signal handler on SIGTERM/SIGINT --
+        see BaseExp.emergency_shutdown(). _stop_monitor() is already safe
+        to call unconditionally (no-ops if the monitor was never started),
+        so this needs no extra guarding. Without this, killing the process
+        while the monitor's daemon thread holds an open PortAudio stream
+        skips cleanup entirely -- sys.exit() only unwinds the main thread,
+        and a daemon thread gets no chance to run its own `finally:
+        audio_input.close()` before the process dies with it. Confirmed
+        live, 2026-09-10 (see project_vocal_recorder memory): this is the
+        leading suspect for a real USB-audio device wedge that cost a
+        production box ~6 hours of missed recording the next morning."""
+        self._stop_monitor()
+
     # ------------------------------------------------------------------
     # Noise model helpers
     # ------------------------------------------------------------------

@@ -4,6 +4,7 @@ import sys, os
 import signal
 import argparse
 import importlib
+import logging
 try: import simplejson as json
 
 except ImportError: import json
@@ -91,6 +92,26 @@ def clean(*args):
     sys.exit(0)
 
 
+def _clean_with_shutdown(behavior):
+    """Returns a signal handler that gives `behavior` a chance to release
+    any resource a bare sys.exit() wouldn't reach -- see
+    BaseExp.emergency_shutdown() -- before exiting the same way clean()
+    does. Registered in main() once `behavior` exists, replacing the
+    plain clean() used during startup (before there's anything to shut
+    down). Wrapped in try/except so a broken shutdown hook can't prevent
+    the process from actually exiting on SIGTERM/SIGINT -- that guarantee
+    matters more than a clean shutdown."""
+    def handler(*args):
+        try:
+            behavior.emergency_shutdown()
+        except Exception:
+            logging.getLogger('pyoperant').exception(
+                'emergency_shutdown() raised; exiting anyway.'
+            )
+        sys.exit(0)
+    return handler
+
+
 def main():
 
     for sig in (signal.SIGINT,signal.SIGTERM,):
@@ -127,6 +148,13 @@ def main():
         stim_path=stimuli_path,
         **parameters
         )
+
+    # Upgrade from the plain clean() used during startup (before there was
+    # anything to shut down) to a handler that also runs `behavior`'s own
+    # emergency_shutdown() -- see _clean_with_shutdown()'s docstring.
+    shutdown_handler = _clean_with_shutdown(behavior)
+    for sig in (signal.SIGINT, signal.SIGTERM,):
+        signal.signal(sig, shutdown_handler)
 
     behavior.run()
 

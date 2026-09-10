@@ -358,6 +358,21 @@ class BaseExp(object):
     def session_post(self):
         return None
 
+    def emergency_shutdown(self):
+        """Called by scripts/behave's SIGTERM/SIGINT handler when the
+        process is being killed, so a subclass can release any resource a
+        bare sys.exit() wouldn't reach -- e.g. a background daemon thread
+        holding a hardware device open (see Lights._stop_monitor()).
+
+        Unlike session_post(), which only runs at the natural end of a
+        session, this must be safe to call from ANY state -- including
+        before any session has ever started -- and must never raise, since
+        it runs from inside a signal handler with process exit right
+        behind it. Default is a no-op; most protocols have nothing here to
+        clean up beyond what process exit already reclaims for free.
+        """
+        return None
+
     def _run_session(self):
         utils.run_state_machine(start_in='pre',
                                 error_state='post',
