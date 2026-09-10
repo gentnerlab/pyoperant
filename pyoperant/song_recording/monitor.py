@@ -74,6 +74,35 @@ device immediately would just recreate that problem. A successful
 `open_stream()` call is NOT by itself treated as recovery (it can succeed
 against the wrong/fallback device without erroring) -- only an actual
 chunk arriving again clears the lost state and resets the backoff.
+
+Capture buffering headroom
+----------------------------
+Observed live, 2026-09-09 (real B1474 deployment, see project_vocal_recorder
+memory): intermittent `paInputOverflow` warnings (PortAudio status flag 2)
+roughly every 8-9 minutes, even with the monitor thread's own CPU/queue
+comfortably unloaded -- PortAudio's ALSA ring buffer for the input stream
+is sized around one `chunk_duration` (100ms) worth of audio per callback,
+so any scheduling jitter longer than that on this Pi's USB-audio driver
+overflows it before our callback runs. This isn't full device loss (the
+callback still fires and decodes fine), just a small window of audio lost
+at the ALSA/kernel level between callbacks.
+
+PyAudio exposes no direct "suggested latency" knob on Linux/ALSA (checked
+the installed binding directly -- `input_host_api_specific_stream_info` is
+CoreAudio/WASAPI/ASIO-only), so the only real lever is `frames_per_buffer`
+itself: requesting a bigger block per PortAudio callback gives ALSA more
+periods/more total buffered audio in flight, at the cost of a larger chunk
+of raw bytes delivered per callback. `capture_chunk_multiplier` (default 3)
+controls how many logical `chunk_duration` chunks are requested per
+callback (e.g. 300ms of PortAudio buffering instead of 100ms) --
+`_on_capture_block()` immediately splits whatever arrives back into exact
+`chunk_duration`-length pieces (carrying any leftover samples across
+callbacks) before queuing, so the gate/smoother/precursor-grace state
+machine downstream -- all of which assume every queued chunk is exactly
+one `chunk_duration` long -- needs no changes. Trade-off: up to roughly
+`(capture_chunk_multiplier - 1) * chunk_duration` of added worst-case
+latency before the last sub-chunk in a block reaches the gate (~200ms at
+the default), negligible against `pre_roll`/`precursor_grace_period`.
 """
 
 from __future__ import annotations
@@ -102,6 +131,11 @@ DEFAULT_CONFIG = {
     "sample_rate":       48000,
     "channels":          1,
     "chunk_duration":    0.1,
+    # Capture buffering headroom -- see module docstring. Requests
+    # capture_chunk_multiplier logical chunks per PortAudio callback
+    # (more ALSA-side buffering headroom) and splits them back into exact
+    # chunk_duration pieces before anything downstream sees them.
+    "capture_chunk_multiplier": 3,
     "freq_low":          1000,
     "freq_high":         10000,
     "pre_roll":          1.0,
@@ -201,6 +235,13 @@ class SongMonitor:
         sr  = self.cfg["sample_rate"]
         dur = self.cfg["chunk_duration"]
         self._chunk_len      = int(sr * dur)
+        # Capture buffering headroom -- see module docstring. PortAudio is
+        # asked for capture_chunk_multiplier chunks per callback;
+        # _on_capture_block() splits each delivery back into exact
+        # _chunk_len pieces, carrying any remainder here across callbacks.
+        self._capture_multiplier = max(1, int(self.cfg["capture_chunk_multiplier"]))
+        self._capture_len        = self._chunk_len * self._capture_multiplier
+        self._capture_pending    = np.zeros(0, dtype=np.float32)
         self._pre_buffer     = collections.deque(maxlen=int(self.cfg["pre_roll"] / dur))
         self._post_chunks    = int(self.cfg["post_roll"] / dur)
         self._precursor_grace_chunks = int(self.cfg["precursor_grace_period"] / dur)
@@ -238,28 +279,48 @@ class SongMonitor:
     # Main run loop
     # ------------------------------------------------------------------
 
+    def _on_capture_block(self, in_data, status):
+        """Handle one PortAudio callback delivery -- which may span several
+        logical chunk_duration chunks, see capture_chunk_multiplier in the
+        module docstring/DEFAULT_CONFIG. Decodes it, stitches on any
+        leftover from the previous delivery, and queues zero or more exact
+        chunk_duration-length pieces, carrying any remainder forward.
+        Pulled out of run()'s callback closure so it's directly
+        unit-testable, matching _on_chunk_received/_check_device_health.
+        """
+        if status:
+            log.warning("Audio status: %s", status)
+        try:
+            block = decode_pcm(in_data, self.audio_input.sample_format,
+                                self.audio_input.channels_opened)
+        except Exception:
+            log.exception("Error decoding audio callback data")
+            return
+        if self._capture_pending.size:
+            block = np.concatenate([self._capture_pending, block])
+        n_full = len(block) // self._chunk_len
+        for i in range(n_full):
+            piece = block[i * self._chunk_len:(i + 1) * self._chunk_len]
+            try:
+                self._audio_q.put_nowait(piece)
+            except queue.Full:
+                pass
+        self._capture_pending = block[n_full * self._chunk_len:]
+
     def run(self):
         """Open the audio stream and process chunks until stop_event is set."""
 
         def _audio_callback(in_data, frame_count, time_info, status):
-            if status:
-                log.warning("Audio status: %s", status)
-            try:
-                chunk = decode_pcm(in_data, self.audio_input.sample_format,
-                                    self.audio_input.channels_opened)
-                self._audio_q.put_nowait(chunk)
-            except queue.Full:
-                pass
-            except Exception:
-                log.exception("Error decoding audio callback data")
+            self._on_capture_block(in_data, status)
             return (None, pyaudio.paContinue)
 
         log.info(
-            "Monitor starting (sr=%d, chunk=%.0fms)",
+            "Monitor starting (sr=%d, chunk=%.0fms, capture_block=%.0fms)",
             self.cfg["sample_rate"], self.cfg["chunk_duration"] * 1000,
+            self.cfg["chunk_duration"] * 1000 * self._capture_multiplier,
         )
 
-        self.audio_input.open_stream(chunk_size=self._chunk_len, callback=_audio_callback)
+        self.audio_input.open_stream(chunk_size=self._capture_len, callback=_audio_callback)
         self._last_chunk_at = time.monotonic()
         try:
             while not self._should_stop():
@@ -309,6 +370,10 @@ class SongMonitor:
             self._device_lost = True
             self._reconnect_backoff = self.cfg["device_reconnect_backoff_initial"]
             self._next_reconnect_attempt_at = now
+            # Any leftover partial-chunk samples belong to the now-dead
+            # stream -- stitching them onto post-reconnect audio would
+            # splice unrelated signals together.
+            self._capture_pending = np.zeros(0, dtype=np.float32)
             log.error(
                 "No audio received for %.1fs — audio device appears to have "
                 "disconnected. Attempting to reconnect.", silent_for,
@@ -323,7 +388,7 @@ class SongMonitor:
             log.exception("Error closing stream during reconnect attempt")
 
         try:
-            self.audio_input.open_stream(chunk_size=self._chunk_len, callback=callback)
+            self.audio_input.open_stream(chunk_size=self._capture_len, callback=callback)
             # Reopening without an exception does NOT by itself mean data is
             # flowing again (it can silently succeed against the wrong/
             # fallback device) -- _last_chunk_at is deliberately left alone,
@@ -551,6 +616,7 @@ def self_test():
         print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
 
     _self_test_device_watchdog()
+    _self_test_capture_buffering()
 
 
 class _FakeAudioInputWatchdog:
@@ -677,6 +743,86 @@ def _self_test_device_watchdog():
                 and max(backoffs) == cfg["device_reconnect_backoff_max"])
         print(f"  [{'OK' if d_ok else 'FAIL'}] D: backoff grows and caps at "
               f"{cfg['device_reconnect_backoff_max']}s (sequence={backoffs})")
+    finally:
+        log.removeHandler(handler)
+
+
+def _self_test_capture_buffering():
+    """Synthetic scenarios for _on_capture_block() (see module docstring's
+    'Capture buffering headroom' section) -- confirms a PortAudio delivery
+    spanning several logical chunks gets split back into exact
+    chunk_duration-length pieces, with leftover samples correctly carried
+    across separate callback deliveries. No real hardware needed."""
+    import tempfile
+    import types
+    from pathlib import Path as _Path
+
+    print("\n=== Capture-buffering self-test ===")
+
+    tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_capture_selftest_"))
+    cfg = {
+        "output_dir": str(tmp_dir), "log_csv": str(tmp_dir / "detections.csv"),
+        "sample_rate": 1000, "chunk_duration": 0.1,  # chunk_len = 100 samples
+        "capture_chunk_multiplier": 3,
+    }
+    fake_audio = types.SimpleNamespace(sample_format=pyaudio.paInt16, channels_opened=1)
+    m = SongMonitor(cfg, audio_input=fake_audio,
+                     gate=_FakeGate([]), extractor=object(),
+                     smoother=__import__(
+                         "pyoperant.song_recording.smoother", fromlist=["CombinedSmoother"]
+                     ).CombinedSmoother.from_config_dict({}))
+
+    def pcm_bytes(start, n):
+        """n int16 samples counting up from `start`, so chunk boundaries
+        are verifiable by value, not just by count."""
+        return np.arange(start, start + n, dtype=np.int16).tobytes()
+
+    handler = _ListLogHandler()
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    try:
+        # --- Scenario A: exactly one full chunk delivered at once ---
+        m._on_capture_block(pcm_bytes(0, 100), status=0)
+        a_ok = (m._audio_q.qsize() == 1 and m._capture_pending.size == 0)
+        if a_ok:
+            piece = m._audio_q.get_nowait()
+            a_ok = (len(piece) == 100 and abs(piece[0] - 0 / 32768.0) < 1e-6)
+        print(f"  [{'OK' if a_ok else 'FAIL'}] A: one exact chunk in -> one chunk queued, "
+              f"no leftover")
+
+        # --- Scenario B: 2.5 chunks in one delivery -> 2 queued, 50 leftover ---
+        m._on_capture_block(pcm_bytes(1000, 250), status=0)
+        b_ok = (m._audio_q.qsize() == 2 and m._capture_pending.size == 50)
+        if b_ok:
+            p0 = m._audio_q.get_nowait()
+            p1 = m._audio_q.get_nowait()
+            b_ok = (len(p0) == 100 and len(p1) == 100
+                    and abs(p0[0] - 1000 / 32768.0) < 1e-6
+                    and abs(p1[0] - 1100 / 32768.0) < 1e-6)
+        print(f"  [{'OK' if b_ok else 'FAIL'}] B: 2.5 chunks in -> 2 queued exactly, "
+              f"50-sample leftover carried")
+
+        # --- Scenario C: completing that leftover across a second delivery ---
+        # (values continue from 1000+250=1250, matching a real continuous stream)
+        m._on_capture_block(pcm_bytes(1250, 50), status=0)
+        c_ok = (m._audio_q.qsize() == 1 and m._capture_pending.size == 0)
+        if c_ok:
+            piece = m._audio_q.get_nowait()
+            # first 50 samples are the carried leftover (values 1200-1249),
+            # last 50 are the new delivery (1250-1299) -- continuous, no gap/dup.
+            c_ok = (len(piece) == 100 and abs(piece[0] - 1200 / 32768.0) < 1e-6
+                    and abs(piece[-1] - 1299 / 32768.0) < 1e-6)
+        print(f"  [{'OK' if c_ok else 'FAIL'}] C: leftover completed by next delivery -> "
+              f"one continuous chunk, no gap/duplication")
+
+        # --- Scenario D: a nonzero status (e.g. paInputOverflow) logs a
+        # warning but capture/decoding still proceeds normally ---
+        handler.records.clear()
+        m._on_capture_block(pcm_bytes(2000, 100), status=2)
+        n_warnings = sum(1 for r in handler.records if r.levelno == logging.WARNING)
+        d_ok = (m._audio_q.qsize() == 1 and n_warnings == 1)
+        print(f"  [{'OK' if d_ok else 'FAIL'}] D: overflow status logs one WARNING, "
+              f"decoding/queuing still happens (warnings={n_warnings})")
     finally:
         log.removeHandler(handler)
 
