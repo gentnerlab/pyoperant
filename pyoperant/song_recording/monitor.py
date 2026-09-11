@@ -122,6 +122,31 @@ investigation) until a *measured*, not reasoned-from-first-principles,
 case for a different value shows up. The knob and the splitting
 infrastructure stay -- both correct and harmless at multiplier=1 -- in
 case that measurement happens later.
+
+Startup retry
+----------------------------
+The device-loss watchdog above only covers losing a stream that was
+already open. Before this section existed, the very first
+`open_stream()` call -- at the top of `run()`, before the main loop --
+had no such protection: a failure there (drift correction's own capture
+attempt, in noise_model.py, has the same gap and is not yet covered)
+logged one ERROR and gave up for the rest of that light period, with
+`Lights` otherwise running normally and recording simply, silently, off.
+Confirmed live, 2026-09-10 (B1474, see project_vocal_recorder memory): one
+transient open failure at a dawn light-on transition cost ~6 hours of
+recording, undiscovered until a human happened to check logs by hand --
+compounded by the fact that this subject's `config.json` didn't have
+`'email'` in `log_handlers` either, so not even the existing
+SMTPHandler-on-root-logger alerting fired.
+
+`_open_stream_with_retry()` now wraps that first `open_stream()` call in
+the same capped exponential backoff as the mid-session watchdog (reusing
+`device_reconnect_backoff_initial`/`_max` -- no new config keys), looping
+until it succeeds or `stop_event` is set (i.e. the session legitimately
+ended, e.g. lights-off, before the device ever became available -- treated
+as a clean exit, not a crash). Only the FIRST failure logs at ERROR (the
+signal meant to reach the SMTPHandler, once); every retry after that logs
+at INFO, so a real outage doesn't spam an inbox once per backoff interval.
 """
 
 from __future__ import annotations
@@ -343,7 +368,14 @@ class SongMonitor:
             self.cfg["chunk_duration"] * 1000 * self._capture_multiplier,
         )
 
-        self.audio_input.open_stream(chunk_size=self._capture_len, callback=_audio_callback)
+        if not self._open_stream_with_retry(_audio_callback):
+            log.warning(
+                "Monitor stopping before a working audio stream was ever "
+                "opened -- session ended while still retrying."
+            )
+            self._det_log.close()
+            return
+
         self._last_chunk_at = time.monotonic()
         try:
             while not self._should_stop():
@@ -359,6 +391,60 @@ class SongMonitor:
             self.audio_input.close()
             self._det_log.close()
             log.info("Monitor stopped. Recordings in %s", self._out_dir)
+
+    def _open_stream_with_retry(self, callback, sleep_fn=time.sleep) -> bool:
+        """Open the capture stream, retrying with the same capped
+        exponential backoff already proven for a mid-session device loss
+        (see module docstring's "Device-loss detection and recovery"
+        section) if the very first attempt fails, instead of giving up for
+        the whole session -- see the module docstring's "Startup retry"
+        section for why this exists (a real ~6h recording gap on B1474,
+        2026-09-10, from exactly this case: one transient open failure at
+        session start, previously left with no way to recover short of a
+        human noticing and restarting the process).
+
+        Logs ERROR once, on the first failure only (this is the signal
+        meant to reach someone via the existing SMTPHandler-on-root-logger
+        mechanism -- see the "Device-loss" section -- not once per retry,
+        which would spam an inbox every backoff interval for a condition
+        already reported). Later retries log at INFO.
+
+        Returns True once open_stream() succeeds. Returns False only if
+        stop_event is set while still retrying -- i.e. the session ended
+        (light-off, or the process was asked to stop) before the device
+        ever became available; run() treats that as a clean, quiet exit,
+        not a crash. `sleep_fn` is injectable so the self-test can drive
+        this deterministically without real waits.
+        """
+        backoff = self.cfg["device_reconnect_backoff_initial"]
+        attempt = 0
+        while not self._should_stop():
+            try:
+                self.audio_input.open_stream(chunk_size=self._capture_len, callback=callback)
+                if attempt > 0:
+                    log.info("Audio device opened after %d retr%s.",
+                             attempt, "y" if attempt == 1 else "ies")
+                return True
+            except Exception as exc:
+                if attempt == 0:
+                    log.error(
+                        "Could not open audio device at startup: %s. "
+                        "Retrying with backoff.", exc, exc_info=True,
+                    )
+                else:
+                    log.warning(
+                        "Retry %d failed to open audio device: %s; "
+                        "retrying in %.1fs.", attempt, exc, backoff,
+                    )
+                attempt += 1
+
+            waited = 0.0
+            while waited < backoff and not self._should_stop():
+                step = min(0.5, backoff - waited)
+                sleep_fn(step)
+                waited += step
+            backoff = min(backoff * 2, self.cfg["device_reconnect_backoff_max"])
+        return False
 
     def _should_stop(self) -> bool:
         return self.stop_event is not None and self.stop_event.is_set()
@@ -640,6 +726,7 @@ def self_test():
 
     _self_test_device_watchdog()
     _self_test_capture_buffering()
+    _self_test_startup_retry()
 
 
 class _FakeAudioInputWatchdog:
@@ -846,6 +933,83 @@ def _self_test_capture_buffering():
         d_ok = (m._audio_q.qsize() == 1 and n_warnings == 1)
         print(f"  [{'OK' if d_ok else 'FAIL'}] D: overflow status logs one WARNING, "
               f"decoding/queuing still happens (warnings={n_warnings})")
+    finally:
+        log.removeHandler(handler)
+
+
+def _self_test_startup_retry():
+    """Synthetic scenarios for _open_stream_with_retry() (see module
+    docstring's "Startup retry" section) -- confirms a failed FIRST
+    open_stream() attempt is retried with backoff instead of giving up for
+    the whole session, logs ERROR exactly once (not once per retry), and
+    that stop_event ends the retry loop promptly. No real hardware, no
+    real sleeps (sleep_fn is injected)."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    print("\n=== Startup-retry self-test ===")
+
+    cfg = {
+        "output_dir": None, "log_csv": None,
+        "device_reconnect_backoff_initial": 1.0,
+        "device_reconnect_backoff_max": 8.0,
+    }
+
+    def make_monitor(fail_open_times=0):
+        tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_startup_selftest_"))
+        real_cfg = {**cfg, "output_dir": str(tmp_dir), "log_csv": str(tmp_dir / "detections.csv")}
+        fake_audio = _FakeAudioInputWatchdog(fail_open_times=fail_open_times)
+        m = SongMonitor(real_cfg, audio_input=fake_audio,
+                         gate=_FakeGate([]), extractor=object(),
+                         smoother=__import__(
+                             "pyoperant.song_recording.smoother", fromlist=["CombinedSmoother"]
+                         ).CombinedSmoother.from_config_dict({}))
+        return m, fake_audio
+
+    handler = _ListLogHandler()
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    try:
+        # --- Scenario A: first attempt succeeds -- no retry, no ERROR ---
+        m, fake = make_monitor(fail_open_times=0)
+        handler.records.clear()
+        ok = m._open_stream_with_retry(callback=None, sleep_fn=lambda s: None)
+        n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
+        a_ok = (ok is True and fake.open_calls == 1 and n_errors == 0)
+        print(f"  [{'OK' if a_ok else 'FAIL'}] A: first attempt succeeds -> no retry, "
+              f"no ERROR (open_calls={fake.open_calls} errors={n_errors})")
+
+        # --- Scenario B: fails twice, succeeds on the third attempt --
+        # exactly one ERROR (first failure only), backoff waited between
+        # retries (not zero real delay skipped) ---
+        m, fake = make_monitor(fail_open_times=2)
+        handler.records.clear()
+        sleeps = []
+        ok = m._open_stream_with_retry(callback=None, sleep_fn=sleeps.append)
+        n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
+        n_warnings = sum(1 for r in handler.records if r.levelno == logging.WARNING)
+        b_ok = (ok is True and fake.open_calls == 3 and n_errors == 1 and n_warnings == 1
+                and sum(sleeps) >= cfg["device_reconnect_backoff_initial"])
+        print(f"  [{'OK' if b_ok else 'FAIL'}] B: fails twice then succeeds -> exactly one "
+              f"ERROR (not one per retry), backoff waited between attempts "
+              f"(open_calls={fake.open_calls} errors={n_errors} warnings={n_warnings})")
+
+        # --- Scenario C: stop_event set while still retrying -> returns
+        # False promptly, doesn't retry forever ---
+        m, fake = make_monitor(fail_open_times=100)  # would never succeed
+        m.stop_event = threading.Event()
+        sleeps = []
+
+        def sleep_then_stop(s):
+            sleeps.append(s)
+            if len(sleeps) >= 2:
+                m.stop_event.set()
+
+        ok = m._open_stream_with_retry(callback=None, sleep_fn=sleep_then_stop)
+        c_ok = (ok is False and fake.open_calls < 100)
+        print(f"  [{'OK' if c_ok else 'FAIL'}] C: stop_event during retries -> returns "
+              f"False promptly, not exhausting all retries "
+              f"(open_calls={fake.open_calls})")
     finally:
         log.removeHandler(handler)
 
