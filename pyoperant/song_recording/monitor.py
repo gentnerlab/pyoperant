@@ -136,6 +136,18 @@ case for a different value shows up. The knob and the splitting
 infrastructure stay -- both correct and harmless at multiplier=1 -- in
 case that measurement happens later.
 
+**Logged at `info`, not `warning`** (changed 2026-09-11, after enabling email alerting for
+a real subject surfaced this in practice): this condition is real but already investigated
+and deliberately left unresolved as low-priority at its established baseline rate -- not
+something to act on. `warning` reaches the same SMTPHandler-on-root-logger mechanism used
+for real alerts (see "Device-loss detection and recovery" below), so at `warning` this
+was emailing genuine noise for something already decided not worth chasing. Still fully
+visible in the local `.log` file at `info` -- nothing lost, just not escalated. Revisit if
+the rate climbs, clusters, or the still-unbuilt severity detector (real lost-duration via
+PortAudio's ADC timestamp, cross-referenced against whether a clip was actively recording --
+discussed but not yet built, see project_vocal_recorder memory) ever shows it costing real
+song.
+
 Startup retry
 ----------------------------
 The device-loss watchdog above only covers losing a stream that was
@@ -360,7 +372,17 @@ class SongMonitor:
         unit-testable, matching _on_chunk_received/_check_device_health.
         """
         if status:
-            log.warning("Audio status: %s", status)
+            # INFO, not WARNING -- deliberately (2026-09-11, see module
+            # docstring's "Capture buffering headroom" section). This is
+            # PortAudio's paInputOverflow flag at its established baseline
+            # rate (~1/8min), already investigated and left unresolved as a
+            # known, low-priority condition -- not something to act on yet.
+            # WARNING reaches the SMTPHandler-on-root-logger alerting (any
+            # WARNING+ anywhere in the process emails the experimenter), so
+            # at WARNING this emailed real noise for something we'd already
+            # decided not to chase. Still fully visible in the local .log
+            # file at INFO -- nothing lost, just not escalated.
+            log.info("Audio status: %s", status)
         try:
             block = decode_pcm(in_data, self.audio_input.sample_format,
                                 self.audio_input.channels_opened)
@@ -462,7 +484,14 @@ class SongMonitor:
                 if attempt == 0:
                     log.error(
                         "Could not open audio device at startup: %s. "
-                        "Retrying with backoff.", exc, exc_info=True,
+                        "Retrying automatically with backoff -- if a "
+                        "RESOLVED follow-up arrives shortly, no action is "
+                        "needed. If this persists more than a few minutes, "
+                        "a plain retry may not be enough (the device can "
+                        "get stuck in a state only a fresh process or a "
+                        "physical unplug/replug clears) -- try unplugging "
+                        "and replugging the USB microphone, or restart the "
+                        "recording process.", exc, exc_info=True,
                     )
                 else:
                     log.warning(
@@ -526,7 +555,14 @@ class SongMonitor:
             self._capture_pending = np.zeros(0, dtype=np.float32)
             log.error(
                 "No audio received for %.1fs — audio device appears to have "
-                "disconnected. Attempting to reconnect.", silent_for,
+                "disconnected. Attempting to reconnect automatically -- if "
+                "a RESOLVED follow-up arrives shortly, no action is "
+                "needed. If this persists more than a few minutes, a "
+                "plain retry may not be enough (the device can get stuck "
+                "in a state only a fresh process or a physical "
+                "unplug/replug clears) -- try unplugging and replugging "
+                "the USB microphone, or restart the recording process.",
+                silent_for,
             )
 
         if now < self._next_reconnect_attempt_at:
@@ -975,14 +1011,18 @@ def _self_test_capture_buffering():
         print(f"  [{'OK' if c_ok else 'FAIL'}] C: leftover completed by next delivery -> "
               f"one continuous chunk, no gap/duplication")
 
-        # --- Scenario D: a nonzero status (e.g. paInputOverflow) logs a
-        # warning but capture/decoding still proceeds normally ---
+        # --- Scenario D: a nonzero status (e.g. paInputOverflow) logs at
+        # INFO (not WARNING -- deliberately doesn't reach email alerting
+        # for this known, low-priority condition, see module docstring)
+        # but capture/decoding still proceeds normally ---
         handler.records.clear()
         m._on_capture_block(pcm_bytes(2000, 100), status=2)
+        n_info = sum(1 for r in handler.records if r.levelno == logging.INFO)
         n_warnings = sum(1 for r in handler.records if r.levelno == logging.WARNING)
-        d_ok = (m._audio_q.qsize() == 1 and n_warnings == 1)
-        print(f"  [{'OK' if d_ok else 'FAIL'}] D: overflow status logs one WARNING, "
-              f"decoding/queuing still happens (warnings={n_warnings})")
+        d_ok = (m._audio_q.qsize() == 1 and n_info == 1 and n_warnings == 0)
+        print(f"  [{'OK' if d_ok else 'FAIL'}] D: overflow status logs at INFO (not "
+              f"WARNING -- doesn't reach email alerting), decoding/queuing still "
+              f"happens (info={n_info} warnings={n_warnings})")
     finally:
         log.removeHandler(handler)
 
