@@ -75,6 +75,19 @@ device immediately would just recreate that problem. A successful
 against the wrong/fallback device without erroring) -- only an actual
 chunk arriving again clears the lost state and resets the backoff.
 
+**Recovery is also reported at `warning`, not `info`** (added 2026-09-11,
+after the user pointed out the gap): an ERROR alert with no matching
+follow-up leaves whoever reads it wondering whether a later quiet retry
+actually fixed things, or whether it's still broken -- INFO-only would
+mean the recovery note only ever reaches the local log file, never the
+inbox the ERROR itself reached. Only fires when `_device_lost` was
+actually `True` (i.e. an ERROR really was raised for this episode) --
+recovering from something nobody was ever told about doesn't need a
+message. Prefixed `RESOLVED:` so it reads unambiguously as good news
+sitting in the same inbox as the alert it answers, not a second problem.
+`_open_stream_with_retry()` (see "Startup retry" below) follows the exact
+same pattern for the same reason.
+
 Capture buffering headroom
 ----------------------------
 Observed live, 2026-09-09 (real B1474 deployment, see project_vocal_recorder
@@ -144,9 +157,19 @@ the same capped exponential backoff as the mid-session watchdog (reusing
 `device_reconnect_backoff_initial`/`_max` -- no new config keys), looping
 until it succeeds or `stop_event` is set (i.e. the session legitimately
 ended, e.g. lights-off, before the device ever became available -- treated
-as a clean exit, not a crash). Only the FIRST failure logs at ERROR (the
-signal meant to reach the SMTPHandler, once); every retry after that logs
-at INFO, so a real outage doesn't spam an inbox once per backoff interval.
+as a clean exit, not a crash). Only the FIRST failure logs at `error` (the
+signal meant to reach the SMTPHandler); every retry after that logs at
+`warning`, same as the mid-session watchdog's own retry-failure line --
+repeated identical-call-site alerts within one outage are already
+suppressed by `log_config()`'s `_EmailOccurrenceFilter` (see base.py),
+not by holding retries below the alerting threshold.
+
+**On success after at least one failure, logs a `RESOLVED:` follow-up at
+`warning`** (see the "Device-loss detection and recovery" section above
+for the full reasoning -- same fix, same day, same motivation: an ERROR
+alert with no matching "it's fixed now" leaves the reader unsure whether
+a later quiet retry actually worked). Gated on `attempt > 0`, so success
+on the very first try (nothing was ever reported broken) stays silent.
 """
 
 from __future__ import annotations
@@ -422,8 +445,18 @@ class SongMonitor:
             try:
                 self.audio_input.open_stream(chunk_size=self._capture_len, callback=callback)
                 if attempt > 0:
-                    log.info("Audio device opened after %d retr%s.",
-                             attempt, "y" if attempt == 1 else "ies")
+                    # WARNING, not INFO, deliberately -- attempt > 0 means the
+                    # ERROR branch below already fired an alert for this
+                    # episode; without a matching reply, the only thing that
+                    # ever reaches an inbox is "something's wrong," with no
+                    # follow-up saying it resolved on its own. RESOLVED: makes
+                    # the two unmistakable apart at a glance in the same
+                    # inbox/subject line.
+                    log.warning(
+                        "RESOLVED: audio device opened after %d retr%s -- "
+                        "recording has resumed automatically. No action "
+                        "needed.", attempt, "y" if attempt == 1 else "ies",
+                    )
                 return True
             except Exception as exc:
                 if attempt == 0:
@@ -459,7 +492,15 @@ class SongMonitor:
         device-loss state left over from a prior reconnect attempt."""
         self._last_chunk_at = time.monotonic()
         if self._device_lost:
-            log.info("Audio device recovered — resuming normal monitoring.")
+            # WARNING, not INFO -- same reasoning as _open_stream_with_retry's
+            # matching RESOLVED log: self._device_lost only being True means
+            # _check_device_health already fired an ERROR alert for this
+            # episode, and that alert deserves a follow-up saying it's over,
+            # not just a local-log-only note nobody but this file ever sees.
+            log.warning(
+                "RESOLVED: audio device recovered -- resuming normal "
+                "monitoring. No action needed."
+            )
             self._device_lost = False
             self._reconnect_backoff = self.cfg["device_reconnect_backoff_initial"]
 
@@ -818,12 +859,21 @@ def _self_test_device_watchdog():
               f"exactly one ERROR logged, still 'lost' until confirmed "
               f"(close={fake.close_calls} open={fake.open_calls} errors={n_errors})")
 
-        # Confirm recovery via a real chunk arriving.
+        # Confirm recovery via a real chunk arriving -- and that it logs a
+        # RESOLVED follow-up at WARNING (reaches the same SMTPHandler the
+        # original ERROR did), not just INFO/local-log-only, so an alert
+        # that something broke gets a matching alert that it's fixed.
         m._on_chunk_received()
+        n_resolved = sum(
+            1 for r in handler.records
+            if r.levelno == logging.WARNING and "RESOLVED" in r.getMessage()
+        )
         b2_ok = (m._device_lost is False
-                  and m._reconnect_backoff == cfg["device_reconnect_backoff_initial"])
-        print(f"  [{'OK' if b2_ok else 'FAIL'}] B2: chunk arrival clears device_lost "
-              f"and resets backoff (device_lost={m._device_lost} "
+                  and m._reconnect_backoff == cfg["device_reconnect_backoff_initial"]
+                  and n_resolved == 1)
+        print(f"  [{'OK' if b2_ok else 'FAIL'}] B2: chunk arrival clears device_lost, "
+              f"resets backoff, AND logs one RESOLVED WARNING "
+              f"(device_lost={m._device_lost} "
               f"backoff={m._reconnect_backoff})")
 
         # --- Scenario C: repeated silence while already 'lost' does NOT
@@ -970,14 +1020,17 @@ def _self_test_startup_retry():
     log.addHandler(handler)
     log.setLevel(logging.DEBUG)
     try:
-        # --- Scenario A: first attempt succeeds -- no retry, no ERROR ---
+        # --- Scenario A: first attempt succeeds -- no retry, no ERROR, and
+        # no false "RESOLVED" (nothing was ever reported broken) ---
         m, fake = make_monitor(fail_open_times=0)
         handler.records.clear()
         ok = m._open_stream_with_retry(callback=None, sleep_fn=lambda s: None)
         n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
-        a_ok = (ok is True and fake.open_calls == 1 and n_errors == 0)
+        n_warnings = sum(1 for r in handler.records if r.levelno == logging.WARNING)
+        a_ok = (ok is True and fake.open_calls == 1 and n_errors == 0 and n_warnings == 0)
         print(f"  [{'OK' if a_ok else 'FAIL'}] A: first attempt succeeds -> no retry, "
-              f"no ERROR (open_calls={fake.open_calls} errors={n_errors})")
+              f"no ERROR, no false RESOLVED "
+              f"(open_calls={fake.open_calls} errors={n_errors} warnings={n_warnings})")
 
         # --- Scenario B: fails twice, succeeds on the third attempt --
         # exactly one ERROR (first failure only), backoff waited between
@@ -987,12 +1040,17 @@ def _self_test_startup_retry():
         sleeps = []
         ok = m._open_stream_with_retry(callback=None, sleep_fn=sleeps.append)
         n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
-        n_warnings = sum(1 for r in handler.records if r.levelno == logging.WARNING)
-        b_ok = (ok is True and fake.open_calls == 3 and n_errors == 1 and n_warnings == 1
+        warning_msgs = [r.getMessage() for r in handler.records if r.levelno == logging.WARNING]
+        n_retry_warnings = sum(1 for m_ in warning_msgs if "RESOLVED" not in m_)
+        n_resolved = sum(1 for m_ in warning_msgs if "RESOLVED" in m_)
+        b_ok = (ok is True and fake.open_calls == 3 and n_errors == 1
+                and n_retry_warnings == 1 and n_resolved == 1
                 and sum(sleeps) >= cfg["device_reconnect_backoff_initial"])
         print(f"  [{'OK' if b_ok else 'FAIL'}] B: fails twice then succeeds -> exactly one "
-              f"ERROR (not one per retry), backoff waited between attempts "
-              f"(open_calls={fake.open_calls} errors={n_errors} warnings={n_warnings})")
+              f"ERROR (not one per retry) AND one RESOLVED WARNING on success (reaches the "
+              f"same alert channel as the ERROR did), backoff waited between attempts "
+              f"(open_calls={fake.open_calls} errors={n_errors} "
+              f"retry_warnings={n_retry_warnings} resolved={n_resolved})")
 
         # --- Scenario C: stop_event set while still retrying -> returns
         # False promptly, doesn't retry forever ---
