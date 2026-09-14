@@ -196,7 +196,11 @@ def check_cmdline_params(parameters, cmd_line):
     # if someone is using red bands they should ammend the checks I perform here
     def digits_only(s):
         return ''.join(c for c in s if c.isdigit())
-    if not ('box' not in cmd_line or cmd_line['box'] == int(digits_only(parameters['panel_name']))):
+    # panel_hw_id (preferred) / panel_name (legacy) -- see base.py's
+    # BaseExp.__init__. A post-init self.parameters always has both
+    # mirrored; falling back covers a raw, pre-init config dict too.
+    panel_hw_id = parameters.get('panel_hw_id', parameters.get('panel_name'))
+    if not ('box' not in cmd_line or cmd_line['box'] == int(digits_only(panel_hw_id))):
         print("box number doesn't match config and command line")
         return False
     if not ('subj' not in cmd_line or int(digits_only(cmd_line['subj'])) == int(digits_only(parameters['subject']))):

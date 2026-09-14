@@ -98,6 +98,8 @@ class BaseExp(object):
                  stim_path='',
                  subject='',
                  panel=None,
+                 panel_hw_id=None,
+                 panel_name=None,
                  log_handlers=None,
                  *args, **kwargs):
         super(BaseExp,  self).__init__()
@@ -126,8 +128,24 @@ class BaseExp(object):
                               'reset',
                               ]
         self.panel = panel
-        if 'panel_name' in self.parameters:
-            self.log.debug('panel %s initialized' % self.parameters['panel_name'])
+        # panel_hw_id (preferred) / panel_name (legacy, pre-2026-09) both
+        # select which PANELS[...] hardware-interface class this run
+        # controls (see local_pi_revd.py's PANELS dict) -- e.g. "1" for
+        # a board with one wired panel. Renamed to stop colliding with
+        # rpioperantctl's own, unrelated "panel" column in
+        # panel_subject_behavior, which means the box's HOSTNAME, not a
+        # hardware-class lookup key -- same word, two different layers.
+        # Both keys are always mirrored into self.parameters with the
+        # same resolved value, whichever one the caller supplied, so any
+        # existing config.json (already deployed fleet-wide with
+        # "panel_name") and any code still reading that key directly --
+        # including glab_behaviors, a private repo not auditable from
+        # here -- keep working unchanged.
+        resolved_panel_hw_id = panel_hw_id if panel_hw_id is not None else panel_name
+        self.parameters['panel_hw_id'] = resolved_panel_hw_id
+        self.parameters['panel_name']  = resolved_panel_hw_id
+        if resolved_panel_hw_id is not None:
+            self.log.debug('panel %s initialized' % resolved_panel_hw_id)
 
         if 'shape' not in self.parameters or self.parameters['shape'] not in ['block1', 'block2', 'block3', 'block4', 'block5']:
             self.parameters['shape'] = None

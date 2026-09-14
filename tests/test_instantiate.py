@@ -145,6 +145,51 @@ class TestLights(unittest.TestCase):
                     type(e).__name__, e))
             self.assertEqual(panel.reset_calls, 1)
 
+    def test_panel_hw_id_preferred_name_is_mirrored_to_legacy_key(self):
+        """New-style config using panel_hw_id must also populate the old
+        panel_name key -- protects any code (including glab_behaviors, a
+        private repo not auditable from here) still reading the old name
+        directly, per base.py's BaseExp.__init__."""
+        config = _load_config("Lights")
+        config.pop("panel_name", None)
+        config["panel_hw_id"] = "1"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            exp = Lights(panel=FakePanel(), **config)
+        self.assertEqual(exp.parameters["panel_hw_id"], "1")
+        self.assertEqual(exp.parameters["panel_name"], "1")
+
+    def test_legacy_panel_name_still_works_and_is_mirrored_forward(self):
+        """An existing, already-deployed config.json using the old
+        panel_name key must keep working unchanged, AND populate the new
+        panel_hw_id key too, so newly-updated code reading the preferred
+        name still finds a value from an old config. Sets panel_name
+        explicitly rather than relying on example_configs/Lights.json
+        still using it -- that file is migrated to panel_hw_id (see the
+        "preferred" test above), so this needs its own legacy-shaped
+        config to actually exercise the old path."""
+        config = _load_config("Lights")
+        config.pop("panel_hw_id", None)
+        config["panel_name"] = "1"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            exp = Lights(panel=FakePanel(), **config)
+        self.assertEqual(exp.parameters["panel_name"], "1")
+        self.assertEqual(exp.parameters["panel_hw_id"], "1")
+
+    def test_panel_hw_id_takes_precedence_when_both_given(self):
+        """Not a configuration anyone should actually write, but the
+        precedence needs to be defined and correct if it happens (e.g. a
+        half-migrated config)."""
+        config = _load_config("Lights")
+        config["panel_name"] = "1"
+        config["panel_hw_id"] = "2"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            exp = Lights(panel=FakePanel(), **config)
+        self.assertEqual(exp.parameters["panel_hw_id"], "2")
+        self.assertEqual(exp.parameters["panel_name"], "2")
+
     def test_Lights_free_food_during_idle(self):
         """free_food_schedule should trigger the free-food state directly
         from _run_idle, without needing check_session_schedule() -- see

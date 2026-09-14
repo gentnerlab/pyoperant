@@ -136,7 +136,12 @@ if __name__ == "__main__":
         print(parameters)
         print(PANELS)
 
-    panel = PANELS[parameters['panel_name']]()
+    # panel_hw_id (preferred) / panel_name (legacy) -- see base.py's
+    # BaseExp.__init__ for why both names exist. Read straight from the
+    # raw config.json dict here (this standalone entry point runs before
+    # any BaseExp instance exists to do the usual mirroring), so check
+    # both explicitly rather than assuming one.
+    panel = PANELS[parameters.get('panel_hw_id', parameters.get('panel_name'))]()
 
     exp = ThreeACMatchingExp(panel=panel,**parameters)
     exp.run()

@@ -5,7 +5,7 @@
         "email": "tgentner@ucsd.edu"
     },
     "subject": "B999",
-    "panel_name": "1",
+    "panel_hw_id": "1",
     "debug": true,
     "stims": {
         "a": "A8 165_s_25 @2_trim800-1200_68dbmean_5mstaper.wav",

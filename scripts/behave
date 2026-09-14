@@ -135,7 +135,12 @@ def main():
         print(parameters)
         print(PANELS)
 
-    for k in ['subject','panel_name','experiment_path']:
+    # panel_hw_id/panel_name (legacy name) are always sourced from the -P
+    # command line below, not from config.json -- strip either key here
+    # first so an existing config.json carrying one doesn't collide with
+    # it as a duplicate keyword argument. See base.py's BaseExp.__init__
+    # for why both names are still accepted/mirrored.
+    for k in ['subject','panel_name','panel_hw_id','experiment_path']:
         parameters.pop(k) if k in parameters.keys() else None
 
     stimuli_path = parameters.pop('stim_path') if 'stim_path' in parameters else stimuli_path
@@ -143,7 +148,7 @@ def main():
     behavior = BehaviorProtocol(
         panel=PANELS[cmd_line['panel']](),
         subject=cmd_line['subject'],
-        panel_name=cmd_line['panel'],
+        panel_hw_id=cmd_line['panel'],
         experiment_path=experiment_path,
         stim_path=stimuli_path,
         **parameters
