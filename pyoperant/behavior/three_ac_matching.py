@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import random, os
+import random, os, logging
 from pyoperant import utils, components
 from pyoperant.behavior import two_alt_choice, shape
 
@@ -140,8 +140,16 @@ if __name__ == "__main__":
     # BaseExp.__init__ for why both names exist. Read straight from the
     # raw config.json dict here (this standalone entry point runs before
     # any BaseExp instance exists to do the usual mirroring), so check
-    # both explicitly rather than assuming one.
-    panel = PANELS[parameters.get('panel_hw_id', parameters.get('panel_name'))]()
+    # both explicitly rather than assuming one. No CLI override exists at
+    # this entry point, so resolution is config-only; see
+    # utils.resolve_panel_hw_id()'s docstring for why an unresolvable
+    # value here (e.g. a fleet config.json with a hostname where "1"
+    # belongs) falls back to the default panel instead of a bare KeyError.
+    config_panel_hw_id = parameters.get('panel_hw_id', parameters.get('panel_name'))
+    resolved_panel_hw_id = utils.resolve_panel_hw_id(
+        None, config_panel_hw_id, PANELS, logger=logging.getLogger('pyoperant'),
+    )
+    panel = PANELS[resolved_panel_hw_id]()
 
     exp = ThreeACMatchingExp(panel=panel,**parameters)
     exp.run()

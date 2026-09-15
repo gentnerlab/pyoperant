@@ -10,6 +10,7 @@ try: import simplejson as json
 except ImportError: import json
 
 from pyoperant.local import PANELS
+from pyoperant.utils import resolve_panel_hw_id
 
 try:
     from pyoperant.local import BEHAVIORS
@@ -40,8 +41,16 @@ def parse_commandline(arg_str=sys.argv[1:]):
                         action='store',
                         type=str,
                         dest='panel',
-                        required=True,
-                        help='(string) panel identifier'
+                        default=None,
+                        required=False,
+                        help='(string) panel hardware identifier -- selects '
+                             'which of this box\'s PANELS[...] classes to '
+                             'use (see local_pi_revd.py). Normally left '
+                             'unset: the value is read from config.json\'s '
+                             'panel_hw_id/panel_name instead, and defaults '
+                             'to "1" (every board has exactly one wired '
+                             'panel today) if that\'s missing or invalid. '
+                             'Pass -P explicitly only to override both.'
                         )
     parser.add_argument('-S', '--subject',
                         action='store',
@@ -135,20 +144,26 @@ def main():
         print(parameters)
         print(PANELS)
 
-    # panel_hw_id/panel_name (legacy name) are always sourced from the -P
-    # command line below, not from config.json -- strip either key here
-    # first so an existing config.json carrying one doesn't collide with
-    # it as a duplicate keyword argument. See base.py's BaseExp.__init__
-    # for why both names are still accepted/mirrored.
+    # panel_hw_id/panel_name: -P on the command line overrides everything;
+    # otherwise config.json's own value is used (falling back to "1" if
+    # that's missing or not a real panel on this box) -- see
+    # resolve_panel_hw_id()'s docstring for why. Resolve before popping so
+    # the config value is still available to fall back to; pop afterward
+    # so it doesn't collide with the explicit panel_hw_id= kwarg below.
+    config_panel_hw_id = parameters.get('panel_hw_id', parameters.get('panel_name'))
+    resolved_panel_hw_id = resolve_panel_hw_id(
+        cmd_line['panel'], config_panel_hw_id, PANELS,
+        logger=logging.getLogger('pyoperant'),
+    )
     for k in ['subject','panel_name','panel_hw_id','experiment_path']:
         parameters.pop(k) if k in parameters.keys() else None
 
     stimuli_path = parameters.pop('stim_path') if 'stim_path' in parameters else stimuli_path
 
     behavior = BehaviorProtocol(
-        panel=PANELS[cmd_line['panel']](),
+        panel=PANELS[resolved_panel_hw_id](),
         subject=cmd_line['subject'],
-        panel_hw_id=cmd_line['panel'],
+        panel_hw_id=resolved_panel_hw_id,
         experiment_path=experiment_path,
         stim_path=stimuli_path,
         **parameters
