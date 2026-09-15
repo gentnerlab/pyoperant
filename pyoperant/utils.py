@@ -200,13 +200,74 @@ def check_cmdline_params(parameters, cmd_line):
     # BaseExp.__init__. A post-init self.parameters always has both
     # mirrored; falling back covers a raw, pre-init config dict too.
     panel_hw_id = parameters.get('panel_hw_id', parameters.get('panel_name'))
-    if not ('box' not in cmd_line or cmd_line['box'] == int(digits_only(panel_hw_id))):
-        print("box number doesn't match config and command line")
-        return False
+    if 'box' in cmd_line and cmd_line['box'] is not None:
+        # A safety check, not a resolution change: panel_hw_id can be
+        # missing or non-numeric (e.g. a fleet config.json that still has
+        # a hostname like "Magpi11" sitting in this field -- see
+        # resolve_panel_hw_id()'s docstring for the full history). Fail
+        # with a clear message rather than a bare TypeError/ValueError
+        # from digits_only(None) or int('').
+        if not panel_hw_id or not digits_only(panel_hw_id):
+            print("Cannot verify box number: config's panel_hw_id/panel_name "
+                  "is missing or non-numeric (%r)" % (panel_hw_id,))
+            return False
+        if cmd_line['box'] != int(digits_only(panel_hw_id)):
+            print("box number doesn't match config and command line")
+            return False
     if not ('subj' not in cmd_line or int(digits_only(cmd_line['subj'])) == int(digits_only(parameters['subject']))):
         print("subject number doesn't match config and command line")
         return False
     return True
+
+
+# Default PANELS[...] key for a box that doesn't specify one -- every
+# board has exactly one wired panel today (see resolve_panel_hw_id()).
+DEFAULT_PANEL_HW_ID = '1'
+
+
+def resolve_panel_hw_id(cli_value, config_value, panels, default=DEFAULT_PANEL_HW_ID,
+                         logger=None):
+    """Resolve which key of `panels` (e.g. local_pi_revd.PANELS) this run
+    should control.
+
+    Historical context: `panels`/`-P`/panel_hw_id used to mean "which of
+    several panels on this one shared machine" back when the lab ran every
+    box from a single central computer. Since migrating to today's
+    client-server architecture (each box is its own independent Pi with
+    exactly one panel), that mechanism is vestigial -- `panels` is always a
+    single-entry `{"1": ...}` dict -- while `panel_subject_behavior`'s own,
+    unrelated "panel" column took on a new meaning (the box's SSH
+    hostname). The two never got reconciled, and some fleet boxes ended up
+    with their hostname mistakenly written into config.json's
+    panel_hw_id/panel_name field instead of "1" (e.g. "Magpi11").
+
+    Priority order: an explicit CLI value always wins -- a bad CLI value is
+    an explicit user request and is left to raise clearly below, not
+    silently substituted. Otherwise config.json's own panel_hw_id/
+    panel_name is used, but only if it's actually a valid key of `panels`;
+    an unresolved/stale config value (like the "Magpi11" case above) falls
+    back to `default` instead of crashing an unattended, cron-driven box,
+    with a warning logged when possible so the bad config can still be
+    noticed and fixed.
+    """
+    if cli_value is not None:
+        resolved = cli_value
+    elif config_value is not None and config_value in panels:
+        resolved = config_value
+    else:
+        if config_value is not None and logger is not None:
+            logger.warning(
+                "config panel_hw_id/panel_name %r is not a valid panel on "
+                "this box (valid: %s); falling back to default panel %r.",
+                config_value, sorted(panels), default,
+            )
+        resolved = default
+    if resolved not in panels:
+        raise KeyError(
+            "panel_hw_id %r is not a valid panel on this box (valid: %s)"
+            % (resolved, sorted(panels))
+        )
+    return resolved
 
 
 
