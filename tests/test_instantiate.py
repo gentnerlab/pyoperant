@@ -66,6 +66,7 @@ from pyoperant.behavior import (  # noqa: E402
     Lights,
     ThreeACMatchingExp,
 )
+from pyoperant import utils  # noqa: E402
 
 
 def _load_config(name):
@@ -357,6 +358,84 @@ class TestLights(unittest.TestCase):
             with patch.object(exp, "_stop_monitor") as mock_stop:
                 exp.emergency_shutdown()
             mock_stop.assert_called_once()
+
+
+class TestResolvePanelHwId(unittest.TestCase):
+    """utils.resolve_panel_hw_id() picks which PANELS[...] key a run
+    controls -- see its docstring for the panel/host naming history this
+    is untangling. PANELS is always a single-entry {"1": ...} dict on a
+    real board; a two-entry fake here is enough to exercise every branch
+    without needing real hardware classes."""
+
+    PANELS = {"1": object(), "2": object()}
+
+    def test_cli_value_wins_even_if_config_disagrees(self):
+        resolved = utils.resolve_panel_hw_id("2", "1", self.PANELS)
+        self.assertEqual(resolved, "2")
+
+    def test_cli_value_missing_falls_back_to_config(self):
+        resolved = utils.resolve_panel_hw_id(None, "2", self.PANELS)
+        self.assertEqual(resolved, "2")
+
+    def test_both_missing_falls_back_to_default(self):
+        resolved = utils.resolve_panel_hw_id(None, None, self.PANELS)
+        self.assertEqual(resolved, utils.DEFAULT_PANEL_HW_ID)
+
+    def test_invalid_config_value_falls_back_to_default_not_crash(self):
+        """The real bug this is fixing: some fleet config.json files have
+        the box's own hostname (e.g. "Magpi11") sitting in panel_hw_id
+        instead of "1" -- a stale value like that must not crash an
+        unattended, cron-driven box."""
+        resolved = utils.resolve_panel_hw_id(None, "Magpi11", self.PANELS)
+        self.assertEqual(resolved, utils.DEFAULT_PANEL_HW_ID)
+
+    def test_invalid_config_value_logs_a_warning(self):
+        logger = MagicMock()
+        utils.resolve_panel_hw_id(None, "Magpi11", self.PANELS, logger=logger)
+        logger.warning.assert_called_once()
+
+    def test_invalid_cli_value_raises_clearly(self):
+        """Unlike a bad config value, an explicit CLI override is a
+        direct user request -- a typo there should raise immediately and
+        legibly, not be silently replaced."""
+        with self.assertRaises(KeyError):
+            utils.resolve_panel_hw_id("nonexistent", None, self.PANELS)
+
+    def test_default_itself_must_be_a_valid_panel(self):
+        with self.assertRaises(KeyError):
+            utils.resolve_panel_hw_id(None, None, self.PANELS, default="nonexistent")
+
+
+class TestCheckCmdlineParamsPanelSafety(unittest.TestCase):
+    """check_cmdline_params()'s box-number check used to call
+    digits_only(panel_hw_id) unconditionally, which raises a bare
+    TypeError/ValueError if panel_hw_id is missing or non-numeric (e.g. a
+    fleet config.json with a hostname in that field). This is a safety
+    check only -- no change to what counts as a match, just no crash."""
+
+    def test_missing_panel_hw_id_fails_clearly_not_crash(self):
+        result = utils.check_cmdline_params(
+            {"subject": "B1"}, {"box": 1, "subj": "B1"}
+        )
+        self.assertFalse(result)
+
+    def test_non_numeric_panel_hw_id_fails_clearly_not_crash(self):
+        result = utils.check_cmdline_params(
+            {"subject": "B1", "panel_hw_id": "Magpi11"}, {"box": 1, "subj": "B1"}
+        )
+        self.assertFalse(result)
+
+    def test_matching_numeric_panel_hw_id_still_passes(self):
+        result = utils.check_cmdline_params(
+            {"subject": "B1", "panel_hw_id": "1"}, {"box": 1, "subj": "B1"}
+        )
+        self.assertTrue(result)
+
+    def test_box_not_in_cmd_line_skips_check_as_before(self):
+        result = utils.check_cmdline_params(
+            {"subject": "B1"}, {"subj": "B1"}
+        )
+        self.assertTrue(result)
 
 
 if __name__ == "__main__":
