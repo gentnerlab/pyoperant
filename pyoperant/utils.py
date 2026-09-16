@@ -7,6 +7,8 @@ import threading
 import traceback
 import shlex
 import os
+import json
+import logging
 import random
 import datetime as dt
 import numpy as np
@@ -268,6 +270,37 @@ def resolve_panel_hw_id(cli_value, config_value, panels, default=DEFAULT_PANEL_H
             % (resolved, sorted(panels))
         )
     return resolved
+
+
+try:
+    from pyoperant.local import PANEL_CONFIG_PATH
+except ImportError:
+    PANEL_CONFIG_PATH = '/home/bird/panel_config.json'
+
+
+def load_panel_config(path=PANEL_CONFIG_PATH):
+    """Reads this box's panel_config.json -- physical-hardware calibration
+    (e.g. Rev D's hopper servo hopper_up_angle/hopper_down_angle) that
+    belongs to this specific box, not to whichever subject happens to be
+    assigned to it. Unlike a subject's config.json, this file is meant to
+    survive a bird being swapped out -- see local_pi_revd.py's
+    PiPanel.__init__ and scripts/tune_servo.py, which writes it.
+
+    Returns {} if the file doesn't exist (a box with no hardware overrides
+    yet -- normal, not an error) or can't be parsed (logged as a warning
+    -- a bad calibration file should never crash the whole experiment,
+    it should just fall back to PiPanel's own hardcoded defaults).
+    """
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, 'r') as f:
+            return json.load(f)
+    except (IOError, ValueError) as e:
+        logging.getLogger('pyoperant').warning(
+            "Could not read panel config %s: %s -- using hardware defaults", path, e
+        )
+        return {}
 
 
 

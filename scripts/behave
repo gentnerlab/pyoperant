@@ -10,7 +10,7 @@ try: import simplejson as json
 except ImportError: import json
 
 from pyoperant.local import PANELS
-from pyoperant.utils import resolve_panel_hw_id
+from pyoperant.utils import resolve_panel_hw_id, load_panel_config
 
 try:
     from pyoperant.local import BEHAVIORS
@@ -160,8 +160,24 @@ def main():
 
     stimuli_path = parameters.pop('stim_path') if 'stim_path' in parameters else stimuli_path
 
+    # Per-box hardware calibration (e.g. Rev D's hopper servo up/down
+    # angles) belongs to this physical box, not to whichever subject is
+    # currently assigned to it -- lives in panel_config.json (written by
+    # scripts/tune_servo.py), not in this subject's config.json and not
+    # hand-edited into a local_pi_*.py file shared across the whole
+    # fleet. A subject's own config.json can still override it for a
+    # one-off case; left in `parameters` too (not popped) so it's also
+    # visible in the behavior's own self.parameters for logging/debugging.
+    panel_config = load_panel_config()
+    panel_kwargs = {}
+    for k in ('hopper_up_angle', 'hopper_down_angle'):
+        if k in parameters:
+            panel_kwargs[k] = parameters[k]
+        elif k in panel_config:
+            panel_kwargs[k] = panel_config[k]
+
     behavior = BehaviorProtocol(
-        panel=PANELS[resolved_panel_hw_id](),
+        panel=PANELS[resolved_panel_hw_id](**panel_kwargs),
         subject=cmd_line['subject'],
         panel_hw_id=resolved_panel_hw_id,
         experiment_path=experiment_path,
