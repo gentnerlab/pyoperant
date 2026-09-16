@@ -7,8 +7,12 @@ The hopper servo channel is defined by HOPPER_SERVO_CHANNEL (channel 0,
 HOPPER_CTL). The second PCA9685 runs at 50 Hz. The lights PCA9685 (U1) is
 at address 0x55 and runs at 1000 Hz as before.
 
-up_angle and down_angle must be tuned empirically for each physical panel
-and updated here. See Section 6.4 of the lab manual for the tuning procedure.
+up_angle and down_angle must be tuned empirically for each physical panel.
+Set hopper_up_angle/hopper_down_angle in that bird's config.json to override
+the defaults below (PiPanel.__init__) for a specific box -- do not hand-edit
+this file per box; it should stay identical across the whole fleet so it
+can be git-pulled cleanly everywhere. See Section 6.4 of the lab manual for
+the tuning procedure.
 
 Do not use this file on Rev C boards. The board revision is detected
 automatically by local.py reading /etc/magpi_revision.
@@ -74,7 +78,7 @@ PWM_OUTPUTS = [0,   # HOUSELIGHT_R
 
 class PiPanel(panels.BasePanel):
     """Panel class for Rev D Magpi clients (servo hopper)."""
-    def __init__(self, id=None, *args, **kwargs):
+    def __init__(self, id=None, *args, hopper_up_angle=45, hopper_down_angle=10, **kwargs):
         super(PiPanel, self).__init__(*args, **kwargs)
         self.id = id
         self.pwm_outputs = []
@@ -132,11 +136,13 @@ class PiPanel(panels.BasePanel):
         self.right  = components.PeckPort(IR=self.inputs[3], LED=self.pwm_outputs[6],
                                           name='r', inverted=False)
 
-        # Servo hopper — up_angle and down_angle must be tuned per panel
+        # Servo hopper — up_angle/down_angle default to the values below,
+        # overridden per box via hopper_up_angle/hopper_down_angle in that
+        # bird's config.json (see the module docstring).
         self.hopper = components.Hopper(IR=self.inputs[0],
                                         servo=self.hopper_servo,
-                                        up_angle=45,
-                                        down_angle=10,
+                                        up_angle=hopper_up_angle,
+                                        down_angle=hopper_down_angle,
                                         inverted=False)
 
         # House Light (RGBW LED strip via PWM channels 0-3)
@@ -164,8 +170,8 @@ class PiPanel(panels.BasePanel):
 
 class Pi1(PiPanel):
     """Panel 1 — Rev D."""
-    def __init__(self):
-        super(Pi1, self).__init__(id=1)
+    def __init__(self, **kwargs):
+        super(Pi1, self).__init__(id=1, **kwargs)
 
 
 PANELS = {

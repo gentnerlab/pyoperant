@@ -54,6 +54,14 @@ if "pyaudio" not in sys.modules:
     except ImportError:
         sys.modules["pyaudio"] = MagicMock()
 
+# local_pi_revd.py's raspi_gpio_ interface imports pigpio unconditionally
+# (real Rev D hardware) -- not installed on a dev machine either.
+if "pigpio" not in sys.modules:
+    try:
+        import pigpio  # noqa: F401
+    except ImportError:
+        sys.modules["pigpio"] = MagicMock()
+
 from fixtures import (  # noqa: E402
     FakePanel,
     prepare_experiment_dirs,
@@ -436,6 +444,72 @@ class TestCheckCmdlineParamsPanelSafety(unittest.TestCase):
             {"subject": "B1"}, {"subj": "B1"}
         )
         self.assertTrue(result)
+
+
+class TestPiPanelHopperCalibration(unittest.TestCase):
+    """Rev D's hopper servo up_angle/down_angle used to be hardcoded in
+    PiPanel.__init__, requiring a permanent, uncommitted per-box edit to
+    local_pi_revd.py for any panel whose hopper needed different values --
+    which then blocked that box from ever git-pulling pyoperant updates
+    again (a dirty file makes update_fleet_code.py skip the whole repo).
+    Now overridable via hopper_up_angle/hopper_down_angle -- see
+    TestLoadPanelConfig below for where those values actually come from
+    (this box's panel_config.json, not a subject's config.json, since
+    hardware calibration belongs to the box, not whichever bird is
+    currently assigned to it). This class only tests that PiPanel itself
+    accepts and uses the kwargs correctly, regardless of their source.
+    Patches out the real hardware interfaces entirely (not just pigpio/
+    pyaudio) so this test exercises only the kwarg plumbing, not real
+    PCA9685/PortAudio setup."""
+
+    def _make_panel(self, panel_cls, **kwargs):
+        import pyoperant.local_pi_revd as local_pi_revd
+        with patch.object(local_pi_revd.raspi_gpio_, "RaspberryPiInterface"), \
+             patch.object(local_pi_revd.pyaudio_, "PyAudioInterface"):
+            return panel_cls(**kwargs)
+
+    def test_defaults_match_the_previous_hardcoded_values(self):
+        from pyoperant.local_pi_revd import Pi1
+        panel = self._make_panel(Pi1)
+        self.assertEqual(panel.hopper.up_angle, 45)
+        self.assertEqual(panel.hopper.down_angle, 10)
+
+    def test_config_supplied_values_override_the_defaults(self):
+        from pyoperant.local_pi_revd import Pi1
+        panel = self._make_panel(Pi1, hopper_up_angle=47.0, hopper_down_angle=17.0)
+        self.assertEqual(panel.hopper.up_angle, 47.0)
+        self.assertEqual(panel.hopper.down_angle, 17.0)
+
+
+class TestLoadPanelConfig(unittest.TestCase):
+    """utils.load_panel_config() reads this box's own panel_config.json --
+    written by scripts/tune_servo.py, holding hardware calibration that
+    belongs to the physical box (e.g. hopper servo angles), not to
+    whichever subject is currently assigned to it. Must never raise: a
+    missing or corrupt calibration file should fall back to PiPanel's own
+    hardcoded defaults, not crash the whole experiment."""
+
+    def test_missing_file_returns_empty_dict(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = utils.load_panel_config(os.path.join(tmp_dir, "panel_config.json"))
+        self.assertEqual(result, {})
+
+    def test_reads_real_values(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = os.path.join(tmp_dir, "panel_config.json")
+            with open(path, "w") as f:
+                json.dump({"hopper_up_angle": 47.0, "hopper_down_angle": 17.0}, f)
+            result = utils.load_panel_config(path)
+        self.assertEqual(result["hopper_up_angle"], 47.0)
+        self.assertEqual(result["hopper_down_angle"], 17.0)
+
+    def test_corrupt_file_returns_empty_dict_not_raise(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = os.path.join(tmp_dir, "panel_config.json")
+            with open(path, "w") as f:
+                f.write("{not valid json")
+            result = utils.load_panel_config(path)
+        self.assertEqual(result, {})
 
 
 if __name__ == "__main__":

@@ -149,7 +149,19 @@ if __name__ == "__main__":
     resolved_panel_hw_id = utils.resolve_panel_hw_id(
         None, config_panel_hw_id, PANELS, logger=logging.getLogger('pyoperant'),
     )
-    panel = PANELS[resolved_panel_hw_id]()
+    # Per-box hardware calibration (e.g. Rev D's hopper servo up/down
+    # angles) belongs to this box, not this subject -- see
+    # local_pi_revd.py's PiPanel.__init__ and utils.load_panel_config().
+    # This subject's own config.json can still override it for a one-off
+    # case.
+    panel_config = utils.load_panel_config()
+    panel_kwargs = {}
+    for k in ('hopper_up_angle', 'hopper_down_angle'):
+        if k in parameters:
+            panel_kwargs[k] = parameters[k]
+        elif k in panel_config:
+            panel_kwargs[k] = panel_config[k]
+    panel = PANELS[resolved_panel_hw_id](**panel_kwargs)
 
     exp = ThreeACMatchingExp(panel=panel,**parameters)
     exp.run()

@@ -4,7 +4,18 @@ tune_servo.py -- Interactive servo angle tuning for Rev D Magpi hopper.
 
 Run this script directly on the Raspberry Pi to find the correct up_angle
 and down_angle values for a panel's hopper servo. Once you have good values
-the script can write them directly back to local_pi_revd.py.
+the script can write them into this box's own panel_config.json as
+hopper_up_angle/hopper_down_angle.
+
+Hopper calibration is a property of this physical box's hardware (servo
+mounting/mechanical tolerances), not of whichever bird happens to be
+assigned to it right now -- it does NOT go in a subject's config.json
+(that would get lost the next time a different bird is assigned here, and
+there'd be no single place to find a box's last-known-good calibration),
+and it does NOT go in local_pi_revd.py either (shared across the whole
+fleet, must stay identical on every board so it can always be git-pulled
+cleanly). See pyoperant.utils.load_panel_config() / PiPanel.__init__ in
+local_pi_revd.py for how it's read back.
 
 Usage:
     python tune_servo.py
@@ -15,68 +26,70 @@ Requirements:
     - Run from the pyoperant repo root, or ensure pyoperant is on PYTHONPATH
 """
 
+import json
 import os
-import re
 import sys
 import time
 
+try:
+    from pyoperant.utils import PANEL_CONFIG_PATH
+except ImportError:
+    PANEL_CONFIG_PATH = '/home/bird/panel_config.json'
+
+
 def _write_angles_to_config(up_angle, down_angle):
-    """Offer to write tuned angles back to local_pi_revd.py."""
-    # Locate local_pi_revd.py relative to this script
-    # scripts/tune_servo.py -> pyoperant/local_pi_revd.py
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, '..', 'pyoperant', 'local_pi_revd.py')
-    config_path = os.path.normpath(config_path)
+    """Offer to write tuned angles into this box's panel_config.json as
+    hopper_up_angle/hopper_down_angle."""
+    if os.path.isfile(PANEL_CONFIG_PATH):
+        with open(PANEL_CONFIG_PATH, 'r') as f:
+            raw = f.read()
+        try:
+            panel_config = json.loads(raw)
+        except ValueError as e:
+            print("\nCould not parse %s as JSON: %s" % (PANEL_CONFIG_PATH, e))
+            print("Add these manually:")
+            print('  "hopper_up_angle": %.1f,' % up_angle)
+            print('  "hopper_down_angle": %.1f,' % down_angle)
+            return
+    else:
+        raw = None
+        panel_config = {}
 
-    if not os.path.isfile(config_path):
-        print("\nCould not find local_pi_revd.py at %s" % config_path)
-        print("Update manually:")
-        print("  up_angle=%.1f, down_angle=%.1f" % (up_angle, down_angle))
+    old_up = panel_config.get('hopper_up_angle')
+    old_down = panel_config.get('hopper_down_angle')
+    if old_up == up_angle and old_down == down_angle:
+        print("\n%s already has these exact values -- nothing to change." % PANEL_CONFIG_PATH)
         return
 
-    with open(config_path, 'r') as f:
-        original = f.read()
-
-    # Replace up_angle=<number> and down_angle=<number> inside the Hopper() call.
-    # Using a targeted pattern so we only touch the Hopper constructor, not any
-    # other hypothetical uses of those keyword names elsewhere in the file.
-    updated = re.sub(r'(components\.Hopper\(.*?)\bup_angle\s*=\s*[\d.]+',
-                     lambda m: m.group(1) + ('up_angle=%.1f' % up_angle),
-                     original, flags=re.DOTALL)
-    updated = re.sub(r'(components\.Hopper\(.*?)\bdown_angle\s*=\s*[\d.]+',
-                     lambda m: m.group(1) + ('down_angle=%.1f' % down_angle),
-                     updated, flags=re.DOTALL)
-
-    if updated == original:
-        print("\nCould not locate up_angle/down_angle in %s" % config_path)
-        print("Check that components.Hopper() is present and update manually.")
-        return
-
-    # Show what will change
-    print("\nProposed changes to %s:" % os.path.relpath(config_path))
-    old_lines = original.splitlines()
-    new_lines = updated.splitlines()
-    diff_shown = False
-    for i, (old, new) in enumerate(zip(old_lines, new_lines)):
-        if old != new:
-            print("  line %d:  %s" % (i + 1, old.strip()))
-            print("         -> %s" % new.strip())
-            diff_shown = True
-    if not diff_shown:
-        print("  (no textual difference detected)")
-        return
+    print("\nProposed change to %s:" % PANEL_CONFIG_PATH)
+    if raw is None:
+        print("  (file does not exist yet -- will be created)")
+    print("  hopper_up_angle:   %r -> %.1f" % (old_up, up_angle))
+    print("  hopper_down_angle: %r -> %.1f" % (old_down, down_angle))
 
     try:
-        resp = input("\nWrite these values to local_pi_revd.py? [y/N]: ").strip().lower()
+        resp = input("\nWrite these values to %s? [y/N]: " % PANEL_CONFIG_PATH).strip().lower()
     except (KeyboardInterrupt, EOFError):
         resp = 'n'
 
-    if resp == 'y':
-        with open(config_path, 'w') as f:
-            f.write(updated)
-        print("  -> %s updated." % os.path.relpath(config_path))
-    else:
+    if resp != 'y':
         print("  -> Not written. Update manually if needed.")
+        return
+
+    panel_config['hopper_up_angle'] = up_angle
+    panel_config['hopper_down_angle'] = down_angle
+
+    backup_msg = ""
+    if raw is not None:
+        backup_path = PANEL_CONFIG_PATH + '.bak_before_hopper_tuning'
+        with open(backup_path, 'w') as f:
+            f.write(raw)
+        backup_msg = " (backup at %s)" % backup_path
+
+    with open(PANEL_CONFIG_PATH, 'w') as f:
+        json.dump(panel_config, f, indent=2)
+        f.write('\n')
+    print("  -> %s updated%s." % (PANEL_CONFIG_PATH, backup_msg))
 
 
 def main():
