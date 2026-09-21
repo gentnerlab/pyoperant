@@ -524,6 +524,7 @@ class Lights(base.BaseExp):
             'device_watchdog_timeout':          mon.get('device_watchdog_timeout', 5.0),
             'device_reconnect_backoff_initial': mon.get('device_reconnect_backoff_initial', 1.0),
             'device_reconnect_backoff_max':      mon.get('device_reconnect_backoff_max', 30.0),
+            'startup_retry_giveup_after':        mon.get('startup_retry_giveup_after', 300.0),
             'output_dir':        self._output_dir(),
             'log_csv':           self._log_csv_path(),
         }

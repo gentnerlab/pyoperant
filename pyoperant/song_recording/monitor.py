@@ -182,6 +182,38 @@ for the full reasoning -- same fix, same day, same motivation: an ERROR
 alert with no matching "it's fixed now" leaves the reader unsure whether
 a later quiet retry actually worked). Gated on `attempt > 0`, so success
 on the very first try (nothing was ever reported broken) stays silent.
+
+**Give-up-and-exit, added 2026-09-21** (see project_vocal_recorder memory's
+"Open question, deliberately deferred" section for the full investigation
+this responds to): the retry loop above helps for causes external to this
+process's own history -- another process briefly holding the device, a
+transient boot-time race -- but real `fuser` evidence from 2026-09-10 shows
+a failed `pa.open()` on this USB Audio Class 1.0/ALSA driver combination can
+leave a kernel-level handle behind, held by THIS SAME process, even though
+the Python call raised. Nothing in `_open_stream_with_retry()`'s own retry
+loop can release a handle its own process leaked -- only the process dying
+and the kernel reclaiming its file descriptors has been confirmed to clear
+that (a manual restart, 2026-09-10). So retrying forever in-process risks
+spinning at the backoff cap indefinitely against exactly the failure mode
+that motivated this whole feature.
+
+`_open_stream_with_retry()` now tracks cumulative backoff time waited and
+gives up once `startup_retry_giveup_after` seconds have passed without a
+successful open (default 300s -- roughly one fleet-supervisor cron cycle,
+confirmed running every ~5 min and confirmed to succeed against a genuinely
+fresh process; giving up any sooner wouldn't get relaunched any faster, and
+giving up much later just prolongs a recording gap the supervisor could
+have already fixed). On give-up, `run()` calls `self._exit_fn` (default
+`os._exit`, injected so this is testable without actually killing the test
+process) to end the WHOLE PROCESS, not just this daemon thread -- a bare
+return/exception here would only unwind the monitor thread, leaving `Lights`
+running with recording silently dead, the same class of gap the
+SIGTERM/`emergency_shutdown` fix addressed for a different trigger.
+Deliberately does NOT call `emergency_shutdown()` first -- that path exists
+for graceful hardware teardown on an intentional stop (SIGTERM/SIGINT), a
+different situation from this one, where the whole point is a fast, certain
+process exit the supervisor can react to; `os._exit()`'s abrupt skip of
+Python-level cleanup is the correct behavior here, not a shortcut around it.
 """
 
 from __future__ import annotations
@@ -191,6 +223,7 @@ import collections
 import csv
 import datetime
 import logging
+import os
 import queue
 import threading
 import time
@@ -232,6 +265,12 @@ DEFAULT_CONFIG = {
     "device_watchdog_timeout":         5.0,   # seconds of silence before declaring the device lost
     "device_reconnect_backoff_initial": 1.0,  # seconds before the first reconnect retry
     "device_reconnect_backoff_max":     30.0, # cap on retry backoff growth
+    # Give-up-and-exit -- see module docstring's "Startup retry" section.
+    # Cumulative backoff time _open_stream_with_retry() will wait before
+    # giving up and exiting the whole process, so the fleet supervisor
+    # relaunches with a genuinely fresh one (clears a device handle this
+    # process may have leaked -- an in-process retry can't).
+    "startup_retry_giveup_after": 300.0,
     "output_dir":        "recordings",
     "log_csv":           "detections.csv",
 }
@@ -281,6 +320,10 @@ class SongMonitor:
     smoother    : CombinedSmoother instance, or None to build from cfg.
     stop_event  : threading.Event — set to stop cleanly.
                  If None, runs until KeyboardInterrupt.
+    exit_fn     : callable(int) — called to end the whole process on
+                 give-up-and-exit (see module docstring). Defaults to
+                 `os._exit`; injectable so this is testable without
+                 actually killing the test process.
     """
 
     def __init__(
@@ -291,10 +334,12 @@ class SongMonitor:
         extractor=None,
         smoother=None,
         stop_event: Optional[threading.Event] = None,
+        exit_fn=os._exit,
     ):
         self.cfg         = {**DEFAULT_CONFIG, **cfg}
         self.audio_input = audio_input
         self.stop_event  = stop_event
+        self._exit_fn    = exit_fn
         self._gate       = gate
         self._extractor  = extractor
         self._smoother   = smoother
@@ -413,13 +458,19 @@ class SongMonitor:
             self.cfg["chunk_duration"] * 1000 * self._capture_multiplier,
         )
 
-        if not self._open_stream_with_retry(_audio_callback):
+        outcome = self._open_stream_with_retry(_audio_callback)
+        if outcome == "stopped":
             log.warning(
                 "Monitor stopping before a working audio stream was ever "
                 "opened -- session ended while still retrying."
             )
             self._det_log.close()
             return
+        if outcome == "giveup":
+            self._det_log.close()
+            self._exit_fn(1)
+            return  # unreachable with the real os._exit; keeps this
+                     # testable when exit_fn is faked
 
         self._last_chunk_at = time.monotonic()
         try:
@@ -437,7 +488,7 @@ class SongMonitor:
             self._det_log.close()
             log.info("Monitor stopped. Recordings in %s", self._out_dir)
 
-    def _open_stream_with_retry(self, callback, sleep_fn=time.sleep) -> bool:
+    def _open_stream_with_retry(self, callback, sleep_fn=time.sleep) -> str:
         """Open the capture stream, retrying with the same capped
         exponential backoff already proven for a mid-session device loss
         (see module docstring's "Device-loss detection and recovery"
@@ -454,15 +505,25 @@ class SongMonitor:
         which would spam an inbox every backoff interval for a condition
         already reported). Later retries log at INFO.
 
-        Returns True once open_stream() succeeds. Returns False only if
-        stop_event is set while still retrying -- i.e. the session ended
-        (light-off, or the process was asked to stop) before the device
-        ever became available; run() treats that as a clean, quiet exit,
-        not a crash. `sleep_fn` is injectable so the self-test can drive
-        this deterministically without real waits.
+        Returns one of three string outcomes (run() needs to tell these
+        apart -- see the module docstring's "Give-up-and-exit" section):
+          "opened"  -- open_stream() succeeded.
+          "stopped" -- stop_event was set while still retrying, i.e. the
+                       session ended legitimately (light-off, or the
+                       process was asked to stop) before the device ever
+                       became available. run() treats this as a clean,
+                       quiet exit, not a crash.
+          "giveup"  -- retried for startup_retry_giveup_after cumulative
+                       seconds without success, stop_event was never set.
+                       run() hard-exits the whole process so the fleet
+                       supervisor relaunches with a genuinely fresh one.
+        `sleep_fn` is injectable so the self-test can drive this
+        deterministically without real waits.
         """
-        backoff = self.cfg["device_reconnect_backoff_initial"]
-        attempt = 0
+        backoff      = self.cfg["device_reconnect_backoff_initial"]
+        giveup_after = self.cfg["startup_retry_giveup_after"]
+        attempt      = 0
+        elapsed      = 0.0
         while not self._should_stop():
             try:
                 self.audio_input.open_stream(chunk_size=self._capture_len, callback=callback)
@@ -479,7 +540,7 @@ class SongMonitor:
                         "recording has resumed automatically. No action "
                         "needed.", attempt, "y" if attempt == 1 else "ies",
                     )
-                return True
+                return "opened"
             except Exception as exc:
                 if attempt == 0:
                     log.error(
@@ -500,13 +561,28 @@ class SongMonitor:
                     )
                 attempt += 1
 
+            if elapsed >= giveup_after:
+                log.error(
+                    "Giving up on in-process retry after %d attempts over "
+                    "%.0fs -- exiting the whole process so the fleet "
+                    "supervisor relaunches with a fresh one. A plain "
+                    "in-process retry cannot release a device handle this "
+                    "process may have leaked on an earlier attempt; a "
+                    "fresh process is the only thing confirmed to clear "
+                    "that. No action needed if the supervisor's next cycle "
+                    "picks it back up automatically -- check for a "
+                    "RESOLVED follow-up.", attempt, elapsed,
+                )
+                return "giveup"
+
             waited = 0.0
             while waited < backoff and not self._should_stop():
                 step = min(0.5, backoff - waited)
                 sleep_fn(step)
-                waited += step
+                waited  += step
+                elapsed += step
             backoff = min(backoff * 2, self.cfg["device_reconnect_backoff_max"])
-        return False
+        return "stopped"
 
     def _should_stop(self) -> bool:
         return self.stop_event is not None and self.stop_event.is_set()
@@ -1029,11 +1105,13 @@ def _self_test_capture_buffering():
 
 def _self_test_startup_retry():
     """Synthetic scenarios for _open_stream_with_retry() (see module
-    docstring's "Startup retry" section) -- confirms a failed FIRST
-    open_stream() attempt is retried with backoff instead of giving up for
-    the whole session, logs ERROR exactly once (not once per retry), and
-    that stop_event ends the retry loop promptly. No real hardware, no
-    real sleeps (sleep_fn is injected)."""
+    docstring's "Startup retry" and "Give-up-and-exit" sections) --
+    confirms a failed FIRST open_stream() attempt is retried with backoff
+    instead of giving up for the whole session, logs ERROR exactly once
+    (not once per retry), that stop_event ends the retry loop promptly,
+    and that exhausting the give-up budget hard-exits the whole process
+    (via an injected fake exit_fn, never a real one) rather than retrying
+    forever. No real hardware, no real sleeps (sleep_fn is injected)."""
     import tempfile
     from pathlib import Path as _Path
 
@@ -1045,15 +1123,17 @@ def _self_test_startup_retry():
         "device_reconnect_backoff_max": 8.0,
     }
 
-    def make_monitor(fail_open_times=0):
+    def make_monitor(fail_open_times=0, exit_fn=None, **cfg_overrides):
         tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_startup_selftest_"))
-        real_cfg = {**cfg, "output_dir": str(tmp_dir), "log_csv": str(tmp_dir / "detections.csv")}
+        real_cfg = {**cfg, **cfg_overrides,
+                    "output_dir": str(tmp_dir), "log_csv": str(tmp_dir / "detections.csv")}
         fake_audio = _FakeAudioInputWatchdog(fail_open_times=fail_open_times)
+        kwargs = {} if exit_fn is None else {"exit_fn": exit_fn}
         m = SongMonitor(real_cfg, audio_input=fake_audio,
                          gate=_FakeGate([]), extractor=object(),
                          smoother=__import__(
                              "pyoperant.song_recording.smoother", fromlist=["CombinedSmoother"]
-                         ).CombinedSmoother.from_config_dict({}))
+                         ).CombinedSmoother.from_config_dict({}), **kwargs)
         return m, fake_audio
 
     handler = _ListLogHandler()
@@ -1064,10 +1144,10 @@ def _self_test_startup_retry():
         # no false "RESOLVED" (nothing was ever reported broken) ---
         m, fake = make_monitor(fail_open_times=0)
         handler.records.clear()
-        ok = m._open_stream_with_retry(callback=None, sleep_fn=lambda s: None)
+        outcome = m._open_stream_with_retry(callback=None, sleep_fn=lambda s: None)
         n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
         n_warnings = sum(1 for r in handler.records if r.levelno == logging.WARNING)
-        a_ok = (ok is True and fake.open_calls == 1 and n_errors == 0 and n_warnings == 0)
+        a_ok = (outcome == "opened" and fake.open_calls == 1 and n_errors == 0 and n_warnings == 0)
         print(f"  [{'OK' if a_ok else 'FAIL'}] A: first attempt succeeds -> no retry, "
               f"no ERROR, no false RESOLVED "
               f"(open_calls={fake.open_calls} errors={n_errors} warnings={n_warnings})")
@@ -1078,12 +1158,12 @@ def _self_test_startup_retry():
         m, fake = make_monitor(fail_open_times=2)
         handler.records.clear()
         sleeps = []
-        ok = m._open_stream_with_retry(callback=None, sleep_fn=sleeps.append)
+        outcome = m._open_stream_with_retry(callback=None, sleep_fn=sleeps.append)
         n_errors = sum(1 for r in handler.records if r.levelno == logging.ERROR)
         warning_msgs = [r.getMessage() for r in handler.records if r.levelno == logging.WARNING]
         n_retry_warnings = sum(1 for m_ in warning_msgs if "RESOLVED" not in m_)
         n_resolved = sum(1 for m_ in warning_msgs if "RESOLVED" in m_)
-        b_ok = (ok is True and fake.open_calls == 3 and n_errors == 1
+        b_ok = (outcome == "opened" and fake.open_calls == 3 and n_errors == 1
                 and n_retry_warnings == 1 and n_resolved == 1
                 and sum(sleeps) >= cfg["device_reconnect_backoff_initial"])
         print(f"  [{'OK' if b_ok else 'FAIL'}] B: fails twice then succeeds -> exactly one "
@@ -1093,7 +1173,7 @@ def _self_test_startup_retry():
               f"retry_warnings={n_retry_warnings} resolved={n_resolved})")
 
         # --- Scenario C: stop_event set while still retrying -> returns
-        # False promptly, doesn't retry forever ---
+        # "stopped" promptly, doesn't retry forever ---
         m, fake = make_monitor(fail_open_times=100)  # would never succeed
         m.stop_event = threading.Event()
         sleeps = []
@@ -1103,11 +1183,39 @@ def _self_test_startup_retry():
             if len(sleeps) >= 2:
                 m.stop_event.set()
 
-        ok = m._open_stream_with_retry(callback=None, sleep_fn=sleep_then_stop)
-        c_ok = (ok is False and fake.open_calls < 100)
+        outcome = m._open_stream_with_retry(callback=None, sleep_fn=sleep_then_stop)
+        c_ok = (outcome == "stopped" and fake.open_calls < 100)
         print(f"  [{'OK' if c_ok else 'FAIL'}] C: stop_event during retries -> returns "
-              f"False promptly, not exhausting all retries "
+              f"'stopped' promptly, not exhausting all retries "
               f"(open_calls={fake.open_calls})")
+
+        # --- Scenario D: give-up budget exhausted, stop_event never set --
+        # returns "giveup" instead of retrying forever, and run() (not
+        # exercised directly here, see below) would call exit_fn(1) on
+        # this outcome. A small startup_retry_giveup_after keeps this fast
+        # without needing hundreds of simulated backoff steps. ---
+        exit_calls = []
+        m, fake = make_monitor(fail_open_times=100,  # would never succeed
+                                startup_retry_giveup_after=5.0,
+                                exit_fn=lambda code: exit_calls.append(code))
+        sleeps = []
+        outcome = m._open_stream_with_retry(callback=None, sleep_fn=sleeps.append)
+        d_ok = (outcome == "giveup" and fake.open_calls < 100 and sum(sleeps) >= 5.0)
+        print(f"  [{'OK' if d_ok else 'FAIL'}] D: give-up budget exhausted (stop_event "
+              f"never set) -> returns 'giveup' instead of retrying forever "
+              f"(open_calls={fake.open_calls} cumulative_wait={sum(sleeps):.1f}s)")
+
+        # run() itself calls self._exit_fn(1) on a "giveup" outcome --
+        # checked directly here (not via a real run() loop, which would
+        # need a real queue/callback) since that wiring is the whole point
+        # of this feature, not just _open_stream_with_retry()'s own return
+        # value.
+        if outcome == "giveup":
+            m._det_log.close()
+            m._exit_fn(1)
+        d2_ok = (exit_calls == [1])
+        print(f"  [{'OK' if d2_ok else 'FAIL'}] D2: 'giveup' outcome calls exit_fn(1) "
+              f"exactly once (exit_calls={exit_calls})")
     finally:
         log.removeHandler(handler)
 
