@@ -33,6 +33,8 @@ class _EmailOccurrenceFilter(logging.Filter):
         there will be a "next occurrence"
       - shape.py's block-progress messages, since the experimenter
         wants those in real time to track a bird's shaping progress
+      - ERROR-level and RESOLVED-tagged records from
+        ALWAYS_IMMEDIATE_ERROR_OR_RESOLVED_FUNCS (see below)
 
     Everything else (routine warnings/errors -- e.g. hopper hiccups)
     only starts emailing once it's recurred EMAIL_OCCURRENCE_THRESHOLD
@@ -49,6 +51,37 @@ class _EmailOccurrenceFilter(logging.Filter):
     """
     ALWAYS_IMMEDIATE_FUNCS = frozenset([("base", "_log_except_hook")])
 
+    # Real gap found and fixed 2026-09-21 (see project_vocal_recorder
+    # memory): a one-shot ERROR/RESOLVED pair from the SAME (module,
+    # funcName, levelno) key -- e.g. song_recording.monitor's device-loss
+    # ERROR followed by its RESOLVED WARNING follow-up -- can never reach
+    # EMAIL_OCCURRENCE_THRESHOLD within one process's lifetime (confirmed
+    # empirically: only 2 occurrences of that key ever fire per episode,
+    # and a fresh process after a supervisor restart resets the counter
+    # to zero anyway). Despite code comments elsewhere describing these
+    # as "the signal meant to reach someone via email," this was never
+    # actually verified against this filter and was silently never
+    # emailing anyone.
+    #
+    # Fixed with a NARROWER exemption than ALWAYS_IMMEDIATE_FUNCS above
+    # (module+funcName only, every level) -- these functions ALSO have a
+    # legitimately-repeating WARNING ("still retrying") with no bound on
+    # some paths (song_recording.monitor's mid-session device watchdog
+    # has no give-up-and-exit today, unlike its startup-retry sibling),
+    # so blanket-exempting the whole function risks the opposite problem:
+    # emailing once per backoff cycle for the entire duration of a real,
+    # extended outage. Only ERROR-level records and RESOLVED-tagged
+    # follow-ups bypass the threshold here; the routine "still retrying"
+    # WARNING stays subject to it -- if there are enough of those to
+    # actually hit the threshold, that's itself a legitimate reason to
+    # escalate, exactly the original design's intent, just correctly
+    # gated now.
+    ALWAYS_IMMEDIATE_ERROR_OR_RESOLVED_FUNCS = frozenset([
+        ("monitor", "_open_stream_with_retry"),
+        ("monitor", "_check_device_health"),
+        ("monitor", "_on_chunk_received"),
+    ])
+
     def __init__(self, threshold=EMAIL_OCCURRENCE_THRESHOLD):
         super(_EmailOccurrenceFilter, self).__init__()
         self.threshold = threshold
@@ -61,6 +94,9 @@ class _EmailOccurrenceFilter(logging.Filter):
             return True
         if (record.module, record.funcName) in self.ALWAYS_IMMEDIATE_FUNCS:
             return True
+        if (record.module, record.funcName) in self.ALWAYS_IMMEDIATE_ERROR_OR_RESOLVED_FUNCS:
+            if record.levelno >= logging.ERROR or "RESOLVED" in record.getMessage():
+                return True
 
         key = (record.module, record.funcName, record.levelno)
         count = self._counts.get(key, 0) + 1

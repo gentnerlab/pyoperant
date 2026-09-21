@@ -22,6 +22,7 @@ confirmed superseded by PlacePrefExp24hr, not something to migrate.
 """
 
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -510,6 +511,77 @@ class TestLoadPanelConfig(unittest.TestCase):
                 f.write("{not valid json")
             result = utils.load_panel_config(path)
         self.assertEqual(result, {})
+
+
+class TestEmailOccurrenceFilter(unittest.TestCase):
+    """_EmailOccurrenceFilter (base.py) -- real gap found and fixed
+    2026-09-21: a one-shot ERROR/RESOLVED pair from the same (module,
+    funcName, levelno) key (e.g. song_recording.monitor's device-loss
+    ERROR + its RESOLVED WARNING follow-up) can never reach
+    EMAIL_OCCURRENCE_THRESHOLD within one process's lifetime, so it was
+    silently never emailing anyone despite code comments claiming it
+    would. No test coverage existed for this filter at all before now."""
+
+    def _make_record(self, module, func_name, levelno, msg):
+        record = logging.LogRecord(module, levelno, "x.py", 1, msg, None, None)
+        record.module = module
+        record.funcName = func_name
+        return record
+
+    def test_one_shot_error_from_exempt_func_reaches_email_immediately(self):
+        from pyoperant.behavior.base import _EmailOccurrenceFilter
+        f = _EmailOccurrenceFilter()
+        rec = self._make_record("monitor", "_open_stream_with_retry", logging.ERROR,
+                                 "Could not open audio device at startup")
+        self.assertTrue(f.filter(rec))
+
+    def test_giveup_error_from_same_func_also_reaches_email_immediately(self):
+        # Regression check for the exact scenario that motivated this fix:
+        # first-failure ERROR then a SECOND ERROR (give-up) from the same
+        # (module, funcName) -- both must pass, not just the first, since
+        # under the old plain occurrence-count filter neither ever would
+        # have (2 occurrences never reaches threshold=3).
+        from pyoperant.behavior.base import _EmailOccurrenceFilter
+        f = _EmailOccurrenceFilter()
+        rec1 = self._make_record("monitor", "_open_stream_with_retry", logging.ERROR,
+                                  "Could not open audio device at startup")
+        rec2 = self._make_record("monitor", "_open_stream_with_retry", logging.ERROR,
+                                  "Giving up on in-process retry")
+        self.assertTrue(f.filter(rec1))
+        self.assertTrue(f.filter(rec2))
+
+    def test_resolved_warning_from_exempt_func_reaches_email_immediately(self):
+        from pyoperant.behavior.base import _EmailOccurrenceFilter
+        f = _EmailOccurrenceFilter()
+        rec = self._make_record("monitor", "_on_chunk_received", logging.WARNING,
+                                 "RESOLVED: audio device recovered -- resuming normal monitoring.")
+        self.assertTrue(f.filter(rec))
+
+    def test_routine_retry_warning_from_exempt_func_still_throttled(self):
+        # The narrower fix deliberately does NOT exempt every record from
+        # these functions -- only ERROR and RESOLVED-tagged ones. A
+        # legitimately-repeating "still retrying" WARNING (no RESOLVED tag)
+        # must stay subject to the normal occurrence threshold, or a long
+        # mid-session outage with no give-up-and-exit could email once per
+        # backoff cycle indefinitely.
+        from pyoperant.behavior.base import _EmailOccurrenceFilter
+        f = _EmailOccurrenceFilter()
+        rec = self._make_record("monitor", "_check_device_health", logging.WARNING,
+                                 "Reconnect attempt failed; retrying in 30.0s.")
+        self.assertFalse(f.filter(rec))   # occurrence 1
+        self.assertFalse(f.filter(rec))   # occurrence 2
+        self.assertTrue(f.filter(rec))    # occurrence 3 -- threshold reached normally
+
+    def test_non_exempt_func_unaffected_by_this_change(self):
+        # A completely unrelated call site (not in the new exemption set)
+        # keeps the original plain occurrence-threshold behavior.
+        from pyoperant.behavior.base import _EmailOccurrenceFilter
+        f = _EmailOccurrenceFilter()
+        rec = self._make_record("some_other_module", "some_func", logging.ERROR,
+                                 "unrelated one-off error")
+        self.assertFalse(f.filter(rec))
+        self.assertFalse(f.filter(rec))
+        self.assertTrue(f.filter(rec))
 
 
 if __name__ == "__main__":
