@@ -54,17 +54,72 @@ class GateConfig:
     # pyoperant.song_recording.variability) scored mean AUC 0.82 against
     # the lab's real 54-bird curated corpus, matching or beating every
     # legacy feature here including the best of them (harmonic_ratio,
-    # 0.756). The other four weights are shaved down PROPORTIONALLY
+    # 0.756 mean AUC across that same 54-bird corpus). That corpus result
+    # is real but describes bout-level average behavior across many
+    # birds/chambers -- it does NOT hold at the instantaneous, per-100ms-
+    # chunk level on this lab's actual UMIK-1/chamber hardware. Confirmed
+    # live 2026-09-21 (project_vocal_recorder memory): replaying real
+    # confirmed-song clips from a live deployment (B1504) through this
+    # exact gate showed harmonic_ratio pinned near 0 (0.01-0.05, never
+    # above 0.15) even on the loudest, clearest singing chunks -- it was
+    # contributing essentially nothing to the composite score, and on 3
+    # of 4 real song clips this was enough to drag borderline chunks below
+    # threshold and cause the clip to release (cut off) while the bird was
+    # still audibly singing. weight_harmonic cut 0.20 -> 0.05 in response
+    # (kept nonzero rather than zeroed, since a cleaner/less-reverberant
+    # chamber could still get real signal from it).
+    #
+    # Where the freed 0.15 goes was NOT the first guess -- two earlier
+    # attempts were caught by testing, not assumed safe:
+    #  1. Proportional redistribution across all four remaining weights
+    #     looked fine against real song/noise clips, but the gate's own
+    #     synthetic self-test (`python -m pyoperant.song_recording.gate`)
+    #     caught a real regression: steady-state pure white noise, whose
+    #     onset_sharpness apparently scores as deceptively "sharp"
+    #     (sub_onset ~0.98 -- onset_sharpness itself near 0, and
+    #     sub_onset = 1 - onset_sharpness), started passing the gate
+    #     (score 0.385 -> 0.456) purely because weight_onset went up.
+    #  2. Routing the freed weight into ONLY weight_flatness/weight_band
+    #     (7:3, matching their prior 0.28:0.12 ratio) fixed that -- but a
+    #     second, subtler edge case then showed up: the self-test's own
+    #     case sequence (silence -> tone -> harmonic -> sweep -> quiet
+    #     noise -> louder noise -> white noise, one shared gate instance)
+    #     lets the variability tracker's rolling window pick up artificial
+    #     "variability" purely from jumping between unrelated signal types
+    #     in immediate succession -- var drifts from a neutral 0.50 up to
+    #     0.67 by the time white noise is reached, vs. 0.50 for the SAME
+    #     white noise fed steady-state to a fresh gate. That inflated var,
+    #     combined with the weight_band boost, pushed white noise's score
+    #     from 0.424 (OLD, correctly fails) to 0.457 (a bare pass) -- a
+    #     real, if narrow, erosion of safety margin against exactly the
+    #     kind of transition a real deployment does see (e.g. right after
+    #     a bird stops singing and the room goes quiet).
+    #  Final choice: route the freed 0.15 into weight_flatness ONLY,
+    #  leaving weight_band untouched at its prior 0.12. flatness is
+    #  unambiguously low on both quiet AND loud white noise (0.15 either
+    #  way) and unambiguously high on every real tonal/harmonic synthetic
+    #  case, whereas band_energy_ratio is inherently more ambiguous for
+    #  broadband signals in general -- boosting the unambiguous feature
+    #  instead of the ambiguous one. Re-tested end to end: identical fix on
+    #  all 4 real song clips (release eliminated entirely on 3/4, barely
+    #  moved on the 4th), the real confirmed-noise clip's behavior
+    #  unchanged, isolated steady-state white noise correctly rejected
+    #  (score 0.414), and even the self-test's own artificial worst-case
+    #  sequential-warm-up white noise still correctly rejected (score
+    #  0.445, under the 0.45 threshold -- a thinner margin than OLD's
+    #  0.424, but still on the right side of it). weight_onset and
+    #  weight_variability are untouched.
+    #
+    # The other four weights below are shaved down PROPORTIONALLY
     # (multiplied by 0.8, preserving their relative weighting exactly as
-    # before) to make room -- a deliberately mechanical, conservative
-    # redistribution. A fuller re-tuning of the legacy four using the same
-    # real evidence is a separate, not-yet-made decision (see
-    # project_vocal_recorder memory) -- don't read these specific values
-    # as a considered opinion on flatness/onset/harmonic/band individually,
-    # only on making room for the new, validated term.
-    weight_flatness:     float = 0.28
+    # before) to make room for weight_variability -- a deliberately
+    # mechanical, conservative redistribution, not an independent
+    # re-tuning of flatness/onset/band individually (that's still a
+    # separate, not-yet-made decision -- see project_vocal_recorder
+    # memory).
+    weight_flatness:     float = 0.43
     weight_onset:        float = 0.20
-    weight_harmonic:     float = 0.20
+    weight_harmonic:     float = 0.05
     weight_band:         float = 0.12
     weight_variability:  float = 0.20
 
