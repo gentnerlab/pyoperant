@@ -413,6 +413,42 @@ class Lights(base.BaseExp):
     # Config-derived paths
     # ------------------------------------------------------------------
 
+    def _pipeline_sample_rate(self):
+        """Single source of truth for the detection pipeline's sample
+        rate: derive it from the panel's actual microphone (the rate
+        PyAudio was really asked to open the capture stream at,
+        `hwio.AudioInput.sample_rate` -- see local_pi_revd.py) rather
+        than a second, independently-configured value.
+
+        Before this, `_build_pipeline()`/`_monitor_run()` each read
+        `song_recording.monitor.sample_rate` from config.json (or a
+        hardcoded 48000 default) with no code-level link to what the mic
+        was actually opened at -- two declarations of "48000" that
+        happened to agree everywhere checked (2026-09-21), but nothing
+        would have caught it if they ever silently drifted apart, which
+        would corrupt every saved WAV's declared rate and the gate's own
+        frequency-bin math -- the same failure category as the earlier,
+        already-fixed Rev D *playback* sample-rate bug, on the capture
+        side instead. See project_vocal_recorder memory's "Sample-rate
+        consistency" note for the full investigation.
+
+        Deliberately uses a quiet `getattr` here, not `self._microphone()`
+        (which logs an ERROR when no mic is configured) -- a sample-rate
+        lookup is a passive read, not an attempted recording action, and
+        callers that DO need to know whether a mic exists already check
+        that themselves via `self._microphone()`. Falls back to
+        config.json's `monitor.sample_rate` (or 48000) only when no real
+        microphone is available -- e.g. building the pipeline in a test
+        with a FakePanel, or a panel with no mic configured at all -- so
+        that key stays a valid manual override for exactly that case, not
+        a silently-competing second value once a real mic exists.
+        """
+        mic = getattr(self.panel, 'microphone', None)
+        if mic is not None:
+            return mic.sample_rate
+        sr = _sr_cfg(self.parameters)
+        return sr.get('monitor', {}).get('sample_rate', 48000)
+
     def _output_dir(self):
         sr = _sr_cfg(self.parameters)
         return sr.get('monitor', {}).get(
@@ -443,7 +479,7 @@ class Lights(base.BaseExp):
         mon = sr.get('monitor', {})
 
         flat_cfg = {
-            'sample_rate':    mon.get('sample_rate', 48000),
+            'sample_rate':    self._pipeline_sample_rate(),
             'freq_low':       mon.get('freq_low',  1000),
             'freq_high':      mon.get('freq_high', 10000),
             'chunk_duration': mon.get('chunk_duration', 0.1),
@@ -510,7 +546,7 @@ class Lights(base.BaseExp):
         sr  = _sr_cfg(self.parameters)
         mon = sr.get('monitor', {})
         flat_cfg = {
-            'sample_rate':       mon.get('sample_rate', 48000),
+            'sample_rate':       self._pipeline_sample_rate(),
             'chunk_duration':    mon.get('chunk_duration', 0.1),
             'capture_chunk_multiplier': mon.get('capture_chunk_multiplier', 1),
             'freq_low':          mon.get('freq_low',  1000),

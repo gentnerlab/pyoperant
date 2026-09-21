@@ -27,6 +27,7 @@ import os
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -331,6 +332,42 @@ class TestLights(unittest.TestCase):
                 self.fail("session_post() should be a no-op when the "
                           "monitor thread never started: {}: {}".format(
                               type(e).__name__, e))
+
+    def test_pipeline_sample_rate_derives_from_real_microphone(self):
+        """The actual fix (see project_vocal_recorder memory's
+        "Sample-rate consistency" note): the detection pipeline's sample
+        rate must come from the panel's real microphone
+        (hwio.AudioInput.sample_rate), not a second, independently
+        configured value that could silently drift from it. config.json
+        deliberately carries NO explicit override here, so a value other
+        than the mic's would only be reachable via the old hardcoded-48000
+        default -- proving the mic, not the default, is what's used."""
+        config = _load_config("Lights")
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            panel.microphone = SimpleNamespace(sample_rate=44100)  # != 48000 default
+            exp = Lights(panel=panel, **config)
+            self.assertEqual(exp._pipeline_sample_rate(), 44100)
+            exp._build_pipeline()
+            self.assertEqual(exp._extractor.sample_rate, 44100)
+
+    def test_pipeline_sample_rate_falls_back_to_config_without_microphone(self):
+        """No real microphone (e.g. FakePanel, or a Rev C board) -- the
+        config.json override, or the 48000 default, must still work as a
+        valid manual fallback, not silently break or crash."""
+        config = _load_config("Lights")
+        config["song_recording"] = {
+            "enabled": True,
+            "monitor": {"sample_rate": 44100},
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            self.assertFalse(hasattr(panel, "microphone"))
+            exp = Lights(panel=panel, **config)
+            self.assertEqual(exp._pipeline_sample_rate(), 44100)
 
     def test_emergency_shutdown_noop_without_monitor(self):
         """emergency_shutdown() (called from scripts/behave's SIGTERM/
