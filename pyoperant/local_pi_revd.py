@@ -78,10 +78,20 @@ PWM_OUTPUTS = [0,   # HOUSELIGHT_R
 
 class PiPanel(panels.BasePanel):
     """Panel class for Rev D Magpi clients (servo hopper)."""
-    def __init__(self, id=None, *args, hopper_up_angle=45, hopper_down_angle=10, **kwargs):
+    def __init__(self, id=None, *args, hopper_up_angle=45, hopper_down_angle=10,
+                 mic_serial=None, **kwargs):
         super(PiPanel, self).__init__(*args, **kwargs)
         self.id = id
         self.pwm_outputs = []
+        # This box's installed UMIK-1 serial number -- hardware identity
+        # that belongs to the physical box, not whichever bird is
+        # currently assigned to it, same reasoning as hopper_up_angle/
+        # hopper_down_angle below (set via panel_config.json, not this
+        # file -- see utils.load_panel_config()). Just stored here for
+        # pyoperant.behavior.lights to cross-check against the actual
+        # synced calibration file's own header (catches a stale/wrong
+        # sync) -- see pyoperant.song_recording.calibration.
+        self.mic_serial = mic_serial
 
         # define interfaces
         # RaspberryPiInterface initialises both PCA9685 chips on Rev D:

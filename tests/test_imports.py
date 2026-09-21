@@ -31,6 +31,7 @@ _BEHAVIOR_MODULES = [
 _SONG_RECORDING_MODULES = [
     "pyoperant.song_recording",
     "pyoperant.song_recording._pcm",
+    "pyoperant.song_recording.calibration",
     "pyoperant.song_recording.features",
     "pyoperant.song_recording.gate",
     "pyoperant.song_recording.smoother",

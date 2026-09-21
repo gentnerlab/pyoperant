@@ -143,6 +143,7 @@ class Lights(base.BaseExp):
         self._gate      = None
         self._extractor = None
         self._smoother  = None
+        self._mic_calibration = None
         # Prevents calibration running more than once per dark period
         self._calibrated_this_night = False
 
@@ -509,6 +510,48 @@ class Lights(base.BaseExp):
                 'Recording will be disabled this session.', exc
             )
             self._gate = self._extractor = self._smoother = None
+            return
+
+        self._mic_calibration = self._load_mic_calibration(mon)
+
+    def _load_mic_calibration(self, mon: dict):
+        """Load this box's UMIK-1 calibration file, if one's been synced --
+        see pyoperant.song_recording.calibration for what this is used for
+        (a per-unit-consistent calibrated_level_db logged alongside each
+        detection) and its honest limits (not certified absolute SPL).
+
+        Returns None (logged, not raised) if no file has been synced yet --
+        recording proceeds uncalibrated, same degrade-gracefully pattern as
+        a missing noise_model.npz. If this box's panel DOES know which
+        mic_serial should be installed (panel_config.json, see
+        local_pi_revd.py's PiPanel), cross-checks it against the loaded
+        file's own header and WARNs on a mismatch -- catches a stale sync
+        (e.g. after physically swapping which UMIK-1 is in this box)
+        rather than silently logging a wrong unit's calibration.
+        """
+        from pyoperant.song_recording.calibration import MicCalibration, DEFAULT_PATH
+
+        path = mon.get('mic_cal_path', DEFAULT_PATH)
+        cal = MicCalibration.load(path)
+        if cal is None:
+            return None
+
+        expected_serial = getattr(self.panel, 'mic_serial', None)
+        if expected_serial is not None and str(expected_serial) != cal.serial:
+            self.log.warning(
+                'Mic calibration file %s is for serial %s, but this box\'s '
+                'panel_config.json says mic_serial=%s -- calibrated_level_db '
+                'will be logged using the WRONG unit\'s correction curve '
+                'until this is re-synced. Check whether the mic was '
+                'physically swapped without updating panel_config.json, or '
+                'the calibration file wasn\'t re-synced after it was.',
+                path, cal.serial, expected_serial,
+            )
+        self.log.info(
+            'Mic calibration loaded: serial=%s sens_factor=%.2fdB (%s)',
+            cal.serial, cal.sens_factor_db, path,
+        )
+        return cal
 
     # ------------------------------------------------------------------
     # Monitor thread management
@@ -567,12 +610,13 @@ class Lights(base.BaseExp):
         try:
             from pyoperant.song_recording.monitor import SongMonitor
             monitor = SongMonitor(
-                cfg         = flat_cfg,
-                audio_input = mic,
-                gate        = self._gate,
-                extractor   = self._extractor,
-                smoother    = self._smoother,
-                stop_event  = self._monitor_stop,
+                cfg             = flat_cfg,
+                audio_input     = mic,
+                gate            = self._gate,
+                extractor       = self._extractor,
+                smoother        = self._smoother,
+                stop_event      = self._monitor_stop,
+                mic_calibration = self._mic_calibration,
             )
             monitor.run()
         except Exception as exc:

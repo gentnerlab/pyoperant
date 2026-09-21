@@ -282,7 +282,8 @@ DEFAULT_CONFIG = {
 
 class DetectionLog:
     FIELDS = ["timestamp", "filename", "duration_s", "rms",
-              "gate_score", "snr_score", "precursor_extended"]
+              "gate_score", "snr_score", "precursor_extended",
+              "calibrated_level_db"]
 
     def __init__(self, csv_path: str):
         Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
@@ -335,6 +336,7 @@ class SongMonitor:
         smoother=None,
         stop_event: Optional[threading.Event] = None,
         exit_fn=os._exit,
+        mic_calibration=None,
     ):
         self.cfg         = {**DEFAULT_CONFIG, **cfg}
         self.audio_input = audio_input
@@ -343,6 +345,12 @@ class SongMonitor:
         self._gate       = gate
         self._extractor  = extractor
         self._smoother   = smoother
+        # Optional pyoperant.song_recording.calibration.MicCalibration --
+        # None means log uncalibrated (no file synced for this box yet).
+        # See module docstring's cross-reference and calibration.py's own
+        # docstring for what calibrated_level_db is (and isn't) traceable
+        # to.
+        self._mic_calibration = mic_calibration
 
         if (self._gate is None) != (self._extractor is None):
             # A caller supplying only one of the two almost certainly meant
@@ -379,6 +387,7 @@ class SongMonitor:
         # docstring) -- reset whenever a new episode starts (below).
         self._episode_active_chunks = 0    # chunks while the smoother was actually triggered
         self._episode_peak_score    = 0.0
+        self._episode_peak_calibrated_db = None   # see _mic_calibration above
         self._precursor_extended    = False
         self._clip_buffer: list[np.ndarray] = []
 
@@ -688,10 +697,26 @@ class SongMonitor:
                 self._clip_buffer = list(self._pre_buffer)
                 self._episode_active_chunks = 0
                 self._episode_peak_score    = 0.0
+                self._episode_peak_calibrated_db = None
                 self._precursor_extended    = False
             self._clip_buffer.append(chunk)
             self._episode_active_chunks += 1
             self._episode_peak_score = max(self._episode_peak_score, gate_result.score)
+            if self._mic_calibration is not None:
+                # A fresh FFT here (rather than reusing whatever gate.py
+                # computed internally) keeps calibration.py fully decoupled
+                # from the gate's own internals -- cheap on a 100ms chunk,
+                # not worth the coupling to save it.
+                magnitude = np.abs(np.fft.rfft(chunk))
+                freqs_hz  = np.fft.rfftfreq(len(chunk), d=1.0 / self.cfg["sample_rate"])
+                level_db  = self._mic_calibration.calibrated_level_db(
+                    magnitude, freqs_hz,
+                    freq_low=self.cfg["freq_low"], freq_high=self.cfg["freq_high"],
+                )
+                self._episode_peak_calibrated_db = level_db if (
+                    self._episode_peak_calibrated_db is None
+                    or level_db > self._episode_peak_calibrated_db
+                ) else self._episode_peak_calibrated_db
             # Actively triggered -> always the normal post_roll tail. A
             # precursor grace period (below) is only ever granted at the
             # moment of release, and re-triggering (e.g. real song arriving
@@ -762,6 +787,10 @@ class SongMonitor:
             gate_score = round(float(gate_result.score), 4),
             snr_score  = round(float(gate_result.snr_score), 4),
             precursor_extended = self._precursor_extended,
+            calibrated_level_db = (
+                round(self._episode_peak_calibrated_db, 2)
+                if self._episode_peak_calibrated_db is not None else ""
+            ),
         )
 
 
@@ -880,6 +909,7 @@ def self_test():
     _self_test_device_watchdog()
     _self_test_capture_buffering()
     _self_test_startup_retry()
+    _self_test_mic_calibration()
 
 
 class _FakeAudioInputWatchdog:
@@ -1218,6 +1248,63 @@ def _self_test_startup_retry():
               f"exactly once (exit_calls={exit_calls})")
     finally:
         log.removeHandler(handler)
+
+
+def _self_test_mic_calibration():
+    """Confirms a saved clip's detections.csv row logs a real
+    calibrated_level_db when a MicCalibration is supplied, and logs
+    nothing (blank, not a crash) when one isn't -- see
+    pyoperant.song_recording.calibration for the feature itself. Uses the
+    same _FakeGate/synthetic-sequence harness as the precursor-grace
+    self-test above; the fed chunks are all-zero (no real audio needed to
+    test the wiring), so the resulting dB values aren't physically
+    meaningful -- only that a value is present vs. absent is checked."""
+    import csv as _csv
+    import tempfile
+    from pathlib import Path as _Path
+    from pyoperant.song_recording.calibration import MicCalibration
+    from pyoperant.song_recording.smoother import CombinedSmoother
+
+    print("\n=== Mic-calibration self-test ===")
+
+    tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_calibration_selftest_"))
+    cal_path = tmp_dir / "mic_cal.txt"
+    cal_path.write_text(
+        '"Sens Factor =-1.500dB, SERNO: 1234567"\n'
+        '"Auto-generated 90-degree calibration file"\n'
+        "500.0\t0.0\n1000.0\t0.0\n2000.0\t6.0\n4000.0\t-3.0\n8000.0\t0.0\n16000.0\t0.0\n"
+    )
+    cal = MicCalibration.load(str(cal_path))
+
+    # Exactly scenario_a's shape from the precursor-grace self-test above
+    # (proven to actually produce one saved clip, including exhausting a
+    # full precursor-grace period, not just release+post_roll) -- not
+    # worth re-deriving timing from scratch here.
+    sequence = [(False, 0.05)] * 15 + [(True, 0.75)] * 8 + [(False, 0.05)] * 115
+
+    def run(mic_calibration, name):
+        cfg = {"output_dir": str(tmp_dir / name), "log_csv": str(tmp_dir / name / "detections.csv")}
+        m = SongMonitor(cfg, audio_input=None, gate=_FakeGate(sequence), extractor=object(),
+                         smoother=CombinedSmoother.from_config_dict({}),
+                         mic_calibration=mic_calibration)
+        z = np.zeros(m._chunk_len, dtype=np.float32)
+        for _ in range(len(sequence)):
+            m._process(z)
+        with open(cfg["log_csv"]) as f:
+            rows = list(_csv.DictReader(f))
+        return rows
+
+    rows_with_cal = run(cal, "with_cal")
+    a_ok = (len(rows_with_cal) == 1 and rows_with_cal[0]["calibrated_level_db"] != "")
+    print(f"  [{'OK' if a_ok else 'FAIL'}] A: calibrated_level_db populated when a "
+          f"MicCalibration is supplied "
+          f"(value={rows_with_cal[0]['calibrated_level_db'] if rows_with_cal else None!r})")
+
+    rows_without_cal = run(None, "without_cal")
+    b_ok = (len(rows_without_cal) == 1 and rows_without_cal[0]["calibrated_level_db"] == "")
+    print(f"  [{'OK' if b_ok else 'FAIL'}] B: calibrated_level_db blank (not a crash) "
+          f"when no MicCalibration is supplied "
+          f"(value={rows_without_cal[0]['calibrated_level_db'] if rows_without_cal else None!r})")
 
 
 # ---------------------------------------------------------------------------

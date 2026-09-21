@@ -369,6 +369,75 @@ class TestLights(unittest.TestCase):
             exp = Lights(panel=panel, **config)
             self.assertEqual(exp._pipeline_sample_rate(), 44100)
 
+    _MIC_CAL_FIXTURE = (
+        '"Sens Factor =-1.500dB, SERNO: 1234567"\n'
+        '"Auto-generated 90-degree calibration file"\n'
+        "500.0\t0.0\n1000.0\t0.0\n2000.0\t6.0\n4000.0\t-3.0\n8000.0\t0.0\n16000.0\t0.0\n"
+    )
+
+    def test_mic_calibration_loads_when_serial_matches(self):
+        """A synced calibration file whose own header serial matches this
+        box's panel_config.json mic_serial loads cleanly, no warning."""
+        config = _load_config("Lights")
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            cal_path = os.path.join(tmp_dir, "mic_cal.txt")
+            with open(cal_path, "w") as f:
+                f.write(self._MIC_CAL_FIXTURE)
+            config["song_recording"]["monitor"] = {"mic_cal_path": cal_path}
+            panel = FakePanel()
+            panel.mic_serial = "1234567"  # matches the fixture's own SERNO
+            exp = Lights(panel=panel, **config)
+            with patch.object(exp.log, "warning") as mock_warning:
+                exp._build_pipeline()
+            self.assertIsNotNone(exp._mic_calibration)
+            self.assertEqual(exp._mic_calibration.serial, "1234567")
+            mock_warning.assert_not_called()
+
+    def test_mic_calibration_warns_on_serial_mismatch(self):
+        """The real safety check this feature exists for: if
+        panel_config.json's mic_serial disagrees with the actually-synced
+        calibration file's own header, that's a stale sync (e.g. the mic
+        was physically swapped without updating panel_config.json) --
+        must warn loudly, not silently log the wrong unit's correction
+        curve as if it were correct."""
+        config = _load_config("Lights")
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            cal_path = os.path.join(tmp_dir, "mic_cal.txt")
+            with open(cal_path, "w") as f:
+                f.write(self._MIC_CAL_FIXTURE)
+            config["song_recording"]["monitor"] = {"mic_cal_path": cal_path}
+            panel = FakePanel()
+            panel.mic_serial = "9999999"  # deliberately does NOT match the fixture's 1234567
+            exp = Lights(panel=panel, **config)
+            with self.assertLogs(exp.log, level="WARNING") as log_ctx:
+                exp._build_pipeline()
+            self.assertTrue(any("mismatch" in m.lower() or "wrong" in m.lower()
+                                 for m in log_ctx.output))
+            # Still loads it (degraded, not blocked) -- a human needs the
+            # WARNING to act on, but a stale calibration shouldn't disable
+            # recording entirely.
+            self.assertIsNotNone(exp._mic_calibration)
+
+    def test_mic_calibration_none_without_synced_file(self):
+        """No calibration file synced yet for this box -- degrades
+        gracefully (None, no crash), same pattern as a missing
+        noise_model.npz."""
+        config = _load_config("Lights")
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            config["song_recording"]["monitor"] = {
+                "mic_cal_path": os.path.join(tmp_dir, "does_not_exist.txt")
+            }
+            panel = FakePanel()
+            exp = Lights(panel=panel, **config)
+            exp._build_pipeline()
+            self.assertIsNone(exp._mic_calibration)
+
     def test_emergency_shutdown_noop_without_monitor(self):
         """emergency_shutdown() (called from scripts/behave's SIGTERM/
         SIGINT handler -- see its module docstring) must be a safe no-op
