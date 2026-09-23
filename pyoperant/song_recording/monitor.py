@@ -235,6 +235,7 @@ import numpy as np
 import pyaudio
 
 from pyoperant.song_recording._pcm import decode_pcm
+from pyoperant.song_recording.melspec import CLASS_NAMES
 
 log = logging.getLogger(__name__)
 
@@ -273,6 +274,31 @@ DEFAULT_CONFIG = {
     "startup_retry_giveup_after": 300.0,
     "output_dir":        "recordings",
     "log_csv":           "detections.csv",
+
+    # Capture mode -- see module docstring's "Capture modes" section.
+    #   "gate_only" (default) -- current/original behavior, unchanged.
+    #                            Zero behavior change for any existing
+    #                            deployed box that doesn't set this.
+    #   "gate_cnn"  -- gate triggers episodes as today; a loaded
+    #                  SongClassifier confirms/vetoes via
+    #                  CombinedSmoother.update_cnn() (AND logic). Requires
+    #                  a `classifier` to be passed into SongMonitor.
+    #   "raw"       -- bypasses gate/smoother/episode-triggering entirely;
+    #                  continuously records the full audio stream, rolling
+    #                  into a new file every raw_chunk_duration_s.
+    "mode": "gate_only",
+    # Which of CLASS_NAMES (classifier.py) count as "worth keeping" in
+    # gate_cnn mode -- confidence fed to update_cnn() is the sum of P(c)
+    # over this set. Default = everything but noise (1 - P(noise)): save
+    # all PROBABLE vocalization, not just song specifically. A narrower
+    # per-box config (e.g. ["song"] only) is an explicit opt-in, not this
+    # default.
+    "cnn_keep_classes": ["whistle", "contact", "song"],
+    # raw mode's file-rotation period. 1800s (30 min) matches the lab's
+    # own existing raw-recording convention (see project history -- the
+    # underlying corpus this project's CNN was trained on was itself
+    # captured as half-hour raw files), not an arbitrary new default.
+    "raw_chunk_duration_s": 1800.0,
 }
 
 
@@ -283,7 +309,12 @@ DEFAULT_CONFIG = {
 class DetectionLog:
     FIELDS = ["timestamp", "filename", "duration_s", "rms",
               "gate_score", "snr_score", "precursor_extended",
-              "calibrated_level_db"]
+              "calibrated_level_db",
+              # Populated only in mode="gate_cnn" (blank otherwise, e.g.
+              # gate_only or raw) -- the episode's mean classifier
+              # probabilities and their argmax. See _save_clip().
+              "cnn_class", "cnn_prob_noise", "cnn_prob_whistle",
+              "cnn_prob_contact", "cnn_prob_song"]
 
     def __init__(self, csv_path: str):
         Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
@@ -337,6 +368,7 @@ class SongMonitor:
         stop_event: Optional[threading.Event] = None,
         exit_fn=os._exit,
         mic_calibration=None,
+        classifier=None,
     ):
         self.cfg         = {**DEFAULT_CONFIG, **cfg}
         self.audio_input = audio_input
@@ -351,6 +383,22 @@ class SongMonitor:
         # docstring for what calibrated_level_db is (and isn't) traceable
         # to.
         self._mic_calibration = mic_calibration
+        # Optional pyoperant.song_recording.classifier.SongClassifier --
+        # required (and validated below) when mode="gate_cnn", ignored
+        # otherwise. Always passed in already-constructed (mirrors
+        # mic_calibration above) -- SongMonitor never hardcodes which
+        # model to load; that's entirely _build_classifier()/lights.py's
+        # job, reading that box's own config (see classifier.py's module
+        # docstring on why: a future different-species/different-purpose
+        # box is just a different config.json, not a code change).
+        self._classifier = classifier
+
+        self._mode = self.cfg.get("mode", "gate_only")
+        if self._mode not in ("gate_only", "gate_cnn", "raw"):
+            raise ValueError(f"SongMonitor: unknown mode {self._mode!r} "
+                              f"(expected 'gate_only', 'gate_cnn', or 'raw')")
+        if self._mode == "gate_cnn" and self._classifier is None:
+            raise ValueError("SongMonitor: mode='gate_cnn' requires a classifier")
 
         if (self._gate is None) != (self._extractor is None):
             # A caller supplying only one of the two almost certainly meant
@@ -363,10 +411,16 @@ class SongMonitor:
                 "or not at all (got gate=%r, extractor=%r)"
                 % (self._gate, self._extractor)
             )
-        if self._gate is None:
-            self._build_pipeline()
-        if self._smoother is None:
-            self._build_smoother()
+        # raw mode never touches the gate/smoother -- see _process_raw()
+        # -- so skip building them entirely rather than construct a pair
+        # that mode will never call.
+        if self._mode != "raw":
+            if self._gate is None:
+                self._build_pipeline()
+            if self._smoother is None:
+                self._build_smoother()
+            if self._mode == "gate_cnn":
+                self._smoother.activate_cnn()
 
         sr  = self.cfg["sample_rate"]
         dur = self.cfg["chunk_duration"]
@@ -390,6 +444,19 @@ class SongMonitor:
         self._episode_peak_calibrated_db = None   # see _mic_calibration above
         self._precursor_extended    = False
         self._clip_buffer: list[np.ndarray] = []
+        # Episode-level classifier probability accumulator (mode="gate_cnn"
+        # only) -- mean of every gate-passed chunk's probs during this
+        # episode, reset alongside the state above. None until the
+        # classifier has actually run at least once this episode. See
+        # _save_clip() for how this becomes the saved cnn_class/subdirectory.
+        self._episode_prob_sum   = None
+        self._episode_prob_count = 0
+
+        # raw mode's own rolling-file state -- unused in gate_only/gate_cnn.
+        self._raw_buffer: list[np.ndarray] = []
+        self._raw_chunk_count  = 0
+        self._raw_chunks_target = int(round(self.cfg["raw_chunk_duration_s"] / dur))
+        self._raw_file_started_at = None
 
         # Device-loss watchdog state -- see module docstring. Initialized
         # here (not just in run()) so _check_device_health()/_on_chunk_received()
@@ -493,6 +560,11 @@ class SongMonitor:
         except KeyboardInterrupt:
             log.info("Monitor stopped by KeyboardInterrupt.")
         finally:
+            if self._mode == "raw":
+                # Flush whatever's accumulated so far rather than silently
+                # dropping up to raw_chunk_duration_s of audio every time a
+                # light period (or the process) ends mid-file.
+                self._flush_raw_file()
             self.audio_input.close()
             self._det_log.close()
             log.info("Monitor stopped. Recordings in %s", self._out_dir)
@@ -682,12 +754,28 @@ class SongMonitor:
     # ------------------------------------------------------------------
 
     def _process(self, chunk: np.ndarray):
-        gate_result = self._gate.evaluate(chunk, self._extractor)
-        sr_result   = self._smoother.update_gate(
-            gate_result.passed, gate_result.score
-        )
+        if self._mode == "raw":
+            self._process_raw(chunk)
+            return
 
-        if sr_result.triggered:
+        gate_result = self._gate.evaluate(chunk, self._extractor)
+        # update_gate()'s OWN return value only reflects the frame smoother
+        # -- correct to use directly in gate_only mode (today's only
+        # active mode until now), but NOT once a classifier stage can
+        # veto/confirm it. In gate_cnn mode, update_cnn() below must run
+        # BEFORE the trigger decision is read, and that decision must come
+        # from the live `smoother.triggered` property (which ANDs both),
+        # not from this call's return value.
+        self._smoother.update_gate(gate_result.passed, gate_result.score)
+
+        classifier_result = None
+        if self._mode == "gate_cnn" and gate_result.passed:
+            classifier_result = self._classifier.update(chunk)
+            self._smoother.update_cnn(classifier_result.confidence)
+
+        triggered = self._smoother.triggered
+
+        if triggered:
             if not self._recording:
                 log.info(
                     "Detection — gate=%.3f snr=%.3f",
@@ -699,9 +787,18 @@ class SongMonitor:
                 self._episode_peak_score    = 0.0
                 self._episode_peak_calibrated_db = None
                 self._precursor_extended    = False
+                self._episode_prob_sum      = None
+                self._episode_prob_count    = 0
             self._clip_buffer.append(chunk)
             self._episode_active_chunks += 1
             self._episode_peak_score = max(self._episode_peak_score, gate_result.score)
+            if classifier_result is not None:
+                if self._episode_prob_sum is None:
+                    self._episode_prob_sum = np.zeros(len(CLASS_NAMES))
+                self._episode_prob_sum += np.array(
+                    [classifier_result.probs[c] for c in CLASS_NAMES]
+                )
+                self._episode_prob_count += 1
             if self._mic_calibration is not None:
                 # A fresh FFT here (rather than reusing whatever gate.py
                 # computed internally) keeps calibration.py fully decoupled
@@ -767,8 +864,27 @@ class SongMonitor:
             log.debug("Clip too short (%.2fs), discarding.", duration)
             return
 
-        ts    = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        fname = self._out_dir / f"bird_{ts}.wav"
+        # Episode's mean classifier probabilities (mode="gate_cnn" only,
+        # and only once the classifier actually ran at least once this
+        # episode -- e.g. a very short episode that never had a
+        # gate-passed chunk before closing stays unclassified rather than
+        # reporting a misleading all-zero/uniform result).
+        cnn_class = None
+        cnn_probs = {}
+        if self._episode_prob_sum is not None and self._episode_prob_count > 0:
+            mean_probs = self._episode_prob_sum / self._episode_prob_count
+            cnn_class  = CLASS_NAMES[int(np.argmax(mean_probs))]
+            cnn_probs  = {name: mean_probs[i] for i, name in enumerate(CLASS_NAMES)}
+
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Classified clips sort into a per-class subdirectory (browsable
+        # on disk with no need to cross-reference detections.csv, matching
+        # the same song/whistle/contact/noise convention the training
+        # corpus itself already uses) -- gate_only clips (no classifier
+        # result) stay in the flat output_dir, unchanged from before.
+        out_dir = self._out_dir / cnn_class if cnn_class is not None else self._out_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fname = out_dir / f"bird_{ts}.wav"
         pcm   = (data * 32767).astype(np.int16)
 
         with wave.open(str(fname), "w") as wf:
@@ -777,7 +893,8 @@ class SongMonitor:
             wf.setframerate(sr)
             wf.writeframes(pcm.tobytes())
 
-        log.info("Saved %s (%.2fs)", fname.name, duration)
+        log.info("Saved %s (%.2fs)%s", fname.name, duration,
+                  f" cnn_class={cnn_class}" if cnn_class is not None else "")
 
         self._det_log.write(
             timestamp  = datetime.datetime.now().isoformat(),
@@ -791,7 +908,59 @@ class SongMonitor:
                 round(self._episode_peak_calibrated_db, 2)
                 if self._episode_peak_calibrated_db is not None else ""
             ),
+            cnn_class = cnn_class if cnn_class is not None else "",
+            cnn_prob_noise   = round(cnn_probs["noise"], 4)   if cnn_probs else "",
+            cnn_prob_whistle = round(cnn_probs["whistle"], 4) if cnn_probs else "",
+            cnn_prob_contact = round(cnn_probs["contact"], 4) if cnn_probs else "",
+            cnn_prob_song    = round(cnn_probs["song"], 4)    if cnn_probs else "",
         )
+
+    # ------------------------------------------------------------------
+    # Raw mode -- continuous capture, no gate/smoother/episode-triggering
+    # at all. See DEFAULT_CONFIG's "mode" entry and module docstring.
+    # ------------------------------------------------------------------
+
+    def _process_raw(self, chunk: np.ndarray):
+        if self._raw_file_started_at is None:
+            self._raw_file_started_at = datetime.datetime.now()
+        self._raw_buffer.append(chunk)
+        self._raw_chunk_count += 1
+        if self._raw_chunk_count >= self._raw_chunks_target:
+            self._flush_raw_file()
+
+    def _flush_raw_file(self):
+        if not self._raw_buffer:
+            return
+        data     = np.concatenate(self._raw_buffer)
+        sr       = self.cfg["sample_rate"]
+        duration = len(data) / sr
+
+        # Microsecond precision, not just seconds -- unlike _save_clip()'s
+        # episode timestamps (naturally seconds-to-minutes apart, no real
+        # collision risk), two raw-file flushes could in principle land in
+        # the same wall-clock second (e.g. a short raw_chunk_duration_s
+        # used for on-the-bench testing) and second-resolution names would
+        # silently overwrite one file with the next.
+        ts    = self._raw_file_started_at.strftime("%Y%m%d_%H%M%S_%f")
+        fname = self._out_dir / f"raw_{ts}.wav"
+        pcm   = (data * 32767).astype(np.int16)
+
+        with wave.open(str(fname), "w") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sr)
+            wf.writeframes(pcm.tobytes())
+
+        log.info("Saved raw file %s (%.1fs)", fname.name, duration)
+        self._det_log.write(
+            timestamp  = datetime.datetime.now().isoformat(),
+            filename   = str(fname),
+            duration_s = round(duration, 2),
+        )
+
+        self._raw_buffer = []
+        self._raw_chunk_count = 0
+        self._raw_file_started_at = None
 
 
 # ---------------------------------------------------------------------------
@@ -910,6 +1079,9 @@ def self_test():
     _self_test_capture_buffering()
     _self_test_startup_retry()
     _self_test_mic_calibration()
+    _self_test_gate_cnn()
+    _self_test_raw_mode()
+    _self_test_mode_validation()
 
 
 class _FakeAudioInputWatchdog:
@@ -1305,6 +1477,162 @@ def _self_test_mic_calibration():
     print(f"  [{'OK' if b_ok else 'FAIL'}] B: calibrated_level_db blank (not a crash) "
           f"when no MicCalibration is supplied "
           f"(value={rows_without_cal[0]['calibrated_level_db'] if rows_without_cal else None!r})")
+
+
+class _FakeClassifier:
+    """Stands in for a real SongClassifier -- feeds a pre-built sequence
+    of ClassifierResult-shaped objects, mirroring _FakeGate above, so the
+    gate_cnn self-test exercises SongMonitor's real update_cnn()/triggered
+    wiring without a real ONNX model."""
+
+    def __init__(self, sequence):
+        self._seq = list(sequence)
+        self._i = 0
+        self.n_calls = 0
+
+    def update(self, chunk):
+        import types
+        probs, confidence = self._seq[self._i]
+        self._i += 1
+        self.n_calls += 1
+        return types.SimpleNamespace(probs=probs, predicted_class=max(probs, key=probs.get),
+                                      confidence=confidence)
+
+
+def _self_test_gate_cnn():
+    """Confirms mode='gate_cnn' actually requires BOTH the gate and the
+    classifier to agree (AND logic, via the live smoother.triggered
+    property -- see _process()'s comment on why update_gate()'s own
+    return value can't be used directly here), that the classifier is
+    only ever called on gate-passed chunks, and that a saved clip's
+    cnn_class/subdirectory reflect the episode's mean probabilities."""
+    import csv as _csv
+    import tempfile
+    from pathlib import Path as _Path
+
+    print("\n=== gate_cnn mode self-test ===")
+    tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_gatecnn_selftest_"))
+
+    def run(name, gate_seq, cnn_seq, keep_classes=None):
+        cfg = {
+            "mode": "gate_cnn",
+            "output_dir": str(tmp_dir / name),
+            "log_csv": str(tmp_dir / name / "detections.csv"),
+        }
+        if keep_classes is not None:
+            cfg["cnn_keep_classes"] = keep_classes
+        classifier = _FakeClassifier(cnn_seq)
+        monitor = SongMonitor(cfg, audio_input=None, gate=_FakeGate(gate_seq),
+                               extractor=object(), classifier=classifier)
+        chunk = np.zeros(monitor._chunk_len, dtype=np.float32)
+        for _ in range(len(gate_seq)):
+            monitor._process(chunk)
+        with open(cfg["log_csv"]) as f:
+            rows = list(_csv.DictReader(f))
+        saved_files = list((tmp_dir / name).rglob("*.wav"))
+        return rows, saved_files, classifier.n_calls
+
+    # Scenario A: gate passes, classifier confidently says "song" -> both
+    # agree -> triggers; then a release tail (gate stops passing) so the
+    # episode actually closes and saves within the fed sequence, with
+    # cnn_class="song" and the file landing in a song/ subdirectory.
+    n_active = 20
+    # This episode is short (2.0s) and confidently scored (0.80 >= the
+    # 0.55 precursor_min_score), so it qualifies for the precursor-grace
+    # extension on top of the normal release+post_roll -- needs release
+    # (~7 chunks) + post_roll (20 chunks) + the full grace period (80
+    # chunks at 0.1s/chunk) to actually close within the test, same
+    # reasoning as the precursor-grace self-test's own "tail" sequences.
+    n_tail = 120
+    gate_seq_a = [(True, 0.80)] * n_active + [(False, 0.05)] * n_tail
+    song_probs = {"noise": 0.02, "whistle": 0.02, "contact": 0.02, "song": 0.94}
+    cnn_seq_a = [(song_probs, 0.98)] * n_active  # classifier only runs on gate-passed chunks
+    rows_a, files_a, calls_a = run("A_agree", gate_seq_a, cnn_seq_a)
+    a_ok = (len(rows_a) == 1 and rows_a[0]["cnn_class"] == "song"
+            and any(f.parent.name == "song" for f in files_a))
+
+    # Scenario B: gate passes throughout (frame smoother would trigger on
+    # its own), but the classifier confidently says "noise" every time
+    # (confidence near-zero under the default keep_classes) -> score
+    # smoother never agrees -> overall triggered must stay False -> NO
+    # clip should ever be saved. This is the actual behavior change
+    # gate_cnn mode is for: gate-only would have saved this.
+    noise_probs = {"noise": 0.95, "whistle": 0.02, "contact": 0.02, "song": 0.01}
+    cnn_seq_b = [(noise_probs, 0.05)] * n_active  # gate_seq_a has n_active gate-passed chunks
+    rows_b, files_b, calls_b = run("B_gate_yes_cnn_no", gate_seq_a, cnn_seq_b)
+    b_ok = (len(rows_b) == 0 and len(files_b) == 0)
+
+    # Scenario C: gate never passes -> classifier must never be called at
+    # all (only ever runs on gate-passed chunks, per its own contract).
+    gate_seq_c = [(False, 0.05)] * n_active
+    _, _, calls_c = run("C_gate_never_passes", gate_seq_c, [({}, 0.0)] * n_active)
+    c_ok = (calls_c == 0)
+
+    checks = [
+        ("A: gate+CNN agree -> clip saved with cnn_class='song' in song/ subdir", a_ok),
+        ("B: gate triggers but CNN says noise -> AND logic blocks the save entirely", b_ok),
+        ("C: classifier never called when the gate never passes", c_ok),
+    ]
+    for desc, ok in checks:
+        print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
+
+
+def _self_test_raw_mode():
+    """Confirms mode='raw' bypasses the gate/smoother entirely, rolls
+    into a new file every raw_chunk_duration_s, and flushes a partial
+    trailing buffer (e.g. at light-off) instead of silently dropping it."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    print("\n=== raw mode self-test ===")
+    tmp_dir = _Path(tempfile.mkdtemp(prefix="song_monitor_raw_selftest_"))
+
+    cfg = {
+        "mode": "raw",
+        "chunk_duration": 0.1,
+        "raw_chunk_duration_s": 1.0,  # 10 chunks/file -- fast to test
+        "output_dir": str(tmp_dir),
+        "log_csv": str(tmp_dir / "detections.csv"),
+    }
+    monitor = SongMonitor(cfg, audio_input=None)
+    chunk = np.zeros(monitor._chunk_len, dtype=np.float32)
+
+    for _ in range(25):  # 2 full files (20 chunks) + a 5-chunk partial
+        monitor._process(chunk)
+    full_files = sorted((tmp_dir).glob("raw_*.wav"))
+    a_ok = len(full_files) == 2
+
+    monitor._flush_raw_file()  # simulates run()'s finally-block flush on stop
+    all_files = sorted((tmp_dir).glob("raw_*.wav"))
+    b_ok = len(all_files) == 3
+
+    checks = [
+        ("A: exactly 2 complete files after 25 chunks (10 chunks/file)", a_ok),
+        ("B: a 3rd (partial) file appears after the stop-time flush", b_ok),
+    ]
+    for desc, ok in checks:
+        print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
+
+
+def _self_test_mode_validation():
+    """Confirms bad config is rejected at construction, not discovered
+    later mid-session."""
+    print("\n=== mode validation self-test ===")
+    checks = []
+    try:
+        SongMonitor({"mode": "not_a_real_mode"}, audio_input=None)
+        checks.append(("unknown mode raises ValueError", False))
+    except ValueError:
+        checks.append(("unknown mode raises ValueError", True))
+
+    try:
+        SongMonitor({"mode": "gate_cnn"}, audio_input=None)  # no classifier passed
+        checks.append(("mode='gate_cnn' without a classifier raises ValueError", False))
+    except ValueError:
+        checks.append(("mode='gate_cnn' without a classifier raises ValueError", True))
+
+    for desc, ok in checks:
+        print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
 
 
 # ---------------------------------------------------------------------------

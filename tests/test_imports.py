@@ -38,6 +38,9 @@ _SONG_RECORDING_MODULES = [
     "pyoperant.song_recording.variability",
     "pyoperant.song_recording.noise_model",
     "pyoperant.song_recording.monitor",
+    "pyoperant.song_recording.melspec",
+    "pyoperant.song_recording.cnn_numpy",
+    "pyoperant.song_recording.classifier",
 ]
 
 

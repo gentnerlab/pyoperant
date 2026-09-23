@@ -144,6 +144,7 @@ class Lights(base.BaseExp):
         self._extractor = None
         self._smoother  = None
         self._mic_calibration = None
+        self._classifier = None
         # Prevents calibration running more than once per dark period
         self._calibrated_this_night = False
 
@@ -513,6 +514,53 @@ class Lights(base.BaseExp):
             return
 
         self._mic_calibration = self._load_mic_calibration(mon)
+        self._classifier = self._load_classifier(sr, mon)
+
+    def _load_classifier(self, sr: dict, mon: dict):
+        """Build a SongClassifier when this box is configured for
+        mode='gate_cnn'; None otherwise (gate_only/raw never touch it).
+
+        model_path is ALWAYS read from this box's own config
+        (song_recording.cnn.model_path), never hardcoded here -- same
+        reason the gate's own weights/thresholds are already fully
+        per-box configurable (see gate.py): a future different-species or
+        different-purpose deployment just points at a different .onnx
+        file in its own config.json, no code change needed. See
+        pyoperant.song_recording.classifier's module docstring.
+        """
+        if mon.get('mode', 'gate_only') != 'gate_cnn':
+            return None
+
+        cnn_cfg = sr.get('cnn', {})
+        model_path = cnn_cfg.get('model_path')
+        if not model_path:
+            self.log.error(
+                "song_recording.mode='gate_cnn' but no song_recording.cnn."
+                "model_path is set -- recording will fall back to gate-only "
+                "behavior this session (the CNN confirmation stage never "
+                "loads, so update_cnn() never activates)."
+            )
+            return None
+
+        try:
+            from pyoperant.song_recording.classifier import SongClassifier
+            classifier = SongClassifier(
+                model_path           = model_path,
+                capture_sample_rate  = self._pipeline_sample_rate(),
+                keep_classes         = cnn_cfg.get('keep_classes'),  # None -> classifier's own default
+            )
+            self.log.info(
+                'CNN classifier loaded: %s (keep_classes=%s)',
+                model_path, classifier.keep_classes,
+            )
+            return classifier
+        except Exception as exc:
+            self.log.error(
+                'Could not load CNN classifier from %s (%s). Recording will '
+                'fall back to gate-only behavior this session.',
+                model_path, exc, exc_info=True,
+            )
+            return None
 
     def _load_mic_calibration(self, mon: dict):
         """Load this box's UMIK-1 calibration file, if one's been synced --
@@ -588,8 +636,27 @@ class Lights(base.BaseExp):
         recording itself is working."""
         sr  = _sr_cfg(self.parameters)
         mon = sr.get('monitor', {})
+
+        # Effective mode, not just the requested one -- _load_classifier()
+        # degrades to None (logged, not raised) on a bad/missing
+        # model_path so Lights keeps running the light schedule regardless,
+        # but SongMonitor itself correctly REQUIRES a classifier whenever
+        # mode='gate_cnn' is actually requested (a real, not-silently-
+        # ignorable misconfiguration). Reconciling that here, once, is
+        # what actually keeps the "falls back to gate-only" promise in
+        # _load_classifier()'s own log message true, rather than that
+        # fallback crashing this thread via SongMonitor's constructor.
+        requested_mode = mon.get('mode', 'gate_only')
+        effective_mode = requested_mode
+        if requested_mode == 'gate_cnn' and self._classifier is None:
+            effective_mode = 'gate_only'
+
         flat_cfg = {
             'sample_rate':       self._pipeline_sample_rate(),
+            'mode':              effective_mode,
+            'cnn_keep_classes':  sr.get('cnn', {}).get('keep_classes',
+                                        ['whistle', 'contact', 'song']),
+            'raw_chunk_duration_s': mon.get('raw_chunk_duration_s', 1800.0),
             'chunk_duration':    mon.get('chunk_duration', 0.1),
             'capture_chunk_multiplier': mon.get('capture_chunk_multiplier', 1),
             'freq_low':          mon.get('freq_low',  1000),
@@ -617,6 +684,7 @@ class Lights(base.BaseExp):
                 smoother        = self._smoother,
                 stop_event      = self._monitor_stop,
                 mic_calibration = self._mic_calibration,
+                classifier      = self._classifier if effective_mode == 'gate_cnn' else None,
             )
             monitor.run()
         except Exception as exc:
