@@ -222,6 +222,7 @@ import argparse
 import collections
 import csv
 import datetime
+import io
 import logging
 import os
 import queue
@@ -318,7 +319,33 @@ class DetectionLog:
 
     def __init__(self, csv_path: str):
         Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
-        exists  = Path(csv_path).exists()
+        csv_path = Path(csv_path)
+        exists = csv_path.exists()
+
+        # A CSV from before FIELDS last grew (e.g. calibrated_level_db,
+        # then the cnn_* columns) has a HEADER that undercounts its own
+        # DATA rows -- write() below has always appended full-width rows
+        # regardless of what the header on disk claims, so any reader
+        # keying off that header (pandas.read_csv, DictReader) silently
+        # misaligns every column from wherever the header first fell
+        # behind. Confirmed live on magpi06/B1504 2026-09-23: a
+        # 7-column header under 13-column rows. Fix: rewrite just the
+        # header line in place to match today's FIELDS -- existing DATA
+        # rows are never touched, so an old short row still reads back
+        # correctly (its missing trailing fields blank/NaN, which is the
+        # accurate representation -- those rows predate those columns).
+        buf = io.StringIO()
+        csv.writer(buf).writerow(self.FIELDS)
+        header_line = buf.getvalue()
+        if exists:
+            with open(csv_path, "r", newline="") as f:
+                first_line = f.readline()
+                rest = f.read()
+            if first_line != header_line:
+                with open(csv_path, "w", newline="") as f:
+                    f.write(header_line)
+                    f.write(rest)
+
         self._f = open(csv_path, "a", newline="")
         self.writer = csv.DictWriter(self._f, fieldnames=self.FIELDS)
         if not exists:
@@ -1082,6 +1109,7 @@ def self_test():
     _self_test_gate_cnn()
     _self_test_raw_mode()
     _self_test_mode_validation()
+    _self_test_detection_log_header_migration()
 
 
 class _FakeAudioInputWatchdog:
@@ -1631,6 +1659,47 @@ def _self_test_mode_validation():
     except ValueError:
         checks.append(("mode='gate_cnn' without a classifier raises ValueError", True))
 
+    for desc, ok in checks:
+        print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
+
+
+def _self_test_detection_log_header_migration():
+    """Confirms DetectionLog repairs a stale on-disk header (fewer columns
+    than FIELDS, e.g. a CSV from before calibrated_level_db/cnn_* were
+    added) instead of silently appending wider rows under a narrower
+    header forever -- a real bug confirmed live on magpi06/B1504,
+    2026-09-23 (a 7-column header under 13-column data rows)."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    print("\n=== DetectionLog header-migration self-test ===")
+    tmp_dir = _Path(tempfile.mkdtemp(prefix="detectionlog_selftest_"))
+    csv_path = tmp_dir / "detections.csv"
+
+    old_fields = ["timestamp", "filename", "duration_s", "rms",
+                  "gate_score", "snr_score", "precursor_extended"]
+    old_row = ["2026-09-01T00:00:00", "old_clip.wav", "5.0", "0.01", "0.6", "0.3", "False"]
+    csv_path.write_text(
+        ",".join(old_fields) + "\r\n" + ",".join(old_row) + "\r\n", newline=""
+    )
+
+    log = DetectionLog(str(csv_path))
+    log.write(timestamp="2026-09-23T00:00:00", filename="new_clip.wav",
+              duration_s=5.0, rms=0.01, gate_score=0.6, snr_score=0.3,
+              precursor_extended=False, calibrated_level_db=-30.0,
+              cnn_class="song", cnn_prob_noise=0.1, cnn_prob_whistle=0.1,
+              cnn_prob_contact=0.1, cnn_prob_song=0.7)
+    log.close()
+
+    lines = csv_path.read_text().splitlines()
+    checks = [
+        ("header rewritten to current FIELDS",
+         lines[0].split(",") == DetectionLog.FIELDS),
+        ("old short row preserved verbatim (not rewritten/padded)",
+         lines[1].split(",") == old_row),
+        ("new row has full width",
+         len(lines[2].split(",")) == len(DetectionLog.FIELDS)),
+    ]
     for desc, ok in checks:
         print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
 
