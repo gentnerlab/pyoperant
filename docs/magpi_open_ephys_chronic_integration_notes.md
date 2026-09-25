@@ -81,6 +81,41 @@ The Open Ephys acquisition link has priority over reproducing the behavioral-roo
 
 Development for the chronic integration is tracked on the `open_ephys_nt` branch of `gentnerlab/pyoperant`.
 
+### 2.4 Preferred transfer workflow (September 25 follow-up; setup pending)
+
+Nathan proposed cloning/pulling on asfour and transferring onward to MagPi. Use
+**GitHub → asfour → magpi101** as the preferred code-deployment route, with
+stimuli transferred separately. The earlier relay/mirror discussion was a
+candidate rather than a completed setup; no working relay or new SSH account is
+claimed yet.
+
+- **Code:** keep pyoperant and py-behaviors as Git repositories on both machines.
+  Asfour fetches reviewed upstream changes; MagPi fetches/pulls the asfour copies
+  over SSH. Verify the actual asfour login and repository paths before setting
+  remotes; `.100` is asfour on this network. Use `git pull --ff-only` on the
+  intended deployment branch, preserving the master behavior workflow. This
+  refuses divergent updates instead of making an unintended merge. Keep any
+  development branch choice explicit and record both installed commit SHAs.
+- **Transport fallback:** if asfour has no SSH server, create Git bundles on
+  asfour, send them to MagPi using its existing SSH/SCP connection, and fetch/pull
+  the bundles locally. This preserves committed Git history; it does not transfer
+  uncommitted edits. Asfour's OS, SSH-server availability and paths still need
+  inspection before producing machine-specific commands.
+- **Stimuli:** copy WAV directories and their manifests separately to the agreed
+  local stimulus root. Prefer resumable rsync when available at both ends; a
+  direct reachable storage-to-MagPi transfer is also fine. Preserve relative
+  paths, verify counts/checksums and manifest resolution, and avoid deleting or
+  replacing the active stimulus set during behavior/recording.
+- **Configuration/data:** keep live subject JSONs, logs, trial CSVs and sampling
+  state under `~/opdat/<subject>`. Code updates do not replace these. Before an
+  update, check working-tree status and the actual glab_behaviors import/symlink
+  location; after it, confirm versions and perform a short dummy-subject check.
+  Preserve the current acquisition network and perform code updates between runs.
+
+References: [Git pull](https://git-scm.com/docs/git-pull),
+[Git bundles](https://git-scm.com/docs/git-bundle),
+[rsync manual](https://download.samba.org/pub/rsync/rsync.1).
+
 ---
 
 ## 3. Rev D hardware used by the chronic rig
@@ -509,6 +544,9 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 ---
 
 ## 12. Open questions / TODO
+
+- [ ] **Make a Neuropixels-to-Doric commutator patch cable/adapter.** Establish the exact connector/pin mapping and ground/shield connections, provide strain relief, verify continuity/isolation before connecting equipment, and check recording integrity during commutator rotation. Requested September 25; exact cable specification and compatibility remain to establish.
+- [ ] Implement the preferred asfour Git relay and separate stimulus-transfer workflow in section 2.4; verify account/paths/import locations and capture installed commits. No relay setup has been performed by these documentation updates.
 
 - [x] Prepare config-driven session recording and queued semantic metadata in the actual `ivr_rt_pilot` inheritance path; offline implementation tested, awaiting review/merge and commissioning.
 - [ ] Deploy and bench-test `ivr_rt_chronic` with a dummy subject config; verify real recorded messages, CSV joins, mode restoration, disconnect handling and free-food eligibility.
