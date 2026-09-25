@@ -1,7 +1,7 @@
 # MagPi–Open Ephys Chronic Behavior Integration Notes
 
 **Status:** Living engineering note  
-**Last updated:** 2026-09-18  
+**Last updated:** 2026-09-25  
 **Scope:** Rev D MagPi chronic behaving setup with Open Ephys / OneBox  
 **Primary background reference:** `pyoperant_manual.md` (especially the standard MagPi hardware and deployment sections)  
 **Purpose:** Record the actual wiring, tested timing behavior, software conventions, deployment state, and unresolved issues for the chronic Open Ephys integration. This file should remain updateable during development and can later be folded into the main RPiOperant manual.
@@ -152,6 +152,18 @@ J7 pin 5 -> OneBox ADC11 ground
 ```
 
 ADC11 is an **electrical copy of the MagPi audio output**, not a microphone recording. It provides electrical playback onset/offset and a copy of the commanded waveform.
+
+---
+
+### 3.4 Wiring completion plan (2026-09-25)
+
+The next hardware task is to replace the temporary wire-to-wire connections with secure, labeled connections between the MagPi breakout boards and OneBox.
+
+- **Short term:** wire the existing breakout boards to BNC connectors and use BNC cables to the corresponding OneBox inputs. Provide a deliberate ground/return connection for each signal: signal to BNC center, the appropriate breakout GND to BNC shield. Preserve the validated ADC0–ADC3 and ADC11 assignments above, label both ends, and secure the cables against strain.
+- **Long term:** replace the interim assembly with dedicated HDMI-to-BNC breakouts. The required breakout boards are not currently available; obtain suitable boards before implementing this stage.
+- After rewiring, verify continuity/pin assignments and repeat a brief center-peck, left/right response, hopper, and audio recording check to confirm that the existing event mapping and resolved audio behavior are preserved.
+
+This plan concerns the front-panel J6/J7 signals and their designated grounds. The HiFiBerry Amp2 speaker terminals are a separate bridged output; neither speaker terminal is a BNC ground return.
 
 ---
 
@@ -368,19 +380,21 @@ The benchmark supports Message Center as a metadata path, not a precise timing p
 
 ## 8. ADC11 / J7 analog-audio artifact investigation
 
-### 8.1 Current observation
+**Resolved as reported by Nathan on 2026-09-25:** the oscilloscope investigation is complete and both MagPi audio potentiometers have been adjusted/fixed. The onset/offset issue is no longer a blocker. Final scope captures, residual transient amplitudes, and potentiometer positions were not supplied with this update; the earlier working hypothesis below is retained as history rather than a proven circuit-level explanation.
+
+### 8.1 Historical observation (before resolution)
 
 J7 → ADC11 produces a clear sustained copy of stimulus playback, but testing also revealed large onset and offset transients. The transients can serve as obvious playback boundaries, but their electrical cause has not yet been established.
 
 Small onset-associated deflections have also been observed on ADC8, ADC9, and ADC10. These channels are not used for reconstruction and may reflect pickup/crosstalk; that remains unverified.
 
-### 8.2 Current hardware hypothesis
+### 8.2 Historical hardware hypothesis
 
 The Rev D schematic shows trim pots `R43` and `R44` in the analog-audio interface. The hardware designer's working hypothesis is that the HiFiBerry differential legs (`L+`/`L-` or `R+`/`R-`) may not switch with perfectly matched transients, and imperfect trim-pot centering could leave a transient in the single-ended `AUDIO_OUT_L` / `AUDIO_OUT_R` signal.
 
 This is a **hypothesis**, not yet a validated cause.
 
-### 8.3 Planned oscilloscope test
+### 8.3 Investigation procedure (completed; retained for reference)
 
 For the left channel, inspect around playback start and stop:
 
@@ -491,8 +505,11 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 ## 12. Open questions / TODO
 
 - [ ] Finalize chronic-rig Git deployment while preserving the dedicated asfour ↔ MagPi Open Ephys network.
-- [ ] Scope the J7 left-channel differential/single-ended path and characterize the ADC11 onset/offset transients.
-- [ ] Test `R43` adjustment only under measurement.
+- [x] Complete the oscilloscope investigation of the audio onset/offset issue — Nathan reported it resolved on 2026-09-25.
+- [x] Adjust/fix both MagPi audio potentiometers (`R43`/`R44`) — reported complete on 2026-09-25.
+- [ ] **Short term:** replace temporary wire-to-wire hookups with existing breakout boards wired to BNC connectors/cables feeding OneBox; provide a ground/return for every signal, label connections, and add strain relief.
+- [ ] Verify the channel map, peck/hopper events, and audio after the wiring change.
+- [ ] **Long term:** obtain the currently unavailable HDMI-to-BNC breakout boards and install a dedicated HDMI-to-BNC connection assembly.
 - [ ] Add a chamber microphone channel to OneBox and document its channel assignment/calibration.
 - [ ] Update `recover_open_ephys_events.py` to the validated ADC0–ADC3 mapping.
 - [ ] Add robust ADC11 analog onset detection to the recovery script.
@@ -508,6 +525,10 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 ---
 
 ## 13. Changelog
+
+### 2026-09-25
+
+Nathan reported that the scope investigation is completely resolved and both MagPi potentiometers are fixed. Marked the scope/potentiometer tasks complete and retained the earlier artifact observations and hypothesis as historical context. Added the short-term breakout-board-to-BNC wiring task, a post-wiring functional check, and the long-term HDMI-to-BNC plan, pending availability of the required breakout boards.
 
 ### 2026-09-18
 
