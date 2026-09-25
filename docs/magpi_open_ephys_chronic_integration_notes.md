@@ -159,8 +159,8 @@ ADC11 is an **electrical copy of the MagPi audio output**, not a microphone reco
 
 The next hardware task is to replace the temporary wire-to-wire connections with secure, labeled connections between the MagPi breakout boards and OneBox.
 
-- **Short term:** wire the existing breakout boards to BNC connectors and use BNC cables to the corresponding OneBox inputs. Provide a deliberate ground/return connection for each signal: signal to BNC center, the appropriate breakout GND to BNC shield. Preserve the validated ADC0–ADC3 and ADC11 assignments above, label both ends, and secure the cables against strain.
-- **Long term:** replace the interim assembly with dedicated HDMI-to-BNC breakouts. The required breakout boards are not currently available; obtain suitable boards before implementing this stage.
+- **Short term:** Nathan is proceeding with the Open Ephys breakout board for analog audio: J7 pin 1 / AUDIO_OUT_L to OneBox IO10 (ADC10), and J7 pin 3 / AUDIO_OUT_R to IO11 (ADC11), via BNC. This new mapping supersedes the historical left-audio-to-ADC11 arrangement when rewiring is completed; it has not yet been verified in a supplied recording. Use signal to BNC center and the designated breakout GND to shield; label and strain-relieve both ends. Keep ADC0–ADC3 assigned to left/center/right/hopper.
+- **Long term:** route the digital J6 signals through HDMI-to-BNC breakout → BNC cables → OneBox BNC breakout too. **Another breakout board is required** before this can be completed. Keep the dedicated analog/digital breakout procurement and pin verification on the hardware TODO.
 - After rewiring, verify continuity/pin assignments and repeat a brief center-peck, left/right response, hopper, and audio recording check to confirm that the existing event mapping and resolved audio behavior are preserved.
 
 This plan concerns the front-panel J6/J7 signals and their designated grounds. The HiFiBerry Amp2 speaker terminals are a separate bridged output; neither speaker terminal is a BNC ground return.
@@ -169,7 +169,7 @@ This plan concerns the front-panel J6/J7 signals and their designated grounds. T
 
 ## 4. OneBox / Open Ephys configuration
 
-### 4.1 Validated channel map
+### 4.1 Historically validated channel map (before the September 25 rewire)
 
 | OneBox channel | Physical signal | Use |
 |---|---|---|
@@ -181,6 +181,8 @@ This plan concerns the front-panel J6/J7 signals and their designated grounds. T
 
 Earlier development notes sometimes used `IO0`, `IO1`, etc. Saved Open Ephys continuous data and `structure.oebin` label these channels as `ADC0` ... `ADC11`. Analysis code should prefer recorded `ADC#` names or robustly resolve either naming convention.
 
+The September 25 planned mapping changes audio to **left ADC10, right ADC11**. Record the final wiring and verify both channels before applying this new map in analysis. Historical recordings retain their original map. TXD is the serial transmit signal, separate from the HTTP metadata path; it remains unwired for this integration.
+
 ### 4.2 Input modes
 
 In the OneBox ADC/DAC settings:
@@ -189,6 +191,8 @@ In the OneBox ADC/DAC settings:
 - `ADC11`: analog input; Digital Input mode OFF.
 
 `ADC0`–`ADC3` carry binary behavioral states. `ADC11` must remain analog because it carries a waveform.
+
+After the planned stereo rewire, **both ADC10 and ADC11 must have Digital Input mode OFF**. The software config's channel map records provenance only and does not change these GUI settings.
 
 ### 4.3 Sample rate
 
@@ -479,6 +483,8 @@ A useful future addition is to include Git provenance in the local session log, 
 
 ## 11. Git / documentation workflow
 
+September 25 implementation: `ivr_rt_chronic` and its standard-library recorder helper are prepared together in py-behaviors on `codex/ivr-rt-chronic-recording`, targeting master. Keeping this first integration together avoids an extra core-branch deployment dependency; the generic helper can move into pyoperant when stable. The ordinary `ivr_rt_pilot` source is unchanged. See [configuration, lifecycle and commissioning instructions](ivr_rt_chronic_recording.md). Eighteen offline tests pass against pinned real behavior/core sources with simulated hardware and a local HTTP server; no MagPi/Open Ephys deployment or physical test is claimed. The standalone center-port diagnostic remains separate. The new wrapper records ordinary trials; activating continuation/silence probes is a subsequent behavior change.
+
 The chronic rig should ultimately follow the same principle as the rest of the lab: production behavior comes from version-controlled code rather than ad-hoc files on the Raspberry Pi.
 
 Recommended repository split:
@@ -504,6 +510,11 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 
 ## 12. Open questions / TODO
 
+- [x] Prepare config-driven session recording and queued semantic metadata in the actual `ivr_rt_pilot` inheritance path; offline implementation tested, awaiting review/merge and commissioning.
+- [ ] Deploy and bench-test `ivr_rt_chronic` with a dummy subject config; verify real recorded messages, CSV joins, mode restoration, disconnect handling and free-food eligibility.
+- [ ] Obtain the additional breakout board for **digital HDMI → BNC → BNC** wiring.
+- [ ] Verify the new stereo map: left audio ADC10, right audio ADC11; both analog, and ADC0–ADC3 remain the four physical behavioral-state channels.
+
 - [ ] Finalize chronic-rig Git deployment while preserving the dedicated asfour ↔ MagPi Open Ephys network.
 - [x] Complete the oscilloscope investigation of the audio onset/offset issue — Nathan reported it resolved on 2026-09-25.
 - [x] Adjust/fix both MagPi audio potentiometers (`R43`/`R44`) — reported complete on 2026-09-25.
@@ -512,11 +523,11 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 - [ ] **Long term:** obtain the currently unavailable HDMI-to-BNC breakout boards and install a dedicated HDMI-to-BNC connection assembly.
 - [ ] Add a chamber microphone channel to OneBox and document its channel assignment/calibration.
 - [ ] Update `recover_open_ephys_events.py` to the validated ADC0–ADC3 mapping.
-- [ ] Add robust ADC11 analog onset detection to the recovery script.
-- [ ] Finalize the compact Message Center event schema.
-- [ ] Integrate compact Open Ephys metadata into `song_recognition_early_resp_subset_first_valid`.
-- [ ] Ensure no blocking HTTP call delays stimulus onset, response polling, audio stop, or reward.
-- [ ] Test ADC11 onset detection across real birdsong, clean stimuli, and noise mixtures.
+- [ ] Add robust audio onset detection to the recovery script, using each recording's channel map (historical left ADC11; planned left ADC10/right ADC11).
+- [x] Prepare version-1 compact session/trial metadata schema; validate actual saved GUI messages during commissioning.
+- [x] Integrate metadata into the selected full `ivr_rt_pilot` path via `ivr_rt_chronic`, superseding the older subset-behavior target. Review/merge and hardware validation remain open.
+- [x] Keep HTTP/journal work outside onset, response polling, audio stop and reward paths in the candidate; verify physical timing under load on the rig.
+- [ ] Test electrical audio onset detection across real birdsong, clean stimuli, and noise mixtures using the final channel map.
 - [ ] Verify whether the Message Center ↔ OneBox timestamp offset remains similar across sessions/configurations. This is QC only; analysis should not depend on correcting it.
 - [ ] Characterize the small ADC8/ADC9/ADC10 onset artifacts if they become relevant.
 - [ ] Decide final placement in the main manual once the chronic workflow stabilizes.
@@ -527,6 +538,8 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 ## 13. Changelog
 
 ### 2026-09-25
+
+Follow-up: recorded the planned left/right audio rewire to ADC10/ADC11 and the extra breakout board needed for the digital BNC route. Added the config-driven `ivr_rt_chronic` implementation/commissioning guide. This candidate uses session recording ownership, retrospective trial metadata, local JSONL, CSV session IDs, and a failure latch preserving configured free-food eligibility. Eighteen offline checks pass; real GUI/OneBox commissioning remains open.
 
 Nathan reported that the scope investigation is completely resolved and both MagPi potentiometers are fixed. Marked the scope/potentiometer tasks complete and retained the earlier artifact observations and hypothesis as historical context. Added the short-term breakout-board-to-BNC wiring task, a post-wiring functional check, and the long-term HDMI-to-BNC plan, pending availability of the required breakout boards.
 
