@@ -46,6 +46,43 @@ estimate than today's live `harmonic_ratio`, see the starsong-feature-
 analysis project) lands in the live gate, which should make this gate
 sharper without changing the surrounding state machine.
 
+Runaway-episode safety cap
+----------------------------
+`_clip_buffer` (the in-memory audio accumulated for the episode currently
+being recorded) has no size limit of its own -- it grows by one chunk every
+time the smoother stays triggered, and `post_countdown` resets to the full
+`post_roll` on every triggered chunk (see `_process()`), so an episode that
+never naturally releases never flushes. A real singing bout tops out at
+tens of seconds in every real recording seen so far; there's no legitimate
+reason for one episode to run for minutes, let alone hours. But nothing
+upstream *guarantees* that -- a stuck/faulty mic, a persistent noise source
+sitting in the vocalization band, or any other condition that keeps the
+gate (or in `gate_cnn` mode, the classifier) continuously triggered would
+grow this buffer without bound. At 100ms/float32/48kHz that's roughly
+19KB/chunk -- around 675MB/hour of continuous triggering, easily enough to
+exhaust a Rev D board's ~970MB of RAM well within a single unattended
+overnight window, long before anything would think to log an error. This
+isn't hypothetical: a USB mic silently going stuck/dead-but-still-open is
+already a confirmed real failure mode on this fleet (see "Device-loss
+detection and recovery" just below), and two real, otherwise-unexplained
+fleet outages (magpi10 2026-09-21, magpi06 2026-09-23 -- both Lights boxes
+running this exact pipeline, both requiring a physical power cycle to
+recover, neither leaving any forensic trace since journald is volatile
+fleet-wide) are consistent with exactly this mechanism.
+
+`max_episode_duration` bounds this directly, independent of whatever
+external condition is causing it: once an episode has been continuously
+triggered for this long, `_process()` force-closes and saves it (logged at
+`warning`, not `info` -- this should never happen during real operation, so
+if it does, it belongs in whatever's watching the logs) exactly as if the
+smoother had released normally, then lets the very next chunk open a fresh
+episode if still triggered. This bounds peak memory to
+`max_episode_duration`'s worth of audio, not zero-growth -- a mic stuck
+true forever still produces one oversized "clip" every
+`max_episode_duration` seconds instead of one unbounded one, which is a
+loud, visible symptom (a suspiciously long, on-the-clock file repeating in
+`recordings/`) rather than a silent multi-hour crash.
+
 Device-loss detection and recovery
 ------------------------------------
 Confirmed live, 2026-09-09 (see project_vocal_recorder memory): unplugging
@@ -263,6 +300,11 @@ DEFAULT_CONFIG = {
     "precursor_max_duration": 3.0,   # episode must be no longer than this to qualify
     "precursor_min_score":    0.55,  # ...and confidently scored (base gate.threshold is 0.45)
     "precursor_grace_period": 8.0,   # extended hangover granted instead of post_roll
+    # Runaway-episode safety cap -- see module docstring. Generous relative
+    # to any real song bout observed so far (tens of seconds), tight enough
+    # to keep worst-case _clip_buffer memory small and bounded (~11MB at
+    # this default, vs. unbounded growth without it).
+    "max_episode_duration": 60.0,
     # Device-loss detection and recovery -- see module docstring.
     "device_watchdog_timeout":         5.0,   # seconds of silence before declaring the device lost
     "device_reconnect_backoff_initial": 1.0,  # seconds before the first reconnect retry
@@ -462,6 +504,7 @@ class SongMonitor:
         self._pre_buffer     = collections.deque(maxlen=int(self.cfg["pre_roll"] / dur))
         self._post_chunks    = int(self.cfg["post_roll"] / dur)
         self._precursor_grace_chunks = int(self.cfg["precursor_grace_period"] / dur)
+        self._max_episode_chunks = int(self.cfg["max_episode_duration"] / dur)
         self._recording      = False
         self._post_countdown = 0
         # Per-episode state for the precursor-grace decision (see module
@@ -849,6 +892,23 @@ class SongMonitor:
             # continuous clip instead of re-extending indefinitely.
             self._post_countdown = self._post_chunks
 
+            # Runaway-episode safety cap -- see module docstring. Force a
+            # close+save exactly as if the smoother had released normally;
+            # the very next chunk opens a fresh episode if still triggered,
+            # so a persistently stuck trigger keeps producing bounded
+            # oversized clips instead of one unbounded in-memory buffer.
+            if self._episode_active_chunks >= self._max_episode_chunks:
+                log.warning(
+                    "Episode force-closed after %.0fs (max_episode_duration "
+                    "cap) — still triggered when closed. This should not "
+                    "happen during real singing; check the microphone/audio "
+                    "chain if this recurs.",
+                    self._episode_active_chunks * self.cfg["chunk_duration"],
+                )
+                self._recording = False
+                self._save_clip(gate_result)
+                self._clip_buffer = []
+
         elif self._recording:
             self._clip_buffer.append(chunk)
             self._post_countdown -= 1
@@ -1110,6 +1170,7 @@ def self_test():
     _self_test_raw_mode()
     _self_test_mode_validation()
     _self_test_detection_log_header_migration()
+    _self_test_max_episode_duration()
 
 
 class _FakeAudioInputWatchdog:
@@ -1702,6 +1763,87 @@ def _self_test_detection_log_header_migration():
     ]
     for desc, ok in checks:
         print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
+
+
+def _self_test_max_episode_duration():
+    """Confirms the runaway-episode safety cap (see module docstring's
+    "Runaway-episode safety cap" section): a persistently-triggered gate
+    force-closes and saves a clip every max_episode_duration seconds
+    instead of growing _clip_buffer without bound -- the concrete
+    mechanism believed to explain two otherwise-unexplained fleet outages
+    (magpi10 2026-09-21, magpi06 2026-09-23), both Lights boxes running
+    this exact pipeline, both requiring a physical power cycle."""
+    import tempfile
+    from pathlib import Path as _Path
+    from pyoperant.song_recording.smoother import CombinedSmoother
+
+    print("\n=== Runaway-episode safety cap self-test ===")
+    tmp_dir = _Path(tempfile.mkdtemp(prefix="max_episode_selftest_"))
+
+    max_dur = 2.0  # seconds -- short, for a fast test
+    cfg = {
+        "output_dir": str(tmp_dir),
+        "log_csv":    str(tmp_dir / "detections.csv"),
+        "max_episode_duration": max_dur,
+    }
+    # Continuously triggered for far longer than max_episode_duration, no
+    # gaps at all -- a stuck-mic-style sequence, the exact condition the
+    # cap exists for.
+    n_chunks = 55  # 5.5s at the default 0.1s chunks -- spans 2 full windows
+    sequence = [(True, 0.9)] * n_chunks
+
+    monitor = SongMonitor(
+        cfg, audio_input=None,
+        gate=_FakeGate(sequence), extractor=object(),
+        smoother=CombinedSmoother.from_config_dict({}),
+    )
+
+    saved_sizes = []
+    real_save_clip = monitor._save_clip
+
+    def spy_save_clip(gate_result):
+        saved_sizes.append(len(monitor._clip_buffer))
+        real_save_clip(gate_result)
+
+    monitor._save_clip = spy_save_clip
+
+    handler = _ListLogHandler()
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    try:
+        chunk = np.zeros(monitor._chunk_len, dtype=np.float32)
+        max_buffer_len_seen = 0
+        for _ in range(len(sequence)):
+            monitor._process(chunk)
+            max_buffer_len_seen = max(max_buffer_len_seen, len(monitor._clip_buffer))
+    finally:
+        log.removeHandler(handler)
+
+    n_warnings = sum(1 for r in handler.records if r.levelno == logging.WARNING)
+    expected_forced_closes = n_chunks // monitor._max_episode_chunks
+    # Every saved clip includes up to pre_buffer's maxlen chunks of
+    # pre-roll prefix on top of max_episode_chunks of active chunks (the
+    # same prefix any normal, non-forced clip also gets -- see
+    # _process()'s episode-open branch) -- the real bound this test
+    # checks for is THIS, not max_episode_chunks alone.
+    max_expected_buffer = monitor._max_episode_chunks + monitor._pre_buffer.maxlen
+
+    checks = [
+        ("episode force-closed at least twice (55 chunks / 20-chunk cap)",
+         len(saved_sizes) >= expected_forced_closes),
+        ("each forced clip is bounded (cap + pre-roll prefix), not larger",
+         all(s <= max_expected_buffer for s in saved_sizes)),
+        ("buffer never grew past the bound -- bounded, not unbounded",
+         max_buffer_len_seen <= max_expected_buffer),
+        ("a WARNING was logged for each forced close",
+         n_warnings >= expected_forced_closes),
+        ("still recording/open at the end (sequence never naturally released)",
+         monitor._recording is True),
+    ]
+    for desc, ok in checks:
+        print(f"  [{'OK' if ok else 'FAIL'}] {desc}")
+    print(f"  (forced {len(saved_sizes)} clip(s), sizes={saved_sizes} chunks, "
+          f"max buffer seen={max_buffer_len_seen} chunks, cap={monitor._max_episode_chunks})")
 
 
 # ---------------------------------------------------------------------------
