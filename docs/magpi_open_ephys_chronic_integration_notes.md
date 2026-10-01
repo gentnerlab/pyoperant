@@ -1,7 +1,7 @@
 # MagPi–Open Ephys Chronic Behavior Integration Notes
 
 **Status:** Living engineering note  
-**Last updated:** 2026-09-30  
+**Last updated:** 2026-10-01  
 **Scope:** Rev D MagPi chronic behaving setup with Open Ephys / OneBox  
 **Primary background reference:** `pyoperant_manual.md` (especially the standard MagPi hardware and deployment sections)  
 **Purpose:** Record the actual wiring, tested timing behavior, software conventions, deployment state, and unresolved issues for the chronic Open Ephys integration. This file should remain updateable during development and can later be folded into the main RPiOperant manual.
@@ -77,43 +77,138 @@ Validated on 2026-09-18:
 - those origins match the normal behavioral-room topology but are not valid chronic-rig deployment remotes because `192.168.1.100` is asfour here;
 - direct GitHub access from `magpi101` is not currently available.
 
-The Open Ephys acquisition link has priority over reproducing the behavioral-room network topology. Git deployment should be finalized without renumbering or otherwise disturbing the validated `192.168.1.100` ↔ `192.168.1.101` acquisition network. An asfour-side Git relay/mirror is one candidate; controlled forwarding is another. This remains a setup TODO.
+The Open Ephys acquisition link has priority over reproducing the behavioral-room network topology. The Git-bundle workflow in section 2.4 was confirmed working by Nathan on 2026-10-01 and preserves the validated `192.168.1.100` ↔ `192.168.1.101` acquisition network. It supersedes the earlier relay/mirror or forwarding setup proposal for routine code transfer.
 
 Development for the chronic integration is tracked on the `open_ephys_nt` branch of `gentnerlab/pyoperant`.
 
-### 2.4 Preferred transfer workflow (September 25 follow-up; setup pending)
+### 2.4 Tested code-transfer workflow: GitHub → asfour → magpi101
 
-Nathan proposed cloning/pulling on asfour and transferring onward to MagPi. Use
-**GitHub → asfour → magpi101** as the preferred code-deployment route, with
-stimuli transferred separately. The earlier relay/mirror discussion was a
-candidate rather than a completed setup; no working relay or new SSH account is
-claimed yet.
+**Confirmed working by Nathan on 2026-10-01.** Clone/pull the code on asfour,
+create Git bundles, copy them to magpi101 over its existing SSH connection, and
+pull locally from the bundles. This preserves committed code and Git history
+without requiring GitHub access from MagPi or an SSH server on asfour.
+Uncommitted edits are not included in a bundle.
 
-- **Code:** keep pyoperant and py-behaviors as Git repositories on both machines.
-  Asfour fetches reviewed upstream changes; MagPi fetches/pulls the asfour copies
-  over SSH. Verify the actual asfour login and repository paths before setting
-  remotes; `.100` is asfour on this network. Use `git pull --ff-only` on the
-  intended deployment branch, preserving the master behavior workflow. This
-  refuses divergent updates instead of making an unintended merge. Keep any
-  development branch choice explicit and record both installed commit SHAs.
-- **Transport fallback:** if asfour has no SSH server, create Git bundles on
-  asfour, send them to MagPi using its existing SSH/SCP connection, and fetch/pull
-  the bundles locally. This preserves committed Git history; it does not transfer
-  uncommitted edits. Asfour's OS, SSH-server availability and paths still need
-  inspection before producing machine-specific commands.
-- **Stimuli:** copy WAV directories and their manifests separately to the agreed
-  local stimulus root. Prefer resumable rsync when available at both ends; a
-  direct reachable storage-to-MagPi transfer is also fine. Preserve relative
-  paths, verify counts/checksums and manifest resolution, and avoid deleting or
-  replacing the active stimulus set during behavior/recording.
-- **Configuration/data:** keep live subject JSONs, logs, trial CSVs and sampling
-  state under `~/opdat/<subject>`. Code updates do not replace these. Before an
-  update, check working-tree status and the actual glab_behaviors import/symlink
-  location; after it, confirm versions and perform a short dummy-subject check.
-  Preserve the current acquisition network and perform code updates between runs.
+These commands transfer **master** for both repositories. This documentation
+lives on `open_ephys_nt`; that does not change the runtime branch selected below.
+Use a shell that supports these commands on asfour (for example Git Bash on
+Windows or a Linux terminal). Keep the existing acquisition network unchanged.
 
-References: [Git pull](https://git-scm.com/docs/git-pull),
+#### 1. On asfour: clone the repositories
+
+```bash
+git --version
+mkdir -p ~/code
+cd ~/code
+
+git clone --branch master https://github.com/gentnerlab/pyoperant.git
+git clone --branch master https://github.com/gentnerlab/py-behaviors.git
+```
+
+Use a GitHub account with lab-repository access when prompted. Git Credential
+Manager can handle browser sign-in for HTTPS clones. If either folder already
+exists, use that checkout rather than cloning over it; verify its working tree
+is clean and its branch is `master` before updating or packaging it.
+
+#### 2. From asfour: connect to the MagPi
+
+```bash
+ssh bird@192.168.1.101
+```
+
+Enter the MagPi's `bird` account password if requested. Once connected:
+
+```bash
+hostname
+mkdir -p ~/code_transfer
+
+git -C ~/pyoperant status --short
+git -C ~/pyoperant branch --show-current
+
+git -C ~/py-behaviors status --short
+git -C ~/py-behaviors branch --show-current
+```
+
+Expect `magpi101`, clean working trees (`status --short` prints nothing), and
+`master` for both repositories. If these differ, stop and inspect the output
+before updating. Preserve local changes; do not reset or delete them to force a pull.
+
+Return to asfour:
+
+```bash
+exit
+```
+
+#### 3. On asfour: package and transfer the code
+
+```bash
+cd ~/code
+
+git -C pyoperant bundle create ../pyoperant.bundle master
+git -C py-behaviors bundle create ../py-behaviors.bundle master
+
+scp pyoperant.bundle py-behaviors.bundle bird@192.168.1.101:/home/bird/code_transfer/
+```
+
+The bundles are written to `~/code` on asfour and copied to `~/code_transfer`
+on MagPi. They carry the committed history reachable from `master`.
+
+#### 4. On MagPi: apply updates between behavior/recording runs
+
+Reconnect from asfour:
+
+```bash
+ssh bird@192.168.1.101
+```
+
+If both repositories are still clean and on `master`, with behavior/recording stopped:
+
+```bash
+git -C ~/pyoperant pull --ff-only ~/code_transfer/pyoperant.bundle master
+git -C ~/py-behaviors pull --ff-only ~/code_transfer/py-behaviors.bundle master
+
+git -C ~/pyoperant rev-parse --short HEAD
+git -C ~/py-behaviors rev-parse --short HEAD
+```
+
+Record both installed commit SHAs with the deployment notes. `--ff-only` refuses
+divergent updates. If it reports divergence, preserve the local changes and
+inspect the branch histories before proceeding. Pulling from an explicit bundle
+path does not depend on, or repair, the old `origin` URLs described in section 2.3.
+
+#### Subsequent updates
+
+First run these **on asfour**, with both checkouts clean and on `master`, then
+repeat the bundle/transfer/pull steps above:
+
+```bash
+cd ~/code
+git -C pyoperant pull --ff-only origin master
+git -C py-behaviors pull --ff-only origin master
+```
+
+**Recording integration status, checked 2026-10-01:**
+[py-behaviors PR #12](https://github.com/gentnerlab/py-behaviors/pull/12) remains
+open, draft, and unmerged. The commands above transfer `master`; they do not
+install that PR's `ivr_rt_chronic` behavior. It becomes available through this
+workflow after review and merge into master. A successful code transfer is
+separate from the [recording commissioning checks](ivr_rt_chronic_recording.md#deployment-and-commissioning).
+
+#### Stimuli, configuration, and data remain separate
+
+- **Stimuli:** copy WAV directories and manifests separately to the agreed local
+  stimulus root. Prefer resumable rsync when available at both ends; a direct
+  reachable storage-to-MagPi transfer is also fine. Preserve relative paths and
+  verify counts/checksums and manifest resolution. Do not replace the active
+  stimulus set during behavior/recording.
+- **Configuration/data:** keep live subject JSONs, logs, trial CSVs, and sampling
+  state under `~/opdat/<subject>`. The bundle commands do not replace these.
+  Confirm the actual `glab_behaviors` import/symlink location and perform a short
+  dummy-subject check after a code update, before resuming animal work.
+
+References: [GitHub credential caching](https://docs.github.com/en/get-started/git-basics/caching-your-github-credentials-in-git),
 [Git bundles](https://git-scm.com/docs/git-bundle),
+[Git pull](https://git-scm.com/docs/git-pull),
 [rsync manual](https://download.samba.org/pub/rsync/rsync.1).
 
 ---
@@ -571,7 +666,8 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 ## 12. Open questions / TODO
 
 - [ ] **Make a Neuropixels-to-Doric commutator patch cable/adapter.** Establish the exact connector/pin mapping and ground/shield connections, provide strain relief, verify continuity/isolation before connecting equipment, and check recording integrity during commutator rotation. Requested September 25; exact cable specification and compatibility remain to establish.
-- [ ] Implement the preferred asfour Git relay and separate stimulus-transfer workflow in section 2.4; verify account/paths/import locations and capture installed commits. No relay setup has been performed by these documentation updates.
+- [x] Establish GitHub → asfour → magpi101 code transfer using Git bundles and SSH/SCP; Nathan confirmed the section 2.4 workflow works on 2026-10-01.
+- [ ] Complete/verify the separate stimulus-transfer workflow; check manifest resolution and the actual behavior import/symlink location, and capture installed commits for each deployment.
 
 - [x] Prepare config-driven session recording and queued semantic metadata in the actual `ivr_rt_pilot` inheritance path; offline implementation tested, awaiting review/merge and commissioning.
 - [ ] Deploy and bench-test `ivr_rt_chronic` with a dummy subject config; verify real recorded messages, CSV joins, mode restoration, disconnect handling and free-food eligibility.
@@ -579,7 +675,7 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 - [x] Validate permanent digital mapping: breakout IO1→ADC0 left, IO2→ADC1 center, IO3→ADC2 right, IO4→ADC3 hopper.
 - [ ] Verify the planned stereo audio map: left audio ADC10, right audio ADC11; both analog.
 
-- [ ] Finalize chronic-rig Git deployment while preserving the dedicated asfour ↔ MagPi Open Ephys network.
+- [x] Establish a working chronic-rig code-update route while preserving the dedicated asfour ↔ MagPi Open Ephys network; master bundle transfer confirmed working on 2026-10-01.
 - [x] Complete the oscilloscope investigation of the audio onset/offset issue — Nathan reported it resolved on 2026-09-25.
 - [x] Adjust/fix both MagPi audio potentiometers (`R43`/`R44`) — reported complete on 2026-09-25.
 - [x] Replace the temporary digital wire-to-wire hookup with HDMI-to-BNC breakout → BNC → OneBox wiring.
@@ -599,6 +695,10 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 ---
 
 ## 13. Changelog
+
+### 2026-10-01
+
+Nathan confirmed the asfour → magpi101 Git-bundle workflow works. Replaced the setup-pending section with the tested clone, SSH check, bundle/SCP transfer, fast-forward pull, installed-commit reporting, and subsequent-update commands. Marked the code-transfer setup complete; retained separate stimulus-transfer and recording-commissioning tasks. Checked that py-behaviors PR #12 remains an unmerged draft, so transferring master does not yet install that recording integration.
 
 ### 2026-09-30
 
