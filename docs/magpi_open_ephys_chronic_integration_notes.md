@@ -1,7 +1,7 @@
 # MagPi–Open Ephys Chronic Behavior Integration Notes
 
 **Status:** Living engineering note  
-**Last updated:** 2026-09-25  
+**Last updated:** 2026-09-30  
 **Scope:** Rev D MagPi chronic behaving setup with Open Ephys / OneBox  
 **Primary background reference:** `pyoperant_manual.md` (especially the standard MagPi hardware and deployment sections)  
 **Purpose:** Record the actual wiring, tested timing behavior, software conventions, deployment state, and unresolved issues for the chronic Open Ephys integration. This file should remain updateable during development and can later be folded into the main RPiOperant manual.
@@ -150,15 +150,29 @@ Relevant J6 signals from the Rev D schematic:
 | 2, 5, 8, 11, 17, 20–23 | GND / shield |
 | 18 | VCC — do not connect to OneBox ADC/GND |
 
-Validated chronic wiring:
+The digital HDMI is now connected through the Open Ephys HDMI-to-BNC breakout. On that breakout, the BNC center conductors expose the HDMI signal lines while the BNC shells are tied to DGND by the breakout board.
+
+**Validated chronic digital wiring (2026-09-30):**
+
+| Open Ephys breakout BNC | J6 signal | OneBox channel | Behavioral signal |
+|---|---|---|---|
+| `IO1` | J6 pin 1 / `LFT_IR_STATE` | `ADC0` | `left_ir` |
+| `IO2` | J6 pin 3 / `CTR_IR_STATE` | `ADC1` | center peck port |
+| `IO3` | J6 pin 4 / `RGT_IR_STATE` | `ADC2` | right peck port |
+| `IO4` | J6 pin 6 / `HOPPER_IR_STATE` | `ADC3` | `hopper_ir` |
+
+Equivalent signal path:
 
 ```text
-J6 pin 1  -> OneBox ADC0 -> left IR
-J6 pin 3  -> OneBox ADC1 -> center IR
-J6 pin 4  -> OneBox ADC2 -> right IR
-J6 pin 6  -> OneBox ADC3 -> hopper IR
-J6 pin 8  -> OneBox GND
+MagPi J6 digital HDMI
+    -> Open Ephys HDMI-to-BNC breakout
+        IO1 -> OneBox ADC0 -> left_ir
+        IO2 -> OneBox ADC1 -> center peck port
+        IO3 -> OneBox ADC2 -> right peck port
+        IO4 -> OneBox ADC3 -> hopper_ir
 ```
+
+The four channels were functionally tested after wiring and produced the expected behavioral-state transitions. The remaining breakout channels corresponding to `TXD`, `AUX_IR_1_STATE`, `AUX_IR_2_STATE`, and `GPIO_16` are not used for the current chronic behavior integration.
 
 Observed polarity in the OneBox recordings:
 
@@ -179,55 +193,54 @@ Relevant J7 signals:
 | 2, 5, 8, 11, 17, 20–23 | GND / shield |
 | 18 | VCC |
 
-Validated chronic wiring:
+Historically validated chronic wiring:
 
 ```text
 J7 pin 1 -> OneBox ADC11 signal
 J7 pin 5 -> OneBox ADC11 ground
 ```
 
-ADC11 is an **electrical copy of the MagPi audio output**, not a microphone recording. It provides electrical playback onset/offset and a copy of the commanded waveform.
+ADC11 in those recordings is an **electrical copy of the MagPi audio output**, not a microphone recording. It provides electrical playback onset/offset and a copy of the commanded waveform.
 
 ---
 
-### 3.4 Wiring completion plan (2026-09-25)
+### 3.4 Breakout/BNC wiring status
 
-The next hardware task is to replace the temporary wire-to-wire connections with secure, labeled connections between the MagPi breakout boards and OneBox.
+The digital J6 wiring is now complete and validated using the Open Ephys HDMI-to-BNC breakout and standard BNC cables to OneBox. The canonical digital map is `IO1–IO4 -> ADC0–ADC3 -> left/center/right/hopper` as listed in Section 3.2.
 
-- **Short term:** Nathan is proceeding with the Open Ephys breakout board for analog audio: J7 pin 1 / AUDIO_OUT_L to OneBox IO10 (ADC10), and J7 pin 3 / AUDIO_OUT_R to IO11 (ADC11), via BNC. This new mapping supersedes the historical left-audio-to-ADC11 arrangement when rewiring is completed; it has not yet been verified in a supplied recording. Use signal to BNC center and the designated breakout GND to shield; label and strain-relieve both ends. Keep ADC0–ADC3 assigned to left/center/right/hopper.
-- **Long term:** route the digital J6 signals through HDMI-to-BNC breakout → BNC cables → OneBox BNC breakout too. **Another breakout board is required** before this can be completed. Keep the dedicated analog/digital breakout procurement and pin verification on the hardware TODO.
-- After rewiring, verify continuity/pin assignments and repeat a brief center-peck, left/right response, hopper, and audio recording check to confirm that the existing event mapping and resolved audio behavior are preserved.
+For analog audio, the September 25 plan remains to use the analog breakout for stereo monitoring: J7 pin 1 / `AUDIO_OUT_L` to OneBox IO10 (`ADC10`) and J7 pin 3 / `AUDIO_OUT_R` to IO11 (`ADC11`) via BNC. That planned stereo map should not be treated as verified until a recording confirms both channels. Historical recordings used left audio on ADC11.
 
-This plan concerns the front-panel J6/J7 signals and their designated grounds. The HiFiBerry Amp2 speaker terminals are a separate bridged output; neither speaker terminal is a BNC ground return.
+After any analog rewiring, repeat a short audio recording check and record the final channel map in this note. The HiFiBerry Amp2 speaker terminals are a separate bridged output; neither speaker terminal is a BNC ground return.
 
 ---
 
 ## 4. OneBox / Open Ephys configuration
 
-### 4.1 Historically validated channel map (before the September 25 rewire)
+### 4.1 Current behavioral-state channel map
 
-| OneBox channel | Physical signal | Use |
-|---|---|---|
-| `ADC0` | Left IR state | Left response timing |
-| `ADC1` | Center IR state | Trial initiation / center-peck timing |
-| `ADC2` | Right IR state | Right response timing |
-| `ADC3` | Hopper IR state | Physical hopper-up / hopper-down timing |
-| `ADC11` | Left electrical audio copy | Electrical playback onset/offset |
+The digital behavior-state map below was re-validated with the HDMI-to-BNC breakout on 2026-09-30:
 
-Earlier development notes sometimes used `IO0`, `IO1`, etc. Saved Open Ephys continuous data and `structure.oebin` label these channels as `ADC0` ... `ADC11`. Analysis code should prefer recorded `ADC#` names or robustly resolve either naming convention.
+| OneBox channel | Breakout BNC | Physical signal | Use |
+|---|---|---|---|
+| `ADC0` | `IO1` | Left IR state | Left response timing |
+| `ADC1` | `IO2` | Center IR state | Trial initiation / center-peck timing |
+| `ADC2` | `IO3` | Right IR state | Right response timing |
+| `ADC3` | `IO4` | Hopper IR state | Physical hopper-up / hopper-down timing |
 
-The September 25 planned mapping changes audio to **left ADC10, right ADC11**. Record the final wiring and verify both channels before applying this new map in analysis. Historical recordings retain their original map. TXD is the serial transmit signal, separate from the HTTP metadata path; it remains unwired for this integration.
+Earlier development notes sometimes used `IO0`, `IO1`, etc. for OneBox input labels. Saved Open Ephys continuous data and `structure.oebin` label these acquisition channels as `ADC0` ... `ADC11`. The `IO1–IO4` labels in the table above refer specifically to the four BNCs on the HDMI breakout board, not the saved Open Ephys channel names.
+
+Historical recordings used left electrical audio on `ADC11`. The September 25 planned stereo mapping changes audio to **left ADC10, right ADC11**. Record and verify the final wiring before applying that new audio map in analysis. Historical recordings retain their original map. `TXD` is separate from the HTTP metadata path and remains unwired for the current integration.
 
 ### 4.2 Input modes
 
 In the OneBox ADC/DAC settings:
 
 - `ADC0`–`ADC3`: Digital Input mode ON;
-- `ADC11`: analog input; Digital Input mode OFF.
+- historical `ADC11` audio: analog input; Digital Input mode OFF.
 
-`ADC0`–`ADC3` carry binary behavioral states. `ADC11` must remain analog because it carries a waveform.
+`ADC0`–`ADC3` carry binary behavioral states. Audio channels must remain analog because they carry waveforms.
 
-After the planned stereo rewire, **both ADC10 and ADC11 must have Digital Input mode OFF**. The software config's channel map records provenance only and does not change these GUI settings.
+After the planned stereo audio rewire, **both ADC10 and ADC11 must have Digital Input mode OFF**. The software config's channel map records provenance only and does not change these GUI settings.
 
 ### 4.3 Sample rate
 
@@ -242,30 +255,30 @@ The tested OneBox ADC continuous stream reported **30,300.5 Hz**, approximately 
 - Center initiation: `ADC1` rising edge
 - Left response: `ADC0` rising edge
 - Right response: `ADC2` rising edge
-- Electrical playback onset: onset detected from the analog `ADC11` waveform
+- Electrical playback onset: onset detected from the active analog audio channel in that recording
 - Hopper physically available: `ADC3` high interval
 
-The authoritative reaction time is:
+For historical recordings with left audio on ADC11, the authoritative reaction time is:
 
 ```text
 RT_hardware = t_response(ADC0 or ADC2) - t_audio_onset(ADC11)
 ```
 
-Both terms therefore live on the OneBox continuous acquisition timebase.
+Both terms therefore live on the OneBox continuous acquisition timebase. Future analysis should resolve the actual audio channel from each recording's documented channel map rather than hard-coding ADC11 once the stereo rewire is commissioned.
 
 ### 5.2 Electrical versus acoustic onset
 
-ADC11 is an electrical playback copy. It is not the actual sound pressure waveform at the bird. A future chamber microphone channel should provide acoustic ground truth when actual acoustic onset at the animal is required.
+The J7 audio signal is an electrical playback copy. It is not the actual sound pressure waveform at the bird. A future chamber microphone channel should provide acoustic ground truth when actual acoustic onset at the animal is required.
 
 Recommended hierarchy:
 
 | Event / quantity | Authoritative source | Do not substitute |
 |---|---|---|
 | Center initiation | ADC1 rising edge | Message Center center event |
-| Electrical playback onset | ADC11 waveform onset | `speaker.play()` timestamp or MC `stim_on` |
+| Electrical playback onset | active J7 analog waveform channel | `speaker.play()` timestamp or MC `stim_on` |
 | Left response | ADC0 rising edge | PyOperant software RT |
 | Right response | ADC2 rising edge | PyOperant software RT |
-| Reaction time | ADC0/ADC2 − ADC11 | Message Center timestamp differences |
+| Reaction time | ADC0/ADC2 − active audio channel onset | Message Center timestamp differences |
 | Hopper physically available | ADC3 high interval | raw `panel.reward()` duration |
 | Exact stimulus filename | Message Center / local log | waveform alone |
 | Trial semantics / labels | Message Center / local log | ADC identity alone |
@@ -316,6 +329,19 @@ For the rewarded left trial:
 - full `panel.reward(2.0)` call: approximately 3.26 s because servo movement is included in the call duration.
 
 ADC3 therefore gives the meaningful physical food-access interval.
+
+### 6.4 Digital-breakout validation (2026-09-30)
+
+The permanent HDMI-to-BNC digital breakout path was functionally tested after wiring. The observed BNC-to-OneBox mapping was:
+
+```text
+breakout IO1 -> ADC0 -> left_ir
+breakout IO2 -> ADC1 -> center peck port
+breakout IO3 -> ADC2 -> right peck port
+breakout IO4 -> ADC3 -> hopper_ir
+```
+
+All four channels behaved as expected during physical port/hopper activation. This supersedes the temporary direct-wire implementation for the digital behavioral-state lines.
 
 ---
 
@@ -456,7 +482,7 @@ A separate chamber microphone should be routed to another OneBox analog input.
 
 The two audio-related channels then have distinct roles:
 
-- **ADC11 / J7 electrical copy:** what the MagPi commanded electrically and when playback started/stopped in the electronics path;
+- **J7 electrical copy:** what the MagPi commanded electrically and when playback started/stopped in the electronics path;
 - **microphone:** what was actually present acoustically in the chamber, including playback verification and bird vocalizations.
 
 ---
@@ -472,17 +498,16 @@ Important conventions:
 - for early response termination, use `panel.speaker.stop()` rather than reaching into the underlying PyAudio stream;
 - avoid low-level PyAudio stream reset/cleanup in the behavioral control path unless a separately validated failure mode requires it.
 
-`recover_open_ephys_events.py` still needs to be made canonical for the chronic rig. Its default map should resolve:
+`recover_open_ephys_events.py` still needs to be made canonical for the chronic rig. Its default digital map should resolve:
 
 ```text
 left   = ADC0
 center = ADC1
 right  = ADC2
 hopper = ADC3
-audio  = ADC11
 ```
 
-It also needs explicit analog ADC11 onset detection rather than relying on a Message Center stimulus event.
+Its audio onset detector should use the actual audio channel documented for each recording rather than assuming a fixed channel across historical and post-rewire sessions.
 
 ---
 
@@ -550,15 +575,15 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 
 - [x] Prepare config-driven session recording and queued semantic metadata in the actual `ivr_rt_pilot` inheritance path; offline implementation tested, awaiting review/merge and commissioning.
 - [ ] Deploy and bench-test `ivr_rt_chronic` with a dummy subject config; verify real recorded messages, CSV joins, mode restoration, disconnect handling and free-food eligibility.
-- [ ] Obtain the additional breakout board for **digital HDMI → BNC → BNC** wiring.
-- [ ] Verify the new stereo map: left audio ADC10, right audio ADC11; both analog, and ADC0–ADC3 remain the four physical behavioral-state channels.
+- [x] Obtain and install the digital HDMI-to-BNC breakout for J6 behavioral-state signals.
+- [x] Validate permanent digital mapping: breakout IO1→ADC0 left, IO2→ADC1 center, IO3→ADC2 right, IO4→ADC3 hopper.
+- [ ] Verify the planned stereo audio map: left audio ADC10, right audio ADC11; both analog.
 
 - [ ] Finalize chronic-rig Git deployment while preserving the dedicated asfour ↔ MagPi Open Ephys network.
 - [x] Complete the oscilloscope investigation of the audio onset/offset issue — Nathan reported it resolved on 2026-09-25.
 - [x] Adjust/fix both MagPi audio potentiometers (`R43`/`R44`) — reported complete on 2026-09-25.
-- [ ] **Short term:** replace temporary wire-to-wire hookups with existing breakout boards wired to BNC connectors/cables feeding OneBox; provide a ground/return for every signal, label connections, and add strain relief.
-- [ ] Verify the channel map, peck/hopper events, and audio after the wiring change.
-- [ ] **Long term:** obtain the currently unavailable HDMI-to-BNC breakout boards and install a dedicated HDMI-to-BNC connection assembly.
+- [x] Replace the temporary digital wire-to-wire hookup with HDMI-to-BNC breakout → BNC → OneBox wiring.
+- [ ] Complete/verify the final analog-audio breakout wiring and update the active audio channel map.
 - [ ] Add a chamber microphone channel to OneBox and document its channel assignment/calibration.
 - [ ] Update `recover_open_ephys_events.py` to the validated ADC0–ADC3 mapping.
 - [ ] Add robust audio onset detection to the recovery script, using each recording's channel map (historical left ADC11; planned left ADC10/right ADC11).
@@ -574,6 +599,17 @@ The current living document is intentionally posted on `open_ephys_nt` so other 
 ---
 
 ## 13. Changelog
+
+### 2026-09-30
+
+Completed and functionally validated the permanent digital behavioral-state wiring through the Open Ephys HDMI-to-BNC breakout. Canonical mapping is now:
+
+- breakout `IO1` → OneBox `ADC0` → `left_ir`;
+- breakout `IO2` → OneBox `ADC1` → center peck port;
+- breakout `IO3` → OneBox `ADC2` → right peck port;
+- breakout `IO4` → OneBox `ADC3` → `hopper_ir`.
+
+All four channels produced the expected state changes during physical testing. Updated Sections 3–4 and the hardware TODOs to treat this as the current validated digital wiring rather than a future breakout-board task.
 
 ### 2026-09-25
 
