@@ -16,10 +16,18 @@ import os
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT_PATH = os.path.join(REPO_ROOT, "scripts", "tune_servo.py")
+
+# raspi_gpio_ imports pigpio unconditionally (real Rev D hardware) -- not
+# installed on a dev machine.
+if "pigpio" not in sys.modules:
+    try:
+        import pigpio  # noqa: F401
+    except ImportError:
+        sys.modules["pigpio"] = MagicMock()
 
 spec = importlib.util.spec_from_file_location("tune_servo", SCRIPT_PATH)
 tune_servo = importlib.util.module_from_spec(spec)
@@ -91,6 +99,35 @@ class TestWriteAnglesToConfig(unittest.TestCase):
         # the broken file is left alone, not clobbered
         with open(self.config_path) as f:
             self.assertEqual(f.read(), "{not valid json")
+
+
+class TestReleaseServo(unittest.TestCase):
+    """The 'r' command's whole job is to put the PCA9685 channel in
+    FULL_OFF so the servo stops getting pulses -- test that against the
+    real PWM class's actual register write, not just that a method got
+    called, since a wrong register value would silently do nothing (or
+    worse, drive the servo somewhere)."""
+
+    def test_delegates_a_negative_duty_cycle_for_the_given_channel(self):
+        raspi = MagicMock()
+        tune_servo.release_servo(raspi, 3)
+        raspi.pwm_servo.set_duty_cycle.assert_called_once_with(3, -1)
+
+    def test_writes_the_pca9685_full_off_bit_for_that_channel_only(self):
+        from pyoperant.interfaces.raspi_gpio_ import PWM
+
+        pi = MagicMock()
+        pwm = PWM(pi, address=0x45)
+        pi.reset_mock()
+
+        raspi = MagicMock()
+        raspi.pwm_servo = pwm
+        tune_servo.release_servo(raspi, 0)
+
+        # LED0_ON_L is 0x06, 4 registers per channel: ON_L, ON_H, OFF_L,
+        # OFF_H. FULL_OFF is bit 4 of OFF_H (0x10); ON stays 0.
+        pi.i2c_write_i2c_block_data.assert_called_once_with(
+            pwm.h, 0x06 + 4 * 0, [0x00, 0x00, 0x00, 0x10])
 
 
 if __name__ == "__main__":

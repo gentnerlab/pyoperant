@@ -92,6 +92,21 @@ def _write_angles_to_config(up_angle, down_angle):
     print("  -> %s updated%s." % (PANEL_CONFIG_PATH, backup_msg))
 
 
+def release_servo(raspi, channel):
+    """Stop sending the PWM pulse on a servo channel, so the servo goes limp.
+
+    The servo's internal position loop only runs while it's receiving
+    pulses; with none, most servos stop driving the motor entirely (power
+    stays on). Handy for telling a servo that's hunting around its target
+    (jitter at rest) apart from electrical noise, and for seeing where the
+    hopper comes to rest under its own load.
+
+    A negative duty cycle sets the PCA9685 channel's FULL_OFF bit (see
+    PWM.set_duty_cycle). Writing a new angle afterwards re-engages it.
+    """
+    raspi.pwm_servo.set_duty_cycle(channel, -1)
+
+
 def main():
     # --- connect to hardware ---
     try:
@@ -125,7 +140,8 @@ def main():
     print("Connected.\n")
 
     # hopper servo is channel 0 on the servo chip (HOPPER_SERVO_CHANNEL)
-    servo = hwio.PWMOutput(interface=raspi, params={'channel': 0, 'servo': True})
+    hopper_channel = 0
+    servo = hwio.PWMOutput(interface=raspi, params={'channel': hopper_channel, 'servo': True})
 
     # hopper IR beam is INPUTS[0] = GPIO 5
     ir = hwio.BooleanInput(interface=raspi, params={'channel': INPUTS[0]})
@@ -138,6 +154,7 @@ def main():
     print("  'sd' = set current angle as down_angle")
     print("  'i'  = read IR beam status")
     print("  'f'  = run a full feed cycle with current angles")
+    print("  'r'  = release the servo (stop sending the pulse; it goes limp until you move it again)")
     print("  'q'  = quit and print final values\n")
 
     up_angle = None
@@ -228,6 +245,12 @@ def main():
                 else:
                     print("  Hopper confirmed DOWN. Feed cycle complete.")
 
+        elif cmd == 'r':
+            release_servo(raspi, hopper_channel)
+            print("  Servo released -- no pulse is being sent, so it should be limp.")
+            print("  Enter an angle, 'u' or 'd' to re-engage it.")
+            read_ir()
+
         else:
             try:
                 angle = float(cmd)
@@ -239,7 +262,7 @@ def main():
                 current_angle = angle
                 read_ir()
             except ValueError:
-                print("  Unknown command. Enter a number, or: u/d/su/sd/i/f/q")
+                print("  Unknown command. Enter a number, or: u/d/su/sd/i/f/r/q")
 
     # --- summary ---
     print("\n=== Tuning Complete ===\n")
