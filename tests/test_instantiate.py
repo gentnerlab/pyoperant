@@ -587,6 +587,11 @@ class TestPiPanelHopperCalibration(unittest.TestCase):
         self.assertEqual(panel.hopper.up_angle, 47.0)
         self.assertEqual(panel.hopper.down_angle, 17.0)
 
+    def test_release_defaults_off_and_can_be_enabled(self):
+        from pyoperant.local_pi_revd import Pi1
+        self.assertFalse(self._make_panel(Pi1).hopper.release)
+        self.assertTrue(self._make_panel(Pi1, hopper_release=True).hopper.release)
+
 
 class TestLoadPanelConfig(unittest.TestCase):
     """utils.load_panel_config() reads this box's own panel_config.json --

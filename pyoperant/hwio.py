@@ -168,6 +168,12 @@ class PWMOutput(BaseIO):
         self.last_value = self.interface._write_pwm(value=val, **self.params)
         return self.last_value
 
+    def release(self):
+        """stop driving the output (servo: stop sending the pulse). Writing a
+        value again re-engages it. Only meaningful for servo outputs."""
+        self.last_value = self.interface._write_pwm(value=None, **self.params)
+        return self.last_value
+
     def toggle(self):
         """ flip value """
         new_val = abs(100.0 - self.last_value)

@@ -130,5 +130,30 @@ class TestReleaseServo(unittest.TestCase):
             pwm.h, 0x06 + 4 * 0, [0x00, 0x00, 0x00, 0x10])
 
 
+class TestInterfaceServoRelease(unittest.TestCase):
+    """Hopper(release=True) goes through RaspberryPiInterface._write_pwm
+    with value=None -- must hit the same PCA9685 FULL_OFF write as the
+    tune_servo 'r' command, and a numeric write afterwards must re-engage."""
+
+    def test_none_value_sets_full_off_then_angle_reengages(self):
+        from pyoperant.interfaces.raspi_gpio_ import RaspberryPiInterface, PWM
+
+        pi = MagicMock()
+        pwm = PWM(pi, address=0x45)
+        iface = RaspberryPiInterface.__new__(RaspberryPiInterface)
+        iface.pwm_servo = pwm
+        iface.pi = MagicMock()  # __del__ -> close() calls pi.stop()
+        pi.reset_mock()
+
+        self.assertIsNone(iface._write_pwm(channel=0, value=None, servo=True))
+        pi.i2c_write_i2c_block_data.assert_called_once_with(
+            pwm.h, 0x06, [0x00, 0x00, 0x00, 0x10])
+
+        pi.reset_mock()
+        iface._write_pwm(channel=0, value=10, servo=True)
+        args = pi.i2c_write_i2c_block_data.call_args[0]
+        self.assertNotEqual(args[2][3] & 0x10, 0x10)  # FULL_OFF cleared
+
+
 if __name__ == "__main__":
     unittest.main()

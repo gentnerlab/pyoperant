@@ -14,6 +14,9 @@ this file per box; it should stay identical across the whole fleet so it
 can be git-pulled cleanly everywhere. See Section 6.4 of the lab manual for
 the tuning procedure.
 
+hopper_release (default False; panel_config.json) stops the servo's PWM
+pulse once the hopper has settled down, for servos that jitter at rest.
+
 Do not use this file on Rev C boards. The board revision is detected
 automatically by local.py reading /etc/magpi_revision.
 """
@@ -79,7 +82,7 @@ PWM_OUTPUTS = [0,   # HOUSELIGHT_R
 class PiPanel(panels.BasePanel):
     """Panel class for Rev D Magpi clients (servo hopper)."""
     def __init__(self, id=None, *args, hopper_up_angle=45, hopper_down_angle=10,
-                 mic_serial=None, **kwargs):
+                 hopper_release=False, mic_serial=None, **kwargs):
         super(PiPanel, self).__init__(*args, **kwargs)
         self.id = id
         self.pwm_outputs = []
@@ -153,7 +156,8 @@ class PiPanel(panels.BasePanel):
                                         servo=self.hopper_servo,
                                         up_angle=hopper_up_angle,
                                         down_angle=hopper_down_angle,
-                                        inverted=False)
+                                        inverted=False,
+                                        release=hopper_release)
 
         # House Light (RGBW LED strip via PWM channels 0-3)
         self.house_light = components.LEDStripHouseLight(

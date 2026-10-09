@@ -62,6 +62,15 @@ class Hopper(BaseComponent):
         Seconds to wait for the IR beam to confirm position (default=0.3).
     inverted : bool, optional
         Set True if the IR beam logic is active-low (default=False).
+    release : bool, optional
+        Servo only (default=False). After down() has settled and the IR beam
+        confirms the hopper is clear, stop sending the PWM pulse so the servo
+        goes limp instead of holding position. Some servos hunt/jitter at
+        rest against a small load offset while pulsed. The servo is
+        re-engaged by the next up() or by a down() that finds the beam
+        tripped (hopper sagged open); a down() on an already-released hopper
+        with a clear beam leaves it released. Raises ValueError with a
+        solenoid.
 
     Examples
     --------
@@ -75,7 +84,8 @@ class Hopper(BaseComponent):
                         up_angle=45, down_angle=10, inverted=False)
     """
     def __init__(self, IR, solenoid=None, servo=None, up_angle=None,
-                 down_angle=None, max_lag=None, inverted=False, *args, **kwargs):
+                 down_angle=None, max_lag=None, inverted=False, release=False,
+                 *args, **kwargs):
         super(Hopper, self).__init__(*args, **kwargs)
 
         # validate: exactly one actuator must be supplied
@@ -84,9 +94,14 @@ class Hopper(BaseComponent):
         if solenoid is not None and servo is not None:
             raise ValueError('Hopper takes either a solenoid or a servo, not both')
 
+        if release and servo is None:
+            raise ValueError('release is only supported with a servo hopper')
+
         if not isinstance(IR, hwio.BooleanInput):
             raise ValueError('%s is not an input channel' % IR)
         self.IR = IR
+        self.release = bool(release)
+        self._released = False  # True while the servo pulse is stopped
         self.inverted = bool(inverted)
         if max_lag is not None:
             self.max_lag = max_lag
@@ -116,6 +131,7 @@ class Hopper(BaseComponent):
     def _actuate_up(self):
         """Send the raise command to whichever actuator is fitted."""
         if self._actuator == 'servo':
+            self._released = False
             self.servo.write(self.up_angle)
         else:
             self.solenoid.write(True)
@@ -123,6 +139,7 @@ class Hopper(BaseComponent):
     def _actuate_down(self):
         """Send the lower command to whichever actuator is fitted."""
         if self._actuator == 'servo':
+            self._released = False
             self.servo.write(self.down_angle)
         else:
             self.solenoid.write(False)
@@ -175,11 +192,18 @@ class Hopper(BaseComponent):
         HopperWontDropError
             The hopper did not lower within max_lag seconds.
         """
+        if self._released and not self.check():
+            # Already resting down with the pulse stopped (e.g. the panel's
+            # periodic reset()): don't re-engage the servo.
+            return datetime.datetime.now()
         self._actuate_down()
         utils.wait(self.max_lag)
         time_down = datetime.datetime.now()
         if self.check():  # IR beam still tripped after waiting
             raise HopperWontDropError
+        if self.release:
+            self.servo.release()
+            self._released = True
         return time_down
 
     def feed(self, dur=2.0, error_check=True):

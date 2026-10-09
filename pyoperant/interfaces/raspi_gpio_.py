@@ -236,6 +236,12 @@ class RaspberryPiInterface(base_.BaseInterface):
         if servo:
             if self.pwm_servo is None:
                 raise InterfaceError("servo PWM requested but no servo_address was provided — is this a Rev C board?")
+            if value is None:
+                # release: PCA9685 FULL_OFF (negative duty cycle) stops the
+                # pulse, so the servo's position loop goes idle. Any later
+                # numeric write re-engages it.
+                self.pwm_servo.set_duty_cycle(channel, -1)
+                return None
             # value is in degrees (0-300) for goBILDA 2000-0025-0002:
             # 0 deg = 500 us, 300 deg = 2500 us
             pulse_us = 500.0 + (value / 300.0) * 2000.0

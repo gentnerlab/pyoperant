@@ -26,6 +26,7 @@ class FakeInterface(object):
 
     def __init__(self):
         self.values = {}
+        self.pwm_writes = []
 
     def _callback(self, func=None, channel=None, **kwargs):
         pass
@@ -45,6 +46,7 @@ class FakeInterface(object):
 
     def _write_pwm(self, value, channel, servo=False, **kwargs):
         self.values[channel] = value
+        self.pwm_writes.append((channel, value))
         return value
 
     def _poll(self, channel, timeout=None, **kwargs):
@@ -210,6 +212,81 @@ class TestHopperDown(unittest.TestCase):
         self.iface.values[5] = True  # beam still broken after lowering
         with self.assertRaises(HopperWontDropError):
             self.hopper.down()
+
+
+# ---------------------------------------------------------------------------
+# Hopper: release (stop the servo pulse once settled down)
+# ---------------------------------------------------------------------------
+
+class TestHopperRelease(unittest.TestCase):
+
+    def _make(self, release=True):
+        self.iface = FakeInterface()
+        self.ir = make_bool_input(self.iface, 5)
+        servo = make_pwm_output(self.iface, 0)
+        hopper = Hopper(IR=self.ir, servo=servo, up_angle=45, down_angle=10,
+                        max_lag=0.1, release=release)
+        self.iface.pwm_writes.clear()
+        return hopper
+
+    def test_release_defaults_off(self):
+        hopper = self._make(release=False)
+        with patch('pyoperant.utils.wait'):
+            hopper.down()
+        self.assertEqual(self.iface.pwm_writes, [(0, 10)])  # no release write
+
+    def test_solenoid_rejects_release(self):
+        iface = FakeInterface()
+        with self.assertRaises(ValueError):
+            Hopper(IR=make_bool_input(iface, 5), solenoid=make_bool_output(iface, 1),
+                   release=True)
+
+    @patch('pyoperant.utils.wait')
+    def test_down_releases_after_settling(self, mock_wait):
+        hopper = self._make()
+        hopper.down()
+        self.assertEqual(self.iface.pwm_writes, [(0, 10), (0, None)])
+        self.assertTrue(hopper._released)
+
+    @patch('pyoperant.utils.wait')
+    def test_down_does_not_release_if_beam_still_broken(self, mock_wait):
+        hopper = self._make()
+        self.iface.values[5] = True
+        with self.assertRaises(HopperWontDropError):
+            hopper.down()
+        self.assertNotIn((0, None), self.iface.pwm_writes)
+
+    @patch('pyoperant.utils.wait')
+    def test_repeat_down_while_released_does_not_reengage(self, mock_wait):
+        hopper = self._make()
+        hopper.down()
+        self.iface.pwm_writes.clear()
+        result = hopper.down()  # e.g. panel.reset()
+        self.assertIsInstance(result, datetime.datetime)
+        self.assertEqual(self.iface.pwm_writes, [])
+
+    @patch('pyoperant.utils.wait')
+    def test_down_while_released_reengages_if_hopper_sagged_open(self, mock_wait):
+        hopper = self._make()
+        hopper.down()
+        self.iface.pwm_writes.clear()
+        self.iface.values[5] = True  # beam tripped: hopper sagged up
+        with patch.object(hopper, 'check', side_effect=[True, False]):
+            hopper.down()
+        self.assertEqual(self.iface.pwm_writes, [(0, 10), (0, None)])
+
+    @patch('pyoperant.utils.wait')
+    def test_up_reengages_and_next_down_releases_again(self, mock_wait):
+        hopper = self._make()
+        hopper.down()
+        self.iface.pwm_writes.clear()
+        self.iface.values[5] = True
+        hopper.up()
+        self.assertEqual(self.iface.pwm_writes, [(0, 45)])
+        self.assertFalse(hopper._released)
+        self.iface.values[5] = False
+        hopper.down()
+        self.assertEqual(self.iface.pwm_writes[-2:], [(0, 10), (0, None)])
 
 
 # ---------------------------------------------------------------------------
