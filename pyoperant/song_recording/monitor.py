@@ -300,11 +300,12 @@ DEFAULT_CONFIG = {
     "precursor_max_duration": 3.0,   # episode must be no longer than this to qualify
     "precursor_min_score":    0.55,  # ...and confidently scored (base gate.threshold is 0.45)
     "precursor_grace_period": 8.0,   # extended hangover granted instead of post_roll
-    # Runaway-episode safety cap -- see module docstring. Generous relative
-    # to any real song bout observed so far (tens of seconds), tight enough
-    # to keep worst-case _clip_buffer memory small and bounded (~11MB at
-    # this default, vs. unbounded growth without it).
-    "max_episode_duration": 60.0,
+    # Runaway-episode safety cap -- see module docstring. Raised 60 -> 180 s
+    # on 2026-10-09: real song bouts on gate_cnn boxes (e.g. B1497) run past
+    # a minute and the 60 s cap was cutting them mid-song. Still tight
+    # enough to keep worst-case _clip_buffer memory small and bounded
+    # (~34MB at this default, vs. unbounded growth without it).
+    "max_episode_duration": 180.0,
     # Device-loss detection and recovery -- see module docstring.
     "device_watchdog_timeout":         5.0,   # seconds of silence before declaring the device lost
     "device_reconnect_backoff_initial": 1.0,  # seconds before the first reconnect retry
