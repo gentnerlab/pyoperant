@@ -593,6 +593,27 @@ class TestPiPanelHopperCalibration(unittest.TestCase):
         self.assertTrue(self._make_panel(Pi1, hopper_release=True).hopper.release)
 
 
+class TestPanelConfigKeys(unittest.TestCase):
+    """Both entry points forward utils.PANEL_CONFIG_KEYS to PiPanel; every
+    key must be a real PiPanel kwarg, and scripts/behave (the real launch
+    path) must use the shared list rather than its own copy."""
+
+    def test_every_key_is_a_pipanel_kwarg(self):
+        import inspect
+        from pyoperant import utils
+        from pyoperant.local_pi_revd import PiPanel
+        params = inspect.signature(PiPanel.__init__).parameters
+        for k in utils.PANEL_CONFIG_KEYS:
+            self.assertIn(k, params)
+        self.assertIn('hopper_release', utils.PANEL_CONFIG_KEYS)
+
+    def test_entry_points_use_the_shared_list(self):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        for rel in ('scripts/behave', 'pyoperant/behavior/three_ac_matching.py'):
+            with open(os.path.join(root, rel)) as f:
+                self.assertIn('PANEL_CONFIG_KEYS', f.read(), rel)
+
+
 class TestLoadPanelConfig(unittest.TestCase):
     """utils.load_panel_config() reads this box's own panel_config.json --
     written by scripts/tune_servo.py, holding hardware calibration that

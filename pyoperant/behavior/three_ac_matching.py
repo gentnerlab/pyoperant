@@ -156,8 +156,7 @@ if __name__ == "__main__":
     # case.
     panel_config = utils.load_panel_config()
     panel_kwargs = {}
-    for k in ('hopper_up_angle', 'hopper_down_angle', 'hopper_release',
-              'mic_serial'):
+    for k in utils.PANEL_CONFIG_KEYS:
         if k in parameters:
             panel_kwargs[k] = parameters[k]
         elif k in panel_config:

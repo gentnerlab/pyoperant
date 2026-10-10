@@ -278,6 +278,13 @@ except ImportError:
     PANEL_CONFIG_PATH = '/home/bird/panel_config.json'
 
 
+# panel_config.json keys that behavior entry points (scripts/behave,
+# behavior/three_ac_matching.py) forward to the Rev D PiPanel constructor.
+# One list so a new PiPanel kwarg only has to be added here.
+PANEL_CONFIG_KEYS = ('hopper_up_angle', 'hopper_down_angle', 'hopper_release',
+                     'mic_serial')
+
+
 def load_panel_config(path=PANEL_CONFIG_PATH):
     """Reads this box's panel_config.json -- physical-hardware calibration
     (e.g. Rev D's hopper servo hopper_up_angle/hopper_down_angle) that
