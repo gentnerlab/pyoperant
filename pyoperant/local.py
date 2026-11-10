@@ -31,8 +31,10 @@ elif 'magpi' in hostname:
         from .local_pi_revd import *
     elif revision == 'revc':
         from .local_pi_revc import *
+    elif revision == 'recorder':
+        from .local_pi_recorder import *
     else:
         raise RuntimeError(
             "Unknown Magpi board revision '%s' in %s. "
-            "Expected 'revc' or 'revd'." % (revision, REVISION_FILE)
+            "Expected 'revc', 'revd' or 'recorder'." % (revision, REVISION_FILE)
         )
