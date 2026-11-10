@@ -257,6 +257,21 @@ class TestLights(unittest.TestCase):
             self.assertEqual(panel.reward_calls, [10])
             self.assertEqual(panel.hopper.calls, [])
 
+    def test_Lights_ignores_free_food_on_panel_without_hopper(self):
+        """A recorder box has no hopper: a leftover free_food_schedule
+        (Lights.json ships an always-on one) must not outrank recording
+        or crash on the missing hopper."""
+        config = _load_config("Lights")
+        config["free_food_schedule"] = [["00:00", "23:59"]]
+        config["song_recording"] = {"enabled": True}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            panel = FakePanel()
+            del panel.hopper
+            exp = Lights(panel=panel, **config)
+            self.assertFalse(exp._check_free_food_block())
+            self.assertEqual(exp._run_idle(), 'session')
+
     def test_Lights_recording_enabled_routes_to_session(self):
         """song_recording.enabled=True should route _run_idle into the
         normal BaseExp session state (session_pre/main/post), where the
