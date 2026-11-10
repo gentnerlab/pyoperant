@@ -195,7 +195,7 @@ class Lights(base.BaseExp):
             return 'idle'
 
     def _check_free_food_block(self):
-        """Free food needs a hopper. A recorder box (local_pi_recorder.py)
+        """Free food needs a hopper. A MagPi Lite board (local_pi_lite.py)
         has none, so a free_food_schedule left in its config -- e.g.
         copied from example_configs/Lights.json -- is ignored (warned
         about once) instead of taking priority over recording and then

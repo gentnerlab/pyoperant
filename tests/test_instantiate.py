@@ -258,7 +258,7 @@ class TestLights(unittest.TestCase):
             self.assertEqual(panel.hopper.calls, [])
 
     def test_Lights_ignores_free_food_on_panel_without_hopper(self):
-        """A recorder box has no hopper: a leftover free_food_schedule
+        """A MagPi Lite board has no hopper: a leftover free_food_schedule
         (Lights.json ships an always-on one) must not outrank recording
         or crash on the missing hopper."""
         config = _load_config("Lights")

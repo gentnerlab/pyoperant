@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-local_pi_recorder.py -- Panel configuration for standalone recording boxes.
+local_pi_lite.py -- Panel configuration for MagPi Lite boards.
 
-A recorder box is a bare Raspberry Pi (4 or newer) with a USB microphone and
+A MagPi Lite board is a bare Raspberry Pi (4 or newer) with a USB microphone and
 an AC relay outlet for the chamber light. It has no operant hardware (no
 hopper, ports or speaker); it only runs pyoperant.behavior.lights, which
 controls the light schedule and song recording. It otherwise joins the fleet
 like any other box.
 
-Select it with `echo 'recorder' | sudo tee /etc/magpi_revision` (see
+Select it with `echo 'lite' | sudo tee /etc/magpi_revision` (see
 local.py). Requires pigpiod (the same daemon the Rev D boards use).
 
 The relay is a Digital Loggers-style IoT relay whose control input is wired
@@ -28,7 +28,7 @@ AUDIO_INPUT_DEVICE = 'UMIK-1'
 
 
 class PiPanel(panels.BasePanel):
-    """Panel class for standalone recorder boxes."""
+    """Panel class for MagPi Lite boards."""
     def __init__(self, id=None, *args, mic_serial=None, relay_pin=RELAY_PIN,
                  **kwargs):
         super(PiPanel, self).__init__(*args, **kwargs)
@@ -56,7 +56,7 @@ class PiPanel(panels.BasePanel):
 
 
 class Pi1(PiPanel):
-    """Panel 1 -- recorder box."""
+    """Panel 1 -- MagPi Lite board."""
     def __init__(self, **kwargs):
         super(Pi1, self).__init__(id=1, **kwargs)
 

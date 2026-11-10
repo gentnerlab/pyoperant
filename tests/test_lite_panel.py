@@ -46,9 +46,9 @@ class TestGpioRelayInterface(unittest.TestCase):
                 gpio_relay_.GpioRelayInterface()
 
 
-class TestRecorderPanel(unittest.TestCase):
+class TestLitePanel(unittest.TestCase):
     def _panel(self, **kwargs):
-        import pyoperant.local_pi_recorder as rec
+        import pyoperant.local_pi_lite as rec
         with patch.object(rec.gpio_relay_, "GpioRelayInterface"), \
              patch.object(rec.pyaudio_, "PyAudioInterface"):
             return rec.Pi1(**kwargs)
