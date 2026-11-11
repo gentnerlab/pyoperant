@@ -195,6 +195,21 @@ class Lights(base.BaseExp):
             utils.wait(self.parameters['idle_poll_interval'])
             return 'idle'
 
+    def _check_free_food_block(self):
+        """Free food needs a hopper. A MagPi Lite board (local_pi_lite.py)
+        has none, so a free_food_schedule left in its config -- e.g.
+        copied from example_configs/Lights.json -- is ignored (warned
+        about once) instead of taking priority over recording and then
+        failing on the missing hopper."""
+        if getattr(self.panel, 'hopper', None) is None:
+            if 'free_food_schedule' in self.parameters and \
+                    not getattr(self, '_warned_no_hopper', False):
+                self._warned_no_hopper = True
+                self.log.warning(
+                    'free_food_schedule ignored: this panel has no hopper')
+            return False
+        return super(Lights, self)._check_free_food_block()
+
     def _free_food(self):
         """A solenoid shouldn't be held energized continuously, so
         BaseExp._free_food cycles it up/down for the duration of the
