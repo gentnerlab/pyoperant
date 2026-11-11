@@ -677,7 +677,7 @@ class Lights(base.BaseExp):
             'sample_rate':       self._pipeline_sample_rate(),
             'mode':              effective_mode,
             'cnn_keep_classes':  sr.get('cnn', {}).get('keep_classes',
-                                        ['whistle', 'contact', 'song']),
+                                        ['whistle', 'call', 'song']),
             'raw_chunk_duration_s': mon.get('raw_chunk_duration_s', 1800.0),
             'chunk_duration':    mon.get('chunk_duration', 0.1),
             'capture_chunk_multiplier': mon.get('capture_chunk_multiplier', 1),

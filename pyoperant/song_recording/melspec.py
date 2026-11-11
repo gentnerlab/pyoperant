@@ -43,8 +43,15 @@ HOP_LENGTH = 256
 CONTEXT_DURATION_S = 0.5
 CHUNK_DURATION_S = 0.1
 
-CLASS_NAMES = ["noise", "whistle", "contact", "song"]
+# Default (starling) class names. A model's .npz may carry its own
+# `class_names` (e.g. the 3-class zebra finch model: noise/call/song) --
+# classifier.SongClassifier reads those when present and falls back to
+# this list. The starling "contact" class was renamed "call" (same
+# functional class as the zebra finch "call"); CLASS_ALIASES keeps old
+# configs that say "contact" working.
+CLASS_NAMES = ["noise", "whistle", "call", "song"]
 CLASS_TO_IDX = {name: i for i, name in enumerate(CLASS_NAMES)}
+CLASS_ALIASES = {"contact": "call"}
 
 
 def _hz_to_mel(hz: np.ndarray) -> np.ndarray:

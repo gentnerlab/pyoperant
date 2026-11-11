@@ -41,15 +41,16 @@ import numpy as np
 from pyoperant.song_recording import melspec
 from pyoperant.song_recording.cnn_numpy import SongCNNWeights
 
-CLASS_NAMES = melspec.CLASS_NAMES
+CLASS_NAMES = melspec.CLASS_NAMES          # default (starling) names -- see SongClassifier.class_names
 CLASS_TO_IDX = melspec.CLASS_TO_IDX
+CLASS_ALIASES = melspec.CLASS_ALIASES
 
 # Default "keep" set if a box's config doesn't specify one -- everything
 # that isn't noise, i.e. confidence = 1 - P(noise). Chosen 2026-09-22:
-# save all PROBABLE vocalization (song, whistle, and contact calls all
+# save all PROBABLE vocalization (song, whistle, and calls all
 # count), narrower sets (e.g. song-only) are an explicit per-box config
 # choice, not the default.
-DEFAULT_KEEP_CLASSES = ["whistle", "contact", "song"]
+DEFAULT_KEEP_CLASSES = ["whistle", "call", "song"]
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
@@ -58,11 +59,16 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     return exp / exp.sum()
 
 
-def _validate_keep_classes(keep_classes: list[str]) -> None:
-    unknown = set(keep_classes) - set(CLASS_NAMES)
+def normalize_class_names(names) -> list[str]:
+    """Apply CLASS_ALIASES (e.g. the old starling "contact" -> "call")."""
+    return [CLASS_ALIASES.get(str(n), str(n)) for n in names]
+
+
+def _validate_keep_classes(keep_classes: list[str], class_names: list[str] = CLASS_NAMES) -> None:
+    unknown = set(keep_classes) - set(class_names)
     if unknown:
         raise ValueError(f"keep_classes contains unknown class(es): {sorted(unknown)} "
-                          f"(valid: {CLASS_NAMES})")
+                          f"(valid: {class_names})")
 
 
 @dataclass
@@ -90,9 +96,11 @@ class SongClassifier:
                           (e.g. panel.microphone.sample_rate, 48000) --
                           NOT necessarily melspec.TARGET_SR; this class
                           resamples internally.
-    keep_classes        : list of class names (subset of CLASS_NAMES)
-                          that count toward `confidence`. Defaults to
-                          DEFAULT_KEEP_CLASSES (= 1 - P(noise)).
+    keep_classes        : list of class names (subset of the model's
+                          class_names; "contact" is accepted as an alias
+                          of "call") that count toward `confidence`.
+                          Defaults to every class except noise
+                          (= 1 - P(noise)).
     chunk_duration       : seconds per update() call. Defaults to
                           melspec.CHUNK_DURATION_S (0.1s) -- must match
                           the monitor's own chunk_duration config, since
@@ -109,14 +117,34 @@ class SongClassifier:
     ):
         self._model = SongCNNWeights(model_path)
 
+        # The model's own class names if its .npz carries them (the 3-class
+        # zebra finch model stores ["noise", "call", "song"]), else the
+        # starling default. Output order is positional, noise first.
+        stored = self._model.w.get("class_names")
+        names = [str(n) for n in stored.tolist()] if stored is not None else list(CLASS_NAMES)
+        self._set_class_names(names, n_outputs=int(self._model.w["fc2_weight"].shape[0]))
+
         self.capture_sample_rate = capture_sample_rate
-        self.keep_classes = list(keep_classes) if keep_classes is not None else list(DEFAULT_KEEP_CLASSES)
-        _validate_keep_classes(self.keep_classes)
+        self.keep_classes = self._resolve_keep_classes(keep_classes)
 
         n_context_chunks = max(1, round(melspec.CONTEXT_DURATION_S / chunk_duration))
         self._buffer: collections.deque = collections.deque(maxlen=n_context_chunks)
         self._expected_native_len = int(melspec.CONTEXT_DURATION_S * capture_sample_rate)
         self._expected_target_len = int(melspec.CONTEXT_DURATION_S * melspec.TARGET_SR)
+
+    def _set_class_names(self, names, n_outputs: int) -> None:
+        self.class_names = normalize_class_names(names)
+        if len(self.class_names) != n_outputs:
+            raise ValueError(f"model has {n_outputs} outputs but {len(self.class_names)} "
+                              f"class names {self.class_names}")
+        self.class_to_idx = {name: i for i, name in enumerate(self.class_names)}
+
+    def _resolve_keep_classes(self, keep_classes):
+        if keep_classes is None:
+            return [c for c in self.class_names if c != "noise"]
+        keep = normalize_class_names(keep_classes)
+        _validate_keep_classes(keep, self.class_names)
+        return keep
 
     def update(self, chunk: np.ndarray) -> ClassifierResult:
         self._buffer.append(chunk)
@@ -145,12 +173,12 @@ class SongClassifier:
         logits = self._model.forward(log_mel)
         probs = _softmax(logits)
 
-        confidence = float(sum(probs[CLASS_TO_IDX[c]] for c in self.keep_classes))
+        confidence = float(sum(probs[self.class_to_idx[c]] for c in self.keep_classes))
         predicted_idx = int(np.argmax(probs))
 
         return ClassifierResult(
-            probs={name: float(probs[i]) for i, name in enumerate(CLASS_NAMES)},
-            predicted_class=CLASS_NAMES[predicted_idx],
+            probs={name: float(probs[i]) for i, name in enumerate(self.class_names)},
+            predicted_class=self.class_names[predicted_idx],
             confidence=confidence,
         )
 
@@ -180,11 +208,14 @@ class _FakeModel:
         return self._logits
 
 
-def _make_test_classifier(logits, capture_sample_rate=48000, keep_classes=None):
+def _make_test_classifier(logits, capture_sample_rate=48000, keep_classes=None,
+                           class_names=None):
     clf = SongClassifier.__new__(SongClassifier)
     clf._model = _FakeModel(logits)
     clf.capture_sample_rate = capture_sample_rate
-    clf.keep_classes = list(keep_classes) if keep_classes is not None else list(DEFAULT_KEEP_CLASSES)
+    clf._set_class_names(class_names if class_names is not None else CLASS_NAMES,
+                         n_outputs=len(logits))
+    clf.keep_classes = clf._resolve_keep_classes(keep_classes)
     n_context_chunks = max(1, round(melspec.CONTEXT_DURATION_S / melspec.CHUNK_DURATION_S))
     clf._buffer = collections.deque(maxlen=n_context_chunks)
     clf._expected_native_len = int(melspec.CONTEXT_DURATION_S * capture_sample_rate)
@@ -220,13 +251,13 @@ def _self_test():
     checks.append(("confidence low (noise excluded from default keep set)",
                     result2.confidence < 0.1))
 
-    # Scenario C: song-only keep_classes -- a confident "contact" prediction
-    # should score LOW confidence even though it's not noise, since contact
+    # Scenario C: song-only keep_classes -- a confident "call" prediction
+    # should score LOW confidence even though it's not noise, since call
     # isn't in this narrower keep set.
-    contact_logits = [-5.0, -2.0, 8.0, -2.0]  # argmax=contact (index 2)
+    contact_logits = [-5.0, -2.0, 8.0, -2.0]  # argmax=call (index 2)
     clf3 = _make_test_classifier(contact_logits, capture_sample_rate=melspec.TARGET_SR, keep_classes=["song"])
     result3 = clf3.update(chunk)
-    checks.append(("predicted_class == 'contact'", result3.predicted_class == "contact"))
+    checks.append(("predicted_class == 'call'", result3.predicted_class == "call"))
     checks.append(("confidence low with keep_classes=['song'] only",
                     result3.confidence < 0.1))
 

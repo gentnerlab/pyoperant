@@ -337,7 +337,7 @@ DEFAULT_CONFIG = {
     # all PROBABLE vocalization, not just song specifically. A narrower
     # per-box config (e.g. ["song"] only) is an explicit opt-in, not this
     # default.
-    "cnn_keep_classes": ["whistle", "contact", "song"],
+    "cnn_keep_classes": ["whistle", "call", "song"],
     # raw mode's file-rotation period. 1800s (30 min) matches the lab's
     # own existing raw-recording convention (see project history -- the
     # underlying corpus this project's CNN was trained on was itself
@@ -358,7 +358,7 @@ class DetectionLog:
               # gate_only or raw) -- the episode's mean classifier
               # probabilities and their argmax. See _save_clip().
               "cnn_class", "cnn_prob_noise", "cnn_prob_whistle",
-              "cnn_prob_contact", "cnn_prob_song",
+              "cnn_prob_call", "cnn_prob_song",
               # Which species preset/gate produced this clip (see
               # species.py) -- so a box configured for the wrong species
               # shows up in the data.
@@ -466,6 +466,9 @@ class SongMonitor:
         # docstring on why: a future different-species/different-purpose
         # box is just a different config.json, not a code change).
         self._classifier = classifier
+        # The classifier's own class names (a 3-class model has no
+        # "whistle"); the default starling names for fakes/gate_only.
+        self._class_names = list(getattr(classifier, "class_names", None) or CLASS_NAMES)
 
         self._mode = self.cfg.get("mode", "gate_only")
         if self._mode not in ("gate_only", "gate_cnn", "raw"):
@@ -869,9 +872,9 @@ class SongMonitor:
             self._episode_peak_score = max(self._episode_peak_score, gate_result.score)
             if classifier_result is not None:
                 if self._episode_prob_sum is None:
-                    self._episode_prob_sum = np.zeros(len(CLASS_NAMES))
+                    self._episode_prob_sum = np.zeros(len(self._class_names))
                 self._episode_prob_sum += np.array(
-                    [classifier_result.probs[c] for c in CLASS_NAMES]
+                    [classifier_result.probs[c] for c in self._class_names]
                 )
                 self._episode_prob_count += 1
             if self._mic_calibration is not None:
@@ -965,13 +968,13 @@ class SongMonitor:
         cnn_probs = {}
         if self._episode_prob_sum is not None and self._episode_prob_count > 0:
             mean_probs = self._episode_prob_sum / self._episode_prob_count
-            cnn_class  = CLASS_NAMES[int(np.argmax(mean_probs))]
-            cnn_probs  = {name: mean_probs[i] for i, name in enumerate(CLASS_NAMES)}
+            cnn_class  = self._class_names[int(np.argmax(mean_probs))]
+            cnn_probs  = {name: mean_probs[i] for i, name in enumerate(self._class_names)}
 
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         # Classified clips sort into a per-class subdirectory (browsable
         # on disk with no need to cross-reference detections.csv, matching
-        # the same song/whistle/contact/noise convention the training
+        # the same song/whistle/call/noise convention the training
         # corpus itself already uses) -- gate_only clips (no classifier
         # result) stay in the flat output_dir, unchanged from before.
         out_dir = self._out_dir / cnn_class if cnn_class is not None else self._out_dir
@@ -1001,10 +1004,12 @@ class SongMonitor:
                 if self._episode_peak_calibrated_db is not None else ""
             ),
             cnn_class = cnn_class if cnn_class is not None else "",
-            cnn_prob_noise   = round(cnn_probs["noise"], 4)   if cnn_probs else "",
-            cnn_prob_whistle = round(cnn_probs["whistle"], 4) if cnn_probs else "",
-            cnn_prob_contact = round(cnn_probs["contact"], 4) if cnn_probs else "",
-            cnn_prob_song    = round(cnn_probs["song"], 4)    if cnn_probs else "",
+            # A class this model doesn't have (e.g. "whistle" on the 3-class
+            # zebra finch model) is logged blank, not 0.
+            cnn_prob_noise   = round(cnn_probs["noise"], 4)   if "noise"   in cnn_probs else "",
+            cnn_prob_whistle = round(cnn_probs["whistle"], 4) if "whistle" in cnn_probs else "",
+            cnn_prob_call    = round(cnn_probs["call"], 4)    if "call"    in cnn_probs else "",
+            cnn_prob_song    = round(cnn_probs["song"], 4)    if "song"    in cnn_probs else "",
             species          = self.cfg.get("species", "starling"),
         )
 
@@ -1640,7 +1645,7 @@ def _self_test_gate_cnn():
     # reasoning as the precursor-grace self-test's own "tail" sequences.
     n_tail = 120
     gate_seq_a = [(True, 0.80)] * n_active + [(False, 0.05)] * n_tail
-    song_probs = {"noise": 0.02, "whistle": 0.02, "contact": 0.02, "song": 0.94}
+    song_probs = {"noise": 0.02, "whistle": 0.02, "call": 0.02, "song": 0.94}
     cnn_seq_a = [(song_probs, 0.98)] * n_active  # classifier only runs on gate-passed chunks
     rows_a, files_a, calls_a = run("A_agree", gate_seq_a, cnn_seq_a)
     a_ok = (len(rows_a) == 1 and rows_a[0]["cnn_class"] == "song"
@@ -1652,7 +1657,7 @@ def _self_test_gate_cnn():
     # smoother never agrees -> overall triggered must stay False -> NO
     # clip should ever be saved. This is the actual behavior change
     # gate_cnn mode is for: gate-only would have saved this.
-    noise_probs = {"noise": 0.95, "whistle": 0.02, "contact": 0.02, "song": 0.01}
+    noise_probs = {"noise": 0.95, "whistle": 0.02, "call": 0.02, "song": 0.01}
     cnn_seq_b = [(noise_probs, 0.05)] * n_active  # gate_seq_a has n_active gate-passed chunks
     rows_b, files_b, calls_b = run("B_gate_yes_cnn_no", gate_seq_a, cnn_seq_b)
     b_ok = (len(rows_b) == 0 and len(files_b) == 0)
@@ -1755,7 +1760,7 @@ def _self_test_detection_log_header_migration():
               duration_s=5.0, rms=0.01, gate_score=0.6, snr_score=0.3,
               precursor_extended=False, calibrated_level_db=-30.0,
               cnn_class="song", cnn_prob_noise=0.1, cnn_prob_whistle=0.1,
-              cnn_prob_contact=0.1, cnn_prob_song=0.7)
+              cnn_prob_call=0.1, cnn_prob_song=0.7)
     log.close()
 
     lines = csv_path.read_text().splitlines()
