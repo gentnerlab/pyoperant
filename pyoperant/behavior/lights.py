@@ -145,6 +145,7 @@ class Lights(base.BaseExp):
         self._smoother  = None
         self._mic_calibration = None
         self._classifier = None
+        self._species   = 'starling'
         # Prevents calibration running more than once per dark period
         self._calibrated_this_night = False
 
@@ -336,7 +337,7 @@ class Lights(base.BaseExp):
 
         from pyoperant.song_recording.noise_model import calibrate
 
-        sr   = _sr_cfg(self.parameters)
+        sr   = self._sr()
         nm   = sr.get('noise_model', {})
         dur  = nm.get('calibration_duration_s', 45)
         path = self._noise_model_path()
@@ -380,7 +381,7 @@ class Lights(base.BaseExp):
         if mic is None:
             return
 
-        sr    = _sr_cfg(self.parameters)
+        sr    = self._sr()
         nm    = sr.get('noise_model', {})
         path  = self._noise_model_path()
         dur   = nm.get('drift_correction_duration_s', 10)
@@ -448,27 +449,38 @@ class Lights(base.BaseExp):
         mic = getattr(self.panel, 'microphone', None)
         if mic is not None:
             return mic.sample_rate
-        sr = _sr_cfg(self.parameters)
+        sr = self._sr()
         return sr.get('monitor', {}).get('sample_rate', 48000)
 
     def _output_dir(self):
-        sr = _sr_cfg(self.parameters)
+        sr = self._sr()
         return sr.get('monitor', {}).get(
             'output_dir', os.path.join(self.parameters['experiment_path'], 'recordings'))
 
     def _log_csv_path(self):
-        sr = _sr_cfg(self.parameters)
+        sr = self._sr()
         return sr.get('monitor', {}).get(
             'log_csv', os.path.join(self.parameters['experiment_path'], 'detections.csv'))
 
     def _noise_model_path(self):
-        sr = _sr_cfg(self.parameters)
+        sr = self._sr()
         return sr.get('noise_model', {}).get(
             'model_path', os.path.join(self.parameters['experiment_path'], 'noise_model.npz'))
 
     # ------------------------------------------------------------------
     # Detection pipeline
     # ------------------------------------------------------------------
+
+    def _sr(self):
+        """song_recording config with the species preset layered under it
+        (see pyoperant.song_recording.species). An unknown species leaves
+        the raw config as-is here; _build_pipeline() is what rejects it."""
+        from pyoperant.song_recording import species as species_mod
+        sr = _sr_cfg(self.parameters)
+        try:
+            return species_mod.apply_preset(species_mod.resolve_species(sr), sr)
+        except species_mod.UnknownSpeciesError:
+            return sr
 
     def _build_pipeline(self):
         """Build gate, feature extractor, and smoother from config.
@@ -477,8 +489,18 @@ class Lights(base.BaseExp):
         format expected by the factory functions in
         pyoperant.song_recording.gate / .smoother.
         """
-        sr  = _sr_cfg(self.parameters)
+        from pyoperant.song_recording import species as species_mod
+
+        sr = _sr_cfg(self.parameters)
+        try:
+            self._species = species_mod.resolve_species(sr)
+        except species_mod.UnknownSpeciesError as exc:
+            self.log.error('%s. Recording will be disabled this session.', exc)
+            self._gate = self._extractor = self._smoother = None
+            return
+        sr  = species_mod.apply_preset(self._species, sr)
         mon = sr.get('monitor', {})
+        self.log.info('Song recording species: %s', self._species)
 
         flat_cfg = {
             'sample_rate':    self._pipeline_sample_rate(),
@@ -494,10 +516,10 @@ class Lights(base.BaseExp):
         }
 
         try:
-            from pyoperant.song_recording.gate import make_gate_from_config
             from pyoperant.song_recording.smoother import CombinedSmoother
 
-            self._gate, self._extractor = make_gate_from_config(flat_cfg)
+            self._gate, self._extractor = species_mod.make_gate(
+                self._species, flat_cfg, sr.get('gate_factory'))
             self._smoother = CombinedSmoother.from_config_dict(flat_cfg)
 
             nm_status = 'loaded' if self._gate.has_noise_model else \
@@ -634,7 +656,7 @@ class Lights(base.BaseExp):
         by PyAudioInterface) is caught and logged, not raised -- Lights
         must keep controlling the light schedule regardless of whether
         recording itself is working."""
-        sr  = _sr_cfg(self.parameters)
+        sr  = self._sr()
         mon = sr.get('monitor', {})
 
         # Effective mode, not just the requested one -- _load_classifier()
@@ -673,6 +695,7 @@ class Lights(base.BaseExp):
             'startup_retry_giveup_after':        mon.get('startup_retry_giveup_after', 300.0),
             'output_dir':        self._output_dir(),
             'log_csv':           self._log_csv_path(),
+            'species':           self._species,
         }
         try:
             from pyoperant.song_recording.monitor import SongMonitor

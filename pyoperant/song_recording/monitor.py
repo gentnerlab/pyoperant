@@ -358,7 +358,11 @@ class DetectionLog:
               # gate_only or raw) -- the episode's mean classifier
               # probabilities and their argmax. See _save_clip().
               "cnn_class", "cnn_prob_noise", "cnn_prob_whistle",
-              "cnn_prob_contact", "cnn_prob_song"]
+              "cnn_prob_contact", "cnn_prob_song",
+              # Which species preset/gate produced this clip (see
+              # species.py) -- so a box configured for the wrong species
+              # shows up in the data.
+              "species"]
 
     def __init__(self, csv_path: str):
         Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
@@ -1001,6 +1005,7 @@ class SongMonitor:
             cnn_prob_whistle = round(cnn_probs["whistle"], 4) if cnn_probs else "",
             cnn_prob_contact = round(cnn_probs["contact"], 4) if cnn_probs else "",
             cnn_prob_song    = round(cnn_probs["song"], 4)    if cnn_probs else "",
+            species          = self.cfg.get("species", "starling"),
         )
 
     # ------------------------------------------------------------------
