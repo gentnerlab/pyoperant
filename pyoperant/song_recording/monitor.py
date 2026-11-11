@@ -318,6 +318,12 @@ DEFAULT_CONFIG = {
     "startup_retry_giveup_after": 300.0,
     "output_dir":        "recordings",
     "log_csv":           "detections.csv",
+    # Per-class caps on KEPT clips (see retention.py); {} = keep everything.
+    "retention":         {},
+    # Hourly-granularity detected-vs-kept counts (see retention.py).
+    # None = counts.csv next to log_csv.
+    "counts_csv":        None,
+    "counts_interval_s": 600.0,
 
     # Capture mode -- see module docstring's "Capture modes" section.
     #   "gate_only" (default) -- current/original behavior, unchanged.
@@ -349,6 +355,10 @@ DEFAULT_CONFIG = {
 # ---------------------------------------------------------------------------
 # Detection log (CSV)
 # ---------------------------------------------------------------------------
+
+from pyoperant.song_recording.retention import (  # noqa: E402
+    DetectionCounts, RetentionLimiter, UNCLASSIFIED)
+
 
 class DetectionLog:
     FIELDS = ["timestamp", "filename", "duration_s", "rms",
@@ -547,7 +557,21 @@ class SongMonitor:
         Path(self.cfg["output_dir"]).mkdir(parents=True, exist_ok=True)
         self._out_dir = Path(self.cfg["output_dir"])
         self._det_log = DetectionLog(self.cfg["log_csv"])
+        self._limiter = RetentionLimiter(self.cfg.get("retention"))
+        self._counts = None
+        if self._mode != "raw":
+            counts_path = self.cfg.get("counts_csv") or str(
+                Path(self.cfg["log_csv"]).with_name("counts.csv"))
+            self._counts = DetectionCounts(
+                counts_path, species=self.cfg.get("species", "starling"),
+                interval_s=self.cfg["counts_interval_s"])
         self._audio_q: queue.Queue[np.ndarray] = queue.Queue(maxsize=400)
+
+    def _close_logs(self):
+        if getattr(self, "_counts", None) is not None:
+            self._counts.close()
+            self._counts = None
+        self._det_log.close()
 
     def _build_pipeline(self):
         from pyoperant.song_recording.gate import make_gate_from_config
@@ -618,10 +642,10 @@ class SongMonitor:
                 "Monitor stopping before a working audio stream was ever "
                 "opened -- session ended while still retrying."
             )
-            self._det_log.close()
+            self._close_logs()
             return
         if outcome == "giveup":
-            self._det_log.close()
+            self._close_logs()
             self._exit_fn(1)
             return  # unreachable with the real os._exit; keeps this
                      # testable when exit_fn is faked
@@ -644,7 +668,7 @@ class SongMonitor:
                 # light period (or the process) ends mid-file.
                 self._flush_raw_file()
             self.audio_input.close()
-            self._det_log.close()
+            self._close_logs()
             log.info("Monitor stopped. Recordings in %s", self._out_dir)
 
     def _open_stream_with_retry(self, callback, sleep_fn=time.sleep) -> str:
@@ -851,6 +875,13 @@ class SongMonitor:
             classifier_result = self._classifier.update(chunk)
             self._smoother.update_cnn(classifier_result.confidence)
 
+        if self._counts is not None:
+            now_dt = datetime.datetime.now()
+            self._counts.maybe_flush(now_dt)
+            self._counts.chunk(
+                gate_result.passed,
+                classifier_result.predicted_class if classifier_result is not None else None)
+
         triggered = self._smoother.triggered
 
         if triggered:
@@ -970,6 +1001,15 @@ class SongMonitor:
             mean_probs = self._episode_prob_sum / self._episode_prob_count
             cnn_class  = self._class_names[int(np.argmax(mean_probs))]
             cnn_probs  = {name: mean_probs[i] for i, name in enumerate(self._class_names)}
+
+        # Retention caps: an over-budget episode is counted but not written.
+        count_cls = cnn_class if cnn_class is not None else UNCLASSIFIED
+        keep = self._limiter.admit(count_cls, datetime.datetime.now())
+        if self._counts is not None:
+            self._counts.episode(count_cls, keep, duration)
+        if not keep:
+            log.info("Dropped %s clip (%.2fs): retention cap reached", count_cls, duration)
+            return
 
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         # Classified clips sort into a per-class subdirectory (browsable

@@ -696,6 +696,9 @@ class Lights(base.BaseExp):
             'output_dir':        self._output_dir(),
             'log_csv':           self._log_csv_path(),
             'species':           self._species,
+            'retention':         sr.get('retention', {}),
+            'counts_csv':        mon.get('counts_csv'),
+            'counts_interval_s': mon.get('counts_interval_s', 600.0),
         }
         try:
             from pyoperant.song_recording.monitor import SongMonitor
