@@ -37,6 +37,14 @@ class TestGpioRelayInterface(unittest.TestCase):
         pi.set_mode.assert_called_with(17, gpio_relay_.pigpio.INPUT)
         pi.set_pull_up_down.assert_called_with(17, gpio_relay_.pigpio.PUD_DOWN)
 
+    def test_close_is_idempotent(self):
+        iface, pi = self._iface(inverted=True)
+        iface._config_write(channel=17)
+        iface.close()
+        iface.close()
+        self.assertEqual(pi.stop.call_count, 1)
+        self.assertEqual(pi.set_mode.call_count, 2)  # OUTPUT config + one INPUT release
+
     def test_raises_when_pigpiod_unreachable(self):
         from pyoperant import InterfaceError
         from pyoperant.interfaces import gpio_relay_

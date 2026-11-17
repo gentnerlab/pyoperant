@@ -29,6 +29,7 @@ class GpioRelayInterface(base_.BaseInterface):
         self.device_name = device_name
         self.inverted = inverted
         self._channels = set()
+        self._closed = False
         self.pi = pigpio.pi()
         if not self.pi.connected:
             raise InterfaceError(
@@ -42,6 +43,11 @@ class GpioRelayInterface(base_.BaseInterface):
         pass
 
     def close(self):
+        # Idempotent: BaseInterface.__del__ calls close() again after an
+        # explicit close, and a stopped pigpio connection raises on use.
+        if getattr(self, "_closed", False):
+            return
+        self._closed = True
         for channel in self._channels:
             self.pi.set_mode(channel, pigpio.INPUT)
             self.pi.set_pull_up_down(channel, pigpio.PUD_DOWN)
