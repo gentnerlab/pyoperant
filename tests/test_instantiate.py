@@ -272,6 +272,37 @@ class TestLights(unittest.TestCase):
             self.assertFalse(exp._check_free_food_block())
             self.assertEqual(exp._run_idle(), 'session')
 
+    def test_Lights_required_panel_attrs_satisfied_without_hopper(self):
+        """BaseExp.run() asserts hasattr(panel, a) for every
+        req_panel_attr. A hopper-less panel (MagPi Lite: just house_light,
+        reset, microphone) must satisfy them all -- Lights used to
+        require `reward` unconditionally and died with AssertionError."""
+        config = _load_config("Lights")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            from pyoperant import panels
+
+            class LitePanel(panels.BasePanel):
+                """What a MagPi Lite panel provides: no hopper/reward."""
+                def __init__(self):
+                    self.house_light = object()
+                    self.microphone = None
+
+                def reset(self):
+                    pass
+
+            panel = LitePanel()
+            exp = Lights(panel=panel, **config)
+            for attr in exp.req_panel_attr:
+                self.assertTrue(hasattr(panel, attr), attr)
+
+    def test_Lights_still_requires_reward_when_panel_has_hopper(self):
+        config = _load_config("Lights")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config = prepare_experiment_dirs(config, tmp_dir)
+            exp = Lights(panel=FakePanel(), **config)
+            self.assertIn("reward", exp.req_panel_attr)
+
     def test_Lights_recording_enabled_routes_to_session(self):
         """song_recording.enabled=True should route _run_idle into the
         normal BaseExp session state (session_pre/main/post), where the

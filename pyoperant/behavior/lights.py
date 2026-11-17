@@ -135,7 +135,11 @@ class Lights(base.BaseExp):
     """
     def __init__(self,  *args, **kwargs):
         super(Lights, self).__init__(*args, **kwargs)
-        self.req_panel_attr.append('reward')
+        # `reward` (the hopper feed) is only needed for free food; a panel
+        # with no hopper (MagPi Lite) neither has nor needs it, and
+        # BaseExp.run() asserts every req_panel_attr exists on the panel.
+        if getattr(self.panel, 'hopper', None) is not None:
+            self.req_panel_attr.append('reward')
 
         # Monitor thread state (song recording only)
         self._monitor_thread = None
